@@ -46,7 +46,7 @@ export function ExportPanel({
   invoiceId: string
   defaultFilename: string
   missing: string[]
-  /** Shown left of the PDF actions (the invoice number stamp). */
+  /** Shown left of the PDF actions (the invoice number). */
   leading?: React.ReactNode
 }) {
   const router = useRouter()

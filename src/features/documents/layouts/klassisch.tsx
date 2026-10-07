@@ -44,11 +44,8 @@ export function KlassischInvoice({ vm, theme, fontFamily }: Props) {
     info: { position: 'absolute', top: mm(din.infoTopMm), right: mm(page.marginRightMm), width: mm(70), fontSize: base, lineHeight: 1.35 },
     infoRow: { flexDirection: 'row', justifyContent: 'space-between', gap: mm(4) },
     infoLabel: { color: c.primary },
-    titleRow: { flexDirection: 'row', alignItems: 'center', gap: mm(3), marginBottom: mm(5) },
-    title: { fontSize: theme.font.headingSizePt, fontWeight: 700, color: c.primary, lineHeight: 1.1 },
-    // Signature of the app: the number stamp (thin frame in the accent color).
-    stamp: { borderWidth: 0.75, borderColor: c.accent, borderRadius: 2, paddingVertical: 1.5, paddingHorizontal: 5 },
-    stampText: { color: c.accent, fontSize: theme.font.headingSizePt * 0.7, letterSpacing: 0.8, lineHeight: 1.1 },
+    title: { fontSize: theme.font.headingSizePt, fontWeight: 700, color: c.primary, lineHeight: 1.1, marginBottom: mm(5) },
+    titleNumber: { fontWeight: 400 },
     paragraph: { marginBottom: mm(5) },
     table: { marginBottom: mm(2) },
     th: { flexDirection: 'row', backgroundColor: c.tableHeaderBg, paddingVertical: 4, paddingHorizontal: 4, fontWeight: 700, color: c.primary },
@@ -140,14 +137,10 @@ export function KlassischInvoice({ vm, theme, fontFamily }: Props) {
             <Text style={s.companyName}>{vm.companyName}</Text>
           </View>
 
-          <View style={s.titleRow}>
-            <Text style={s.title}>{vm.title}</Text>
-            {vm.number !== '' && (
-              <View style={s.stamp}>
-                <Text style={s.stampText}>{vm.number}</Text>
-              </View>
-            )}
-          </View>
+          <Text style={s.title}>
+            {vm.title}
+            {vm.number !== '' && <Text style={s.titleNumber}> {vm.number}</Text>}
+          </Text>
           {vm.intro !== '' && <Text style={s.paragraph}>{vm.intro}</Text>}
 
           {/* Header and rows share one view: the fixed header repeats only while the table itself breaks. */}

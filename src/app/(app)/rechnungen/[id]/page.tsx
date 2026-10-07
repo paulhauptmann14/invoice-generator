@@ -2,7 +2,7 @@ import { Copy } from 'lucide-react'
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { z } from 'zod'
-import { InvoiceNumberStamp } from '@/components/invoice-number-stamp'
+import { InvoiceNumber } from '@/components/invoice-number'
 import { PageHeader } from '@/components/page-header'
 import { StatusBanner } from '@/components/status-banner'
 import { Button } from '@/components/ui/button'
@@ -67,7 +67,7 @@ export default async function EditInvoicePage({ params, searchParams }: { params
           invoiceId={invoice.id}
           defaultFilename={defaultFilename}
           missing={documentSettings.missing}
-          leading={<InvoiceNumberStamp number={invoice.number} size="lg" />}
+          leading={<InvoiceNumber number={invoice.number} size="lg" />}
         />
         {query.gespeichert && <StatusBanner>Rechnung gespeichert.</StatusBanner>}
         {query.kopiert && <StatusBanner>Kopie angelegt – mit neuer Nummer und heutigem Datum.</StatusBanner>}

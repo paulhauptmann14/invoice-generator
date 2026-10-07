@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { EmptyState } from '@/components/empty-state'
-import { InvoiceNumberStamp } from '@/components/invoice-number-stamp'
+import { InvoiceNumber } from '@/components/invoice-number'
 import { ListToolbar } from '@/components/list-toolbar'
 import { PageHeader } from '@/components/page-header'
 import { StatusBanner } from '@/components/status-banner'
@@ -66,7 +66,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Sea
                   <TableRow key={i.id}>
                     <TableCell>
                       <Link href={`/rechnungen/${i.id}`} aria-label={`Rechnung ${i.number} öffnen`}>
-                        <InvoiceNumberStamp number={i.number} />
+                        <InvoiceNumber number={i.number} />
                       </Link>
                     </TableCell>
                     <TableCell className="tabular-nums">{formatDateDe(i.issueDate)}</TableCell>
@@ -84,7 +84,7 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Sea
               <li key={i.id}>
                 <Link href={`/rechnungen/${i.id}`} className="flex min-h-11 items-center justify-between gap-4 px-4 py-3">
                   <span className="min-w-0">
-                    <InvoiceNumberStamp number={i.number} />
+                    <InvoiceNumber number={i.number} />
                     <span className="mt-1 block truncate">{i.recipientName}</span>
                     <span className="block text-sm text-muted-foreground">{formatDateDe(i.issueDate)}</span>
                   </span>

@@ -7,7 +7,7 @@ import './globals.css'
 
 const sans = IBM_Plex_Sans({ subsets: ['latin'], weight: ['400', '500'], variable: '--font-plex-sans', display: 'swap' })
 const display = Barlow_Condensed({ subsets: ['latin'], weight: ['600'], variable: '--font-barlow', display: 'swap' })
-// Only used for invoice-number stamps, never above the fold on first load.
+// Only used for invoice numbers (list, editor, number field).
 const mono = IBM_Plex_Mono({
   subsets: ['latin'],
   weight: ['500'],

@@ -13,7 +13,7 @@
   --color-bleistift: #5b6168;  /* pencil: secondary text, 5.7:1 on papier */
   --color-linie: #d5d9d3;      /* decorative rules only (1.4:1) */
   --color-feld: #868c86;       /* form control borders, >= 3:1 (WCAG 1.4.11) */
-  --color-stempel: #b3261e;    /* numbering-stamp red */
+  --color-stempel: #b3261e;    /* red: errors, required markers, destructive actions */
   --color-kuli: #2f4fc9;       /* ballpoint blue: focus only */
   --color-wash: #eceee9;       /* hover/muted surface */
   --duration-fast: 150ms;
@@ -73,7 +73,7 @@
   --font-sans: var(--font-plex-sans);
   --font-display: var(--font-barlow);
   --font-mono: var(--font-plex-mono);
-  /* Explicit radius scale: derived values would round the 2px stamp and 4px controls unpredictably. */
+  /* Explicit radius scale: derived values would round the 2px and 4px radii unpredictably. */
   --radius-sm: 2px;
   --radius-md: 4px;
   --radius-lg: 4px;
