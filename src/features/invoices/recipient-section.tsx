@@ -92,7 +92,7 @@ export function RecipientSection({
         </div>
       ))}
 
-      <div className="grid gap-5 sm:grid-cols-[10rem_1fr]">
+      <div className="grid gap-5 @lg:grid-cols-[10rem_1fr]">
         <div className="space-y-1.5">
           <Label htmlFor="inv-recipient.postalCode">PLZ</Label>
           {input('postalCode', { inputMode: 'numeric', autoComplete: 'postal-code' })}
@@ -103,7 +103,7 @@ export function RecipientSection({
         </div>
       </div>
 
-      <div className="grid gap-5 sm:grid-cols-2">
+      <div className="grid gap-5 @lg:grid-cols-2">
         <div className="space-y-1.5">
           <Label htmlFor="inv-recipient.countryCode">Land</Label>
           <NativeSelect

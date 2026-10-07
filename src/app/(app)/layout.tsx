@@ -30,7 +30,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         tabIndex={-1}
         className="px-4 pt-6 pb-[calc(5rem+env(safe-area-inset-bottom))] outline-none sm:px-8 md:px-12 md:py-10"
       >
-        <div className="mx-auto max-w-5xl">{children}</div>
+        {/* Pages marked with data-wide (invoice editor with live preview) get more room. */}
+        <div className="mx-auto max-w-5xl has-[[data-wide]]:max-w-[96rem]">{children}</div>
       </main>
       <TabBar />
     </div>

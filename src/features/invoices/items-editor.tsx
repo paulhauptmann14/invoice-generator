@@ -11,8 +11,8 @@ import { VAT_RATES } from '@/lib/domain/input-schemas'
 import { formatEuro, toCents } from '@/lib/domain/money'
 import type { DraftAction, DraftItem, PickerArticle } from './draft'
 
-// Row layout needs ~830px of content width; below xl each item is a stacked card.
-const GRID = 'xl:grid xl:grid-cols-[minmax(0,1fr)_5.5rem_5.5rem_7.5rem_6rem_7rem_auto] xl:items-start xl:gap-3'
+// Row layout needs ~830px: rows from @4xl (56rem) of the *form* width (container query), cards below.
+const GRID = '@4xl:grid @4xl:grid-cols-[minmax(0,1fr)_5.5rem_5.5rem_7.5rem_6rem_7rem_auto] @4xl:items-start @4xl:gap-3'
 
 export function ItemsEditor({
   items,
@@ -45,7 +45,7 @@ export function ItemsEditor({
         <span className="w-[7.5rem]" />
       </div>
 
-      <ol className="space-y-4 xl:space-y-2">
+      <ol className="space-y-4 @4xl:space-y-2">
         {items.map((item, index) => {
           const n = index + 1
           const err = (field: string) => errors[`items.${index}.${field}`]
@@ -54,9 +54,9 @@ export function ItemsEditor({
             dispatch({ type: 'updateItem', key: item.key, field: f, value })
           const total = lineTotals.get(item.key)
           return (
-            <li key={item.key} className={`rounded-md border border-border bg-card p-4 xl:border-0 xl:bg-transparent xl:p-0 ${GRID}`}>
+            <li key={item.key} className={`rounded-md border border-border bg-card p-4 @4xl:border-0 @4xl:bg-transparent @4xl:p-0 ${GRID}`}>
               <div className="space-y-1">
-                <label htmlFor={field('description')} className="text-sm font-medium xl:sr-only">
+                <label htmlFor={field('description')} className="text-sm font-medium @4xl:sr-only">
                   Beschreibung<span className="sr-only"> Position {n}</span>
                 </label>
                 <Textarea
@@ -65,11 +65,11 @@ export function ItemsEditor({
                   value={item.description}
                   onChange={(e) => update('description', e.target.value)}
                   aria-invalid={Boolean(err('description'))}
-                  className="min-h-11 bg-card xl:min-h-10"
+                  className="min-h-11 bg-card @4xl:min-h-10"
                 />
                 {err('description') && <FieldError id={`${field('description')}-error`}>{err('description')}</FieldError>}
                 {item.articleId === null && item.description.trim() !== '' && (
-                  <label className="flex min-h-11 items-center gap-2 text-sm text-muted-foreground xl:min-h-8">
+                  <label className="flex min-h-11 items-center gap-2 text-sm text-muted-foreground @4xl:min-h-8">
                     <input
                       type="checkbox"
                       checked={item.saveAsArticle}
@@ -81,9 +81,9 @@ export function ItemsEditor({
                 )}
               </div>
 
-              <div className="mt-3 grid grid-cols-2 gap-3 xl:contents">
+              <div className="mt-3 grid grid-cols-2 gap-3 @4xl:contents">
                 <div className="space-y-1">
-                  <label htmlFor={field('quantity')} className="text-sm font-medium xl:sr-only">
+                  <label htmlFor={field('quantity')} className="text-sm font-medium @4xl:sr-only">
                     Menge<span className="sr-only"> Position {n}</span>
                   </label>
                   <Input
@@ -97,13 +97,13 @@ export function ItemsEditor({
                   {err('quantity') && <FieldError id={`${field('quantity')}-error`}>{err('quantity')}</FieldError>}
                 </div>
                 <div className="space-y-1">
-                  <label htmlFor={field('unit')} className="text-sm font-medium xl:sr-only">
+                  <label htmlFor={field('unit')} className="text-sm font-medium @4xl:sr-only">
                     Einheit<span className="sr-only"> Position {n}</span>
                   </label>
                   <Input id={field('unit')} list="unit-suggestions" value={item.unit} onChange={(e) => update('unit', e.target.value)} className="bg-card" />
                 </div>
                 <div className="space-y-1">
-                  <label htmlFor={field('unitPriceGross')} className="text-sm font-medium xl:sr-only">
+                  <label htmlFor={field('unitPriceGross')} className="text-sm font-medium @4xl:sr-only">
                     Einzelpreis brutto<span className="sr-only"> Position {n}</span>
                   </label>
                   <Input
@@ -117,7 +117,7 @@ export function ItemsEditor({
                   {err('unitPriceGross') && <FieldError id={`${field('unitPriceGross')}-error`}>{err('unitPriceGross')}</FieldError>}
                 </div>
                 <div className="space-y-1">
-                  <label htmlFor={field('vatRate')} className="text-sm font-medium xl:sr-only">
+                  <label htmlFor={field('vatRate')} className="text-sm font-medium @4xl:sr-only">
                     MwSt.-Satz<span className="sr-only"> Position {n}</span>
                   </label>
                   <NativeSelect id={field('vatRate')} value={item.vatRate} onChange={(e) => update('vatRate', e.target.value)}>
@@ -130,21 +130,21 @@ export function ItemsEditor({
                 </div>
               </div>
 
-              <p className="mt-3 flex items-baseline justify-between text-sm xl:mt-0 xl:block xl:pt-2.5 xl:text-right">
-                <span className="text-muted-foreground xl:sr-only">Gesamt</span>
+              <p className="mt-3 flex items-baseline justify-between text-sm @4xl:mt-0 @4xl:block @4xl:pt-2.5 @4xl:text-right">
+                <span className="text-muted-foreground @4xl:sr-only">Gesamt</span>
                 <span className="tabular-nums" aria-live="polite">
                   {invalidKeys.includes(item.key) || total === undefined ? '–' : formatEuro(total)}
                 </span>
               </p>
 
-              <div className="mt-3 flex justify-end gap-1 xl:mt-0">
-                <Button type="button" variant="ghost" size="icon" className="size-11 xl:size-8" aria-label={`Position ${n} nach oben`} disabled={index === 0} onClick={() => dispatch({ type: 'moveItem', key: item.key, direction: -1 })}>
+              <div className="mt-3 flex justify-end gap-1 @4xl:mt-0">
+                <Button type="button" variant="ghost" size="icon" className="size-11 @4xl:size-8" aria-label={`Position ${n} nach oben`} disabled={index === 0} onClick={() => dispatch({ type: 'moveItem', key: item.key, direction: -1 })}>
                   <ArrowUp aria-hidden />
                 </Button>
-                <Button type="button" variant="ghost" size="icon" className="size-11 xl:size-8" aria-label={`Position ${n} nach unten`} disabled={index === items.length - 1} onClick={() => dispatch({ type: 'moveItem', key: item.key, direction: 1 })}>
+                <Button type="button" variant="ghost" size="icon" className="size-11 @4xl:size-8" aria-label={`Position ${n} nach unten`} disabled={index === items.length - 1} onClick={() => dispatch({ type: 'moveItem', key: item.key, direction: 1 })}>
                   <ArrowDown aria-hidden />
                 </Button>
-                <Button type="button" variant="ghost" size="icon" className="size-11 xl:size-8" aria-label={`Position ${n} entfernen`} onClick={() => dispatch({ type: 'removeItem', key: item.key })}>
+                <Button type="button" variant="ghost" size="icon" className="size-11 @4xl:size-8" aria-label={`Position ${n} entfernen`} onClick={() => dispatch({ type: 'removeItem', key: item.key })}>
                   <Trash2 aria-hidden />
                 </Button>
               </div>
@@ -159,8 +159,8 @@ export function ItemsEditor({
         ))}
       </datalist>
 
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <div className="sm:w-72">
+      <div className="flex flex-col gap-2 @lg:flex-row">
+        <div className="@lg:w-72">
           <Combobox
             options={articles.map((a) => ({ value: a.id, label: a.name, detail: `${formatEuro(toCents(a.unitPriceGross))} · ${a.unit}` }))}
             value={null}

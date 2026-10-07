@@ -1,18 +1,22 @@
 'use client'
 
-import { CircleAlert, Info } from 'lucide-react'
+import { CircleAlert, Eye, EyeOff, Info, X } from 'lucide-react'
 import Link from 'next/link'
 import { useActionState, useEffect, useMemo, useReducer, useRef } from 'react'
 import { FieldError } from '@/components/field-error'
 import { FormAlert } from '@/components/form-alert'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogClose, DialogContent, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { addDays, formatDateDe } from '@/lib/domain/dates'
+import { useMediaQuery } from '@/lib/use-media-query'
+import { useStoredFlag } from '@/lib/use-stored-flag'
 import { type InvoiceFormState, saveInvoice } from './actions'
 import { createDraftReducer, draftTotals, type InvoiceDraft, type NumberContext, type PickerArticle, type PickerCustomer, recipientNotice, toPayload } from './draft'
 import { ItemsEditor } from './items-editor'
+import { LivePreview } from './live-preview'
 import { RecipientSection } from './recipient-section'
 import { TotalsPanel } from './totals-panel'
 
@@ -38,6 +42,11 @@ export function InvoiceForm({
   const { totals, invalidKeys, lineTotals } = draftTotals(draft)
   const notice = recipientNotice(draft, totals.grossCents)
   const dirty = draft !== initialDraft
+  const payloadJson = useMemo(() => JSON.stringify(toPayload(draft)), [draft])
+  // Side-by-side preview from 80rem (Tailwind xl, 1280px); below that it opens in a full-screen dialog.
+  const wide = useMediaQuery('(min-width: 80rem)')
+  const [previewOn, setPreviewOn] = useStoredFlag('rechnung-vorschau', true)
+  const sidePreview = wide && previewOn
 
   // Focus the first invalid control after a failed save.
   useEffect(() => {
@@ -56,9 +65,41 @@ export function InvoiceForm({
   const err = state.errors
   const dueDate = /^\d{1,3}$/.test(draft.paymentDays) && /^\d{4}-\d{2}-\d{2}$/.test(draft.issueDate) ? formatDateDe(addDays(draft.issueDate, Number(draft.paymentDays))) : '–'
 
-  return (
-    <form ref={formRef} action={action} noValidate className="mt-8 space-y-10">
-      <input type="hidden" name="payload" value={JSON.stringify(toPayload(draft))} />
+  const previewToggle = wide ? (
+    <Button type="button" variant="outline" className="gap-2" onClick={() => setPreviewOn(!previewOn)}>
+      {previewOn ? <EyeOff aria-hidden className="size-4" /> : <Eye aria-hidden className="size-4" />}
+      {previewOn ? 'Vorschau ausblenden' : 'Vorschau einblenden'}
+    </Button>
+  ) : (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button type="button" variant="outline" className="gap-2">
+          <Eye aria-hidden className="size-4" />
+          Vorschau
+        </Button>
+      </DialogTrigger>
+      <DialogContent
+        showCloseButton={false}
+        aria-describedby={undefined}
+        className="inset-0 top-0 left-0 flex h-dvh w-full max-w-none translate-x-0 translate-y-0 flex-col gap-3 overflow-y-auto rounded-none border-0 bg-background p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:max-w-none sm:p-6"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <DialogTitle className="font-display text-xl font-semibold">Vorschau</DialogTitle>
+          <DialogClose asChild>
+            <Button type="button" variant="outline" className="min-h-11 gap-2 md:min-h-9">
+              <X aria-hidden className="size-4" />
+              Schließen
+            </Button>
+          </DialogClose>
+        </div>
+        <LivePreview payload={payloadJson} showLabel={false} className="mx-auto w-full max-w-2xl" />
+      </DialogContent>
+    </Dialog>
+  )
+
+  const form = (
+    <form ref={formRef} action={action} noValidate className="space-y-10">
+      <input type="hidden" name="payload" value={payloadJson} />
       {state.message && (
         <FormAlert>
           {state.message}
@@ -72,11 +113,14 @@ export function InvoiceForm({
           )}
         </FormAlert>
       )}
-      <p className="text-sm text-muted-foreground">
-        <span className="text-stamp">*</span> Pflichtfeld
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
+          <span className="text-stamp">*</span> Pflichtfeld
+        </p>
+        {previewToggle}
+      </div>
 
-      <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <div className="grid gap-10 @3xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <RecipientSection draft={draft} dispatch={dispatch} customers={customers} errors={err} />
 
         <fieldset className="space-y-5">
@@ -88,7 +132,7 @@ export function InvoiceForm({
             <Input id="inv-number" value={draft.number} onChange={(e) => dispatch({ type: 'setField', field: 'number', value: e.target.value })} aria-invalid={Boolean(err.number)} aria-required className="font-mono" />
             {err.number && <FieldError id="inv-number-error">{err.number}</FieldError>}
           </div>
-          <div className="grid gap-5 sm:grid-cols-2">
+          <div className="grid gap-5 @lg:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="inv-issueDate">Rechnungsdatum</Label>
               <Input id="inv-issueDate" type="date" value={draft.issueDate} onChange={(e) => dispatch({ type: 'setField', field: 'issueDate', value: e.target.value })} aria-invalid={Boolean(err.issueDate)} />
@@ -101,7 +145,7 @@ export function InvoiceForm({
               {err.paymentDays && <FieldError id="inv-paymentDays-error">{err.paymentDays}</FieldError>}
             </div>
           </div>
-          <div className="grid gap-5 sm:grid-cols-2">
+          <div className="grid gap-5 @lg:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="inv-serviceDateFrom">{draft.serviceDateTo === null ? 'Leistungsdatum' : 'Leistung von'}</Label>
               <Input id="inv-serviceDateFrom" type="date" value={draft.serviceDateFrom} onChange={(e) => dispatch({ type: 'setField', field: 'serviceDateFrom', value: e.target.value })} aria-invalid={Boolean(err.serviceDateFrom)} />
@@ -156,5 +200,14 @@ export function InvoiceForm({
         </Button>
       </div>
     </form>
+  )
+
+  // data-wide lets the app shell widen the content area for the editor (see (app)/layout.tsx).
+  return (
+    <div data-wide className={sidePreview ? 'mt-8 grid grid-cols-[minmax(0,1fr)_minmax(22rem,40%)] items-start gap-10' : 'mt-8'}>
+      {/* Container queries: the form adapts to its own width, which shrinks next to the preview. */}
+      <div className="@container min-w-0">{form}</div>
+      {sidePreview && <LivePreview payload={payloadJson} className="sticky top-6" frameClassName="aspect-[210/297] max-h-[calc(100dvh-6rem)]" />}
+    </div>
   )
 }
