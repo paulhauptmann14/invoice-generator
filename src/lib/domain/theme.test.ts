@@ -9,6 +9,7 @@ describe('theme', () => {
     expect(t.page.din5008).toBe('B')
     expect(t.table.labels.total).toBe('Gesamt')
     expect(t.texts.footerColumns).toEqual([])
+    expect(t.texts.paymentNoteWithoutDueDate).toBe('Bitte überweisen Sie den Betrag von {Betrag} unter Angabe der Rechnungsnummer {Nr}.')
   })
   test('partial values are merged with defaults', () => {
     const t = parseTheme({ colors: { primary: '#000000' } })

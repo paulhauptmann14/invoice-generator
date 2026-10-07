@@ -44,9 +44,14 @@ describe('inputFromPayload (live preview, lenient)', () => {
   }
   test('keeps valid parts, drops unreadable lines, fills defaults', () => {
     const input = inputFromPayload(payload, '2026-10-08')
-    expect(input).toMatchObject({ number: '2026-0002', issueDate: '2026-10-07', serviceDateFrom: '2026-10-08', paymentDays: 0 })
+    expect(input).toMatchObject({ number: '2026-0002', issueDate: '2026-10-07', serviceDateFrom: '2026-10-08', paymentDays: null })
     expect(input.recipient).toMatchObject({ name: 'Laufkunde', contactPerson: null, vatId: null })
     expect(input.items).toEqual([{ description: 'Gut', quantity: 1.5, unit: 'kg', unitPriceGross: 54.9, vatRate: 7 }])
+  })
+  test('payment days: empty or unreadable = no due date, digits are used', () => {
+    expect(inputFromPayload({ ...payload, paymentDays: '' }, '2026-10-08').paymentDays).toBeNull()
+    expect(inputFromPayload({ ...payload, paymentDays: '30' }, '2026-10-08').paymentDays).toBe(30)
+    expect(inputFromPayload({ ...payload, paymentDays: '999' }, '2026-10-08').paymentDays).toBe(365)
   })
   test('never throws on garbage', () => {
     expect(inputFromPayload(null, '2026-10-08')).toMatchObject({ number: '', items: [], issueDate: '2026-10-08' })

@@ -103,6 +103,13 @@ describe('buildInvoiceViewModel', () => {
     )
   })
 
+  test('without payment days: no due date, payment note without a date', () => {
+    const noDue = buildInvoiceViewModel({ ...input, paymentDays: null, introText: 'Fällig: {Faellig}.' }, company, defaultTheme)
+    expect(noDue.dueDate).toBeNull()
+    expect(noDue.intro).toBe('Fällig: .')
+    expect(noDue.paymentNote).toBe(`Bitte überweisen Sie den Betrag von 70,30${NBSP}€ unter Angabe der Rechnungsnummer 2026-0001.`)
+  })
+
   test('footer generated from company data', () => {
     expect(vm.footerColumns).toEqual([
       'Gasthaus & Metzgerei Beispiel\nHauptstraße 1\n12345 Musterstadt',

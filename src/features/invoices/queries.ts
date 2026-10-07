@@ -12,7 +12,8 @@ export type InvoiceListRow = {
   id: string
   number: string
   issueDate: string
-  dueDate: string
+  /** null = invoice without payment terms. */
+  dueDate: string | null
   recipientName: string
   grossCents: number
 }
@@ -38,7 +39,7 @@ export async function listInvoices(supabase: Client, opts: { q: string }): Promi
       id: row.id,
       number: row.number,
       issueDate: row.issue_date,
-      dueDate: row.due_date as string,
+      dueDate: row.due_date,
       recipientName: typeof recipient.name === 'string' ? recipient.name : '',
       grossCents: totals.grossCents,
     }
@@ -69,7 +70,7 @@ export async function listInvoiceNumbers(supabase: Client): Promise<string[]> {
 
 export async function getInvoiceSettings(
   supabase: Client,
-): Promise<{ numberFormat: string | null; defaultPaymentDays: number; theme: Theme }> {
+): Promise<{ numberFormat: string | null; defaultPaymentDays: number | null; theme: Theme }> {
   const { data, error } = await supabase.from('settings').select('number_format, default_payment_days, theme').single()
   if (error) throw new Error(`Loading settings failed: ${error.message}`)
   return { numberFormat: data.number_format, defaultPaymentDays: data.default_payment_days, theme: parseTheme(data.theme) }

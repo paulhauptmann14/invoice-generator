@@ -54,6 +54,14 @@ describe('renderInvoicePdf', () => {
     expect(text).toContain('Position 60')
   })
 
+  test('without payment terms: no due date anywhere, payment note without a date', async () => {
+    const vm = buildInvoiceViewModel({ ...input(1), paymentDays: null }, company, defaultTheme)
+    const { text } = await pdfText(await renderInvoicePdf(vm, defaultTheme))
+    expect(text).not.toContain('Fällig')
+    expect(text).not.toContain('bis zum')
+    expect(text).toMatch(/Bitte überweisen Sie den Betrag von 10,00\s€ unter Angabe der Rechnungsnummer 2026-0001\./)
+  })
+
   test('theme options: hidden columns, form A, other font', async () => {
     const theme = themeSchema.parse({
       page: { din5008: 'A', senderLine: false },

@@ -50,11 +50,13 @@ export const invoiceSchema = z
     issueDate: isoDate('Bitte ein gültiges Rechnungsdatum wählen.'),
     serviceDateFrom: isoDate('Bitte ein gültiges Leistungsdatum wählen.'),
     serviceDateTo: isoDate('Bitte ein gültiges Enddatum wählen.').nullable(),
+    // Optional: empty = no payment terms, the invoice then shows no due date.
     paymentDays: z
       .string()
-      .regex(/^\d{1,3}$/, 'Bitte 0 bis 365 Tage eingeben.')
-      .transform(Number)
-      .refine((n) => n <= 365, 'Bitte 0 bis 365 Tage eingeben.'),
+      .trim()
+      .regex(/^(\d{1,3})?$/, 'Bitte 0 bis 365 Tage eingeben.')
+      .transform((v) => (v === '' ? null : Number(v)))
+      .refine((n) => n === null || n <= 365, 'Bitte 0 bis 365 Tage eingeben.'),
     introText: optionalText(2000),
     closingText: optionalText(2000),
     items: z.array(invoiceItemSchema).min(1, 'Bitte mindestens eine Position hinzufügen.').max(200, 'Höchstens 200 Positionen.'),

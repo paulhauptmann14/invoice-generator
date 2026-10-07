@@ -68,7 +68,8 @@ export function InvoiceForm({
   }, [dirty, pending])
 
   const err = state.errors
-  const dueDate = /^\d{1,3}$/.test(draft.paymentDays) && /^\d{4}-\d{2}-\d{2}$/.test(draft.issueDate) ? formatDateDe(addDays(draft.issueDate, Number(draft.paymentDays))) : '–'
+  const days = draft.paymentDays.trim()
+  const dueDate = /^\d{1,3}$/.test(days) && /^\d{4}-\d{2}-\d{2}$/.test(draft.issueDate) ? formatDateDe(addDays(draft.issueDate, Number(days))) : null
 
   const previewToggle = wide ? (
     <Button type="button" variant="outline" className="gap-2" onClick={() => setPreviewOn(!previewOn)}>
@@ -146,7 +147,9 @@ export function InvoiceForm({
             <div className="space-y-1.5">
               <Label htmlFor="inv-paymentDays">Zahlungsziel (Tage)</Label>
               <Input id="inv-paymentDays" inputMode="numeric" value={draft.paymentDays} onChange={(e) => dispatch({ type: 'setField', field: 'paymentDays', value: e.target.value })} aria-invalid={Boolean(err.paymentDays)} aria-describedby="inv-due" />
-              <p id="inv-due" className="text-sm text-muted-foreground">Fällig am {dueDate}</p>
+              <p id="inv-due" className="text-sm text-muted-foreground">
+                {dueDate ? `Fällig am ${dueDate}` : days === '' ? 'Leer = kein Fälligkeitsdatum auf der Rechnung.' : 'Fällig am –'}
+              </p>
               {err.paymentDays && <FieldError id="inv-paymentDays-error">{err.paymentDays}</FieldError>}
             </div>
           </div>

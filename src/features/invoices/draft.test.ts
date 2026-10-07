@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { createDraftReducer, draftTotals, type InvoiceDraft, newDraft, recipientNotice, toPayload } from './draft'
+import { createDraftReducer, draftFromInvoice, draftTotals, type InvoiceDraft, newDraft, recipientNotice, toPayload } from './draft'
 
 const ctx = { format: '{JJJJ}-{NNNN}', existing: ['2026-0007', '2027-0002'] }
 const reduce = createDraftReducer(ctx)
@@ -22,6 +22,10 @@ describe('newDraft', () => {
     })
     expect(d.items).toHaveLength(1)
     expect(d.items[0]).toMatchObject({ quantity: '1', vatRate: '7', articleId: null })
+  })
+  test('without a default payment term the field starts empty (no due date)', () => {
+    const d = newDraft({ today: '2026-10-07', numberContext: ctx, paymentDays: null, introText: '', closingText: '' })
+    expect(d.paymentDays).toBe('')
   })
 })
 
@@ -112,5 +116,26 @@ describe('toPayload', () => {
     const p = toPayload(base())
     expect(p).not.toHaveProperty('numberEdited')
     expect(p.items[0]).not.toHaveProperty('key')
+  })
+})
+
+describe('draftFromInvoice', () => {
+  const stored = {
+    number: '2026-0001',
+    customer_id: null,
+    recipient: { name: 'Bar' },
+    issue_date: '2026-10-07',
+    service_date_from: '2026-10-07',
+    service_date_to: null,
+    payment_days: null,
+    intro_text: null,
+    closing_text: null,
+    invoice_items: [],
+  }
+  test('an invoice without payment terms gets an empty field', () => {
+    expect(draftFromInvoice(stored).paymentDays).toBe('')
+  })
+  test('stored payment days are shown as text', () => {
+    expect(draftFromInvoice({ ...stored, payment_days: 30 }).paymentDays).toBe('30')
   })
 })

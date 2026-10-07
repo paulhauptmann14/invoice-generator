@@ -96,7 +96,8 @@ const freeItem = (key: string): DraftItem => ({
 export function newDraft(opts: {
   today: string
   numberContext: NumberContext
-  paymentDays: number
+  /** Default payment term from the settings; null = new invoices start without a due date. */
+  paymentDays: number | null
   introText: string
   closingText: string
   firstItemKey?: string
@@ -110,7 +111,7 @@ export function newDraft(opts: {
     issueDate: opts.today,
     serviceDateFrom: opts.today,
     serviceDateTo: null,
-    paymentDays: String(opts.paymentDays),
+    paymentDays: opts.paymentDays === null ? '' : String(opts.paymentDays),
     introText: opts.introText,
     closingText: opts.closingText,
     items: [freeItem(opts.firstItemKey ?? 'item-1')],
@@ -124,7 +125,7 @@ export type InvoiceRecordWithItems = {
   issue_date: string
   service_date_from: string
   service_date_to: string | null
-  payment_days: number
+  payment_days: number | null
   intro_text: string | null
   closing_text: string | null
   invoice_items: {
@@ -162,7 +163,7 @@ export function draftFromInvoice(invoice: InvoiceRecordWithItems): InvoiceDraft 
     issueDate: invoice.issue_date,
     serviceDateFrom: invoice.service_date_from,
     serviceDateTo: invoice.service_date_to,
-    paymentDays: String(invoice.payment_days),
+    paymentDays: invoice.payment_days === null ? '' : String(invoice.payment_days),
     introText: invoice.intro_text ?? '',
     closingText: invoice.closing_text ?? '',
     items: [...invoice.invoice_items]

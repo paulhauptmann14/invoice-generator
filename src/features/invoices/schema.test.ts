@@ -55,4 +55,10 @@ describe('invoiceSchema', () => {
       paymentDays: 'Bitte 0 bis 365 Tage eingeben.',
     })
   })
+  test('payment days are optional: empty means no due date', () => {
+    expect(invoiceSchema.parse({ ...base, paymentDays: '' }).paymentDays).toBeNull()
+    expect(invoiceSchema.parse({ ...base, paymentDays: '  ' }).paymentDays).toBeNull()
+    expect(invoiceSchema.parse({ ...base, paymentDays: '0' }).paymentDays).toBe(0)
+    expect(pathErrorsFrom(invoiceSchema.safeParse({ ...base, paymentDays: 'x' }).error!)).toEqual({ paymentDays: 'Bitte 0 bis 365 Tage eingeben.' })
+  })
 })

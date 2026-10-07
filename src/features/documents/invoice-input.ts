@@ -60,7 +60,8 @@ export function inputFromPayload(payload: unknown, today: string): InvoiceInput 
   const issueDate = validDate(p.issueDate, today)
   const serviceDateFrom = validDate(p.serviceDateFrom, today)
   const serviceDateTo = p.serviceDateTo == null || p.serviceDateTo === '' ? null : validDate(p.serviceDateTo, serviceDateFrom)
-  const days = /^\d{1,3}$/.test(str(p.paymentDays)) ? Math.min(Number(p.paymentDays), 365) : 0
+  // Empty or not (yet) readable = no payment terms, so the preview never shows a made-up due date.
+  const days = /^\d{1,3}$/.test(str(p.paymentDays).trim()) ? Math.min(Number(str(p.paymentDays).trim()), 365) : null
   const rawItems = Array.isArray(p.items) ? p.items : []
   const items = rawItems.flatMap((raw) => {
     const i = record(raw)

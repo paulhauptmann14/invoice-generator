@@ -71,7 +71,16 @@ export default async function InvoicesPage({ searchParams }: { searchParams: Sea
                     </TableCell>
                     <TableCell className="tabular-nums">{formatDateDe(i.issueDate)}</TableCell>
                     <TableCell>{i.recipientName}</TableCell>
-                    <TableCell className="tabular-nums text-muted-foreground">{formatDateDe(i.dueDate)}</TableCell>
+                    <TableCell className="tabular-nums text-muted-foreground">
+                      {i.dueDate ? (
+                        formatDateDe(i.dueDate)
+                      ) : (
+                        <>
+                          <span aria-hidden>–</span>
+                          <span className="sr-only">kein Fälligkeitsdatum</span>
+                        </>
+                      )}
+                    </TableCell>
                     <TableCell className="text-right tabular-nums">{formatEuro(i.grossCents)}</TableCell>
                   </TableRow>
                 ))}

@@ -127,7 +127,7 @@ export function KlassischInvoice({ vm, theme, fontFamily }: Props) {
           {infoRow('Rechnungsnr.', vm.number)}
           {infoRow('Rechnungsdatum', vm.issueDate)}
           {infoRow('Leistungsdatum', vm.serviceDate)}
-          {infoRow('Fällig am', vm.dueDate)}
+          {vm.dueDate && infoRow('Fällig am', vm.dueDate)}
           {vm.recipientVatId && infoRow('Ihre USt-IdNr.', vm.recipientVatId)}
         </View>
 

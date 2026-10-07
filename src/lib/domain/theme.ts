@@ -79,6 +79,11 @@ export const themeSchema = z.object({
         .string()
         .max(1000)
         .default('Bitte überweisen Sie den Betrag von {Betrag} bis zum {Faellig} unter Angabe der Rechnungsnummer {Nr}.'),
+      /** Used instead of paymentNote when the invoice has no payment days (and therefore no due date). */
+      paymentNoteWithoutDueDate: z
+        .string()
+        .max(1000)
+        .default('Bitte überweisen Sie den Betrag von {Betrag} unter Angabe der Rechnungsnummer {Nr}.'),
       /** Empty = footer is generated from the company data. */
       footerColumns: z.array(z.string().max(500)).max(4).default([]),
     })

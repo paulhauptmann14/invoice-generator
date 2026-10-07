@@ -28,7 +28,8 @@ export type InvoiceInput = {
   issueDate: string
   serviceDateFrom: string
   serviceDateTo: string | null
-  paymentDays: number
+  /** null = no payment terms: the invoice shows no due date. */
+  paymentDays: number | null
   recipient: Recipient
   introText: string | null
   closingText: string | null
@@ -42,7 +43,7 @@ export type InvoiceViewModel = {
   number: string
   issueDate: string
   serviceDate: string
-  dueDate: string
+  dueDate: string | null
   senderLine: string
   recipientLines: string[]
   recipientVatId: string | null
@@ -85,13 +86,13 @@ function autoFooter(c: Company): string[] {
 
 export function buildInvoiceViewModel(input: InvoiceInput, company: Company, theme: Theme): InvoiceViewModel {
   const totals = calcTotals(input.items)
-  const dueIso = addDays(input.issueDate, input.paymentDays)
+  const dueIso = input.paymentDays === null ? null : addDays(input.issueDate, input.paymentDays)
 
   const placeholders: Record<string, string> = {
     Nr: input.number,
     Kunde: input.recipient.name,
     Datum: formatDateDe(input.issueDate),
-    Faellig: formatDateDe(dueIso),
+    Faellig: dueIso ? formatDateDe(dueIso) : '',
     Betrag: formatEuro(totals.grossCents),
   }
   const fill = (text: string | null) => fillPlaceholders(text ?? '', placeholders)
@@ -107,13 +108,13 @@ export function buildInvoiceViewModel(input: InvoiceInput, company: Company, the
     number: input.number,
     issueDate: formatDateDe(input.issueDate),
     serviceDate,
-    dueDate: formatDateDe(dueIso),
+    dueDate: dueIso ? formatDateDe(dueIso) : null,
     senderLine: [company.name, company.street, `${company.postalCode} ${company.city}`.trim()].filter(Boolean).join(' · '),
     recipientLines: recipientLines(input.recipient),
     recipientVatId: input.recipient.vatId || null,
     intro: fill(input.introText),
     closing: fill(input.closingText),
-    paymentNote: fill(theme.texts.paymentNote),
+    paymentNote: fill(dueIso ? theme.texts.paymentNote : theme.texts.paymentNoteWithoutDueDate),
     items: input.items.map((item, i) => ({
       position: i + 1,
       description: item.description,
