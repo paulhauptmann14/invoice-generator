@@ -1,26 +1,113 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
+/* Light-only app: dark: variants from shadcn components must never follow the OS setting. */
+@custom-variant dark (&:is(.dark *));
+
+/* === PRIMITIVES: palette of the carbon-copy invoice pad === */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --color-papier: #f4f5f2;     /* carbon-copy paper (cool, not cream) */
+  --color-weiss: #ffffff;
+  --color-tinte: #17191c;      /* ink */
+  --color-bleistift: #5b6168;  /* pencil: secondary text, 5.7:1 on papier */
+  --color-linie: #d5d9d3;      /* decorative rules only (1.4:1) */
+  --color-feld: #868c86;       /* form control borders, >= 3:1 (WCAG 1.4.11) */
+  --color-stempel: #b3261e;    /* numbering-stamp red */
+  --color-kuli: #2f4fc9;       /* ballpoint blue: focus only */
+  --color-wash: #eceee9;       /* hover/muted surface */
+  --duration-fast: 150ms;
+}
+
+/* === SEMANTIC: shadcn/ui variables === */
+:root {
+  --radius: 0.25rem;
+  --background: var(--color-papier);
+  --foreground: var(--color-tinte);
+  --card: var(--color-weiss);
+  --card-foreground: var(--color-tinte);
+  --popover: var(--color-weiss);
+  --popover-foreground: var(--color-tinte);
+  --primary: var(--color-tinte);
+  --primary-foreground: var(--color-weiss);
+  --secondary: var(--color-weiss);
+  --secondary-foreground: var(--color-tinte);
+  --muted: var(--color-wash);
+  --muted-foreground: var(--color-bleistift);
+  --accent: var(--color-wash);
+  --accent-foreground: var(--color-tinte);
+  --destructive: var(--color-stempel);
+  --border: var(--color-linie);
+  --input: var(--color-feld);
+  --ring: var(--color-kuli);
+  --stamp: var(--color-stempel);
+}
+
+/* === COMPONENT === */
+:root {
+  --field-border: var(--input);
+  --nav-indicator: var(--color-tinte);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-stamp: var(--stamp);
+  --color-nav-indicator: var(--nav-indicator);
+  --font-sans: var(--font-plex-sans);
+  --font-display: var(--font-barlow);
+  --font-mono: var(--font-plex-mono);
+  /* Explicit radius scale: derived values would round the 2px stamp and 4px controls unpredictably. */
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 4px;
+  --radius-xl: 6px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html {
+    @apply font-sans;
+    color-scheme: light;
+  }
+  body {
+    @apply bg-background text-foreground;
+    line-height: 1.5;
+  }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+  /* Solid 2px focus indicator with offset (6.8:1); replaces shadcn's translucent ring (2.3:1). */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }

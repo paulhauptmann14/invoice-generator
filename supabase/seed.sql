@@ -41,3 +41,31 @@ update public.settings set company = '{
   "bic": "COBADEFFXXX",
   "bankName": "Commerzbank"
 }'::jsonb;
+
+-- Authenticated but NOT a member: used to verify the "no access" path.
+-- stranger@invoice.localhost / lokales-dev-passwort-123
+insert into auth.users (
+  instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at,
+  confirmation_token, recovery_token, email_change, email_change_token_new,
+  email_change_token_current, phone_change, phone_change_token, reauthentication_token
+) values (
+  '00000000-0000-0000-0000-000000000000',
+  'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+  'authenticated', 'authenticated',
+  'stranger@invoice.localhost',
+  extensions.crypt('lokales-dev-passwort-123', extensions.gen_salt('bf')),
+  now(),
+  '{"provider":"email","providers":["email"]}', '{}', now(), now(),
+  '', '', '', '',
+  '', '', '', ''
+);
+
+insert into auth.identities (id, user_id, provider_id, identity_data, provider, last_sign_in_at, created_at, updated_at)
+values (
+  gen_random_uuid(),
+  'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+  'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+  '{"sub":"bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb","email":"stranger@invoice.localhost","email_verified":true}',
+  'email', now(), now(), now()
+);

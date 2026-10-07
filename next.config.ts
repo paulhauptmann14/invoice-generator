@@ -3,8 +3,6 @@ import { securityHeaders } from './src/lib/security-headers'
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
-  cacheComponents: true,
-  partialPrefetching: true,
   turbopack: {
     rules: {
       '*.css': {

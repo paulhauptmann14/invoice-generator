@@ -31,12 +31,14 @@ export const themeSchema = z.object({
       widthMm: mm(10, 120, 45),
     })
     .prefault({}),
+  // Invoice document colors are user data rendered into PDF/DOCX (no CSS variables there), so they are hex values.
+  // Defaults follow the app palette: tinte, stempel, tinte, wash.
   colors: z
     .object({
-      primary: hex.default('#1F2937'),
-      accent: hex.default('#9A3412'),
-      text: hex.default('#111827'),
-      tableHeaderBg: hex.default('#F3F4F6'),
+      primary: hex.default('#17191C'),
+      accent: hex.default('#B3261E'),
+      text: hex.default('#17191C'),
+      tableHeaderBg: hex.default('#ECEEE9'),
       zebra: z.boolean().default(false),
     })
     .prefault({}),
