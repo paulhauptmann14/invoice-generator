@@ -39,9 +39,10 @@ export function Combobox({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-(--radix-popover-trigger-width) min-w-72 p-0" align="start">
-        <Command>
+        {/* label names the search input for screen readers (cmdk renders it visually hidden). */}
+        <Command label={searchPlaceholder}>
           <CommandInput placeholder={searchPlaceholder} />
-          <CommandList>
+          <CommandList label="Vorschläge">
             <CommandEmpty>{emptyText}</CommandEmpty>
             <CommandGroup>
               {options.map((o) => (

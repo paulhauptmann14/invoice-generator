@@ -13,8 +13,9 @@ select is((select file_size_limit from storage.buckets where id = 'invoice-pdfs'
 
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}', true);
-select lives_ok($$insert into storage.objects (bucket_id, name) values ('invoice-pdfs', 'a/test.pdf')$$, 'member: upload allowed');
-select is((select count(*)::int from storage.objects where bucket_id = 'invoice-pdfs'), 1, 'member: file visible');
+select lives_ok($$insert into storage.objects (bucket_id, name) values ('invoice-pdfs', 'PGTAP-04/test.pdf')$$, 'member: upload allowed');
+-- Only count the test's own object: the local bucket may already hold real archived PDFs.
+select is((select count(*)::int from storage.objects where bucket_id = 'invoice-pdfs' and name = 'PGTAP-04/test.pdf'), 1, 'member: file visible');
 reset role;
 
 set local role authenticated;
