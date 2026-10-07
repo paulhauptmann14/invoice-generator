@@ -9,11 +9,13 @@ export function ListToolbar({
   q,
   archived,
   searchLabel,
+  showViews = true,
 }: {
   basePath: string
   q: string
   archived: boolean
   searchLabel: string
+  showViews?: boolean
 }) {
   const tab = (active: boolean) =>
     [
@@ -35,14 +37,16 @@ export function ListToolbar({
           Suchen
         </Button>
       </form>
-      <nav aria-label="Ansicht" className="flex">
-        <Link href={basePath} aria-current={!archived ? 'page' : undefined} className={tab(!archived)}>
-          Aktiv
-        </Link>
-        <Link href={`${basePath}?ansicht=archiv`} aria-current={archived ? 'page' : undefined} className={tab(archived)}>
-          Archiviert
-        </Link>
-      </nav>
+      {showViews && (
+        <nav aria-label="Ansicht" className="flex">
+          <Link href={basePath} aria-current={!archived ? 'page' : undefined} className={tab(!archived)}>
+            Aktiv
+          </Link>
+          <Link href={`${basePath}?ansicht=archiv`} aria-current={archived ? 'page' : undefined} className={tab(archived)}>
+            Archiviert
+          </Link>
+        </nav>
+      )}
     </div>
   )
 }

@@ -81,14 +81,14 @@ isOneToOne: false
                   ]
                 },"invoices": {
                   Row: {
-                    "closing_text": string | null,"created_at": string,"created_by": string | null,"customer_id": string | null,"due_date": string | null,"id": string,"intro_text": string | null,"issue_date": string,"number": string,"payment_days": number,"recipient": NonNullable<Json>,"service_date_from": string,"service_date_to": string | null,"updated_at": string
+                    "closing_text": string | null,"created_at": string,"created_by": string | null,"customer_id": string | null,"due_date": string | null,"id": string,"intro_text": string | null,"issue_date": string,"number": string,"payment_days": number,"recipient": NonNullable<Json>,"search_text": string | null,"service_date_from": string,"service_date_to": string | null,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "closing_text"?: string | null,"created_at"?: string,"created_by"?: string | null,"customer_id"?: string | null,"due_date"?: never,"id"?: string,"intro_text"?: string | null,"issue_date"?: string,"number": string,"payment_days"?: number,"recipient": NonNullable<Json>,"service_date_from": string,"service_date_to"?: string | null,"updated_at"?: string
+                    "closing_text"?: string | null,"created_at"?: string,"created_by"?: string | null,"customer_id"?: string | null,"due_date"?: never,"id"?: string,"intro_text"?: string | null,"issue_date"?: string,"number": string,"payment_days"?: number,"recipient": NonNullable<Json>,"search_text"?: never,"service_date_from": string,"service_date_to"?: string | null,"updated_at"?: string
                   }
                   Update: {
-                    "closing_text"?: string | null,"created_at"?: string,"created_by"?: string | null,"customer_id"?: string | null,"due_date"?: never,"id"?: string,"intro_text"?: string | null,"issue_date"?: string,"number"?: string,"payment_days"?: number,"recipient"?: NonNullable<Json>,"service_date_from"?: string,"service_date_to"?: string | null,"updated_at"?: string
+                    "closing_text"?: string | null,"created_at"?: string,"created_by"?: string | null,"customer_id"?: string | null,"due_date"?: never,"id"?: string,"intro_text"?: string | null,"issue_date"?: string,"number"?: string,"payment_days"?: number,"recipient"?: NonNullable<Json>,"search_text"?: never,"service_date_from"?: string,"service_date_to"?: string | null,"updated_at"?: string
                   }
                   Relationships: [
                     {

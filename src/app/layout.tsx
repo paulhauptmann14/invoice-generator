@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import { Barlow_Condensed, IBM_Plex_Mono, IBM_Plex_Sans } from 'next/font/google'
+import { headers } from 'next/headers'
 import { connection } from 'next/server'
+import { CspNonce } from '@/components/csp-nonce'
 import './globals.css'
 
 const sans = IBM_Plex_Sans({ subsets: ['latin'], weight: ['400', '500'], variable: '--font-plex-sans', display: 'swap' })
@@ -22,9 +24,13 @@ export const metadata: Metadata = {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   // Nonce-based CSP: every page must be rendered per request so scripts receive the nonce.
   await connection()
+  const nonce = (await headers()).get('x-nonce') ?? ''
   return (
     <html lang="de" className={`${sans.variable} ${display.variable} ${mono.variable}`}>
-      <body className="min-h-dvh antialiased">{children}</body>
+      <body className="min-h-dvh antialiased">
+        <CspNonce nonce={nonce} />
+        {children}
+      </body>
     </html>
   )
 }

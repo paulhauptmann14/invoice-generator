@@ -10,7 +10,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const companyName = parseCompany(data?.company).name || 'Rechnungen'
 
   return (
-    <div className="min-h-dvh md:grid md:grid-cols-[14rem_1fr]">
+    <div className="min-h-dvh md:grid md:grid-cols-[14rem_minmax(0,1fr)]">
       <SkipLink />
       <aside className="flex items-center justify-between gap-4 border-b border-border px-4 py-2 md:sticky md:top-0 md:h-dvh md:flex-col md:items-stretch md:justify-start md:border-r md:border-b-0 md:px-0 md:py-0">
         <p className="font-display text-base leading-tight font-semibold tracking-[0.12em] uppercase md:px-6 md:pt-8 md:pb-6">

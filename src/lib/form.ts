@@ -19,3 +19,13 @@ export function fieldErrorsFrom<K extends string>(error: z.ZodError): Partial<Re
   }
   return errors
 }
+
+/** Errors keyed by dotted path ("recipient.name", "items.2.quantity"); first message per path. */
+export function pathErrorsFrom(error: z.ZodError): Record<string, string> {
+  const errors: Record<string, string> = {}
+  for (const issue of error.issues) {
+    const key = issue.path.join('.')
+    if (errors[key] === undefined) errors[key] = issue.message
+  }
+  return errors
+}
