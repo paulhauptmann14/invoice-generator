@@ -7,28 +7,28 @@ export type Database = {
           Tables: {
             "articles": {
                   Row: {
-                    "archived_at": string | null,"created_at": string,"created_by": string | null,"description": string | null,"id": string,"name": string,"unit": string,"unit_price_gross": number,"updated_at": string,"vat_rate": number
+                    "archived_at": string | null,"created_at": string,"created_by": string | null,"description": string | null,"id": string,"name": string,"search_text": string | null,"unit": string,"unit_price_gross": number,"updated_at": string,"vat_rate": number
                   }
                   ComputedFields: never
                   Insert: {
-                    "archived_at"?: string | null,"created_at"?: string,"created_by"?: string | null,"description"?: string | null,"id"?: string,"name": string,"unit"?: string,"unit_price_gross": number,"updated_at"?: string,"vat_rate": number
+                    "archived_at"?: string | null,"created_at"?: string,"created_by"?: string | null,"description"?: string | null,"id"?: string,"name": string,"search_text"?: never,"unit"?: string,"unit_price_gross": number,"updated_at"?: string,"vat_rate": number
                   }
                   Update: {
-                    "archived_at"?: string | null,"created_at"?: string,"created_by"?: string | null,"description"?: string | null,"id"?: string,"name"?: string,"unit"?: string,"unit_price_gross"?: number,"updated_at"?: string,"vat_rate"?: number
+                    "archived_at"?: string | null,"created_at"?: string,"created_by"?: string | null,"description"?: string | null,"id"?: string,"name"?: string,"search_text"?: never,"unit"?: string,"unit_price_gross"?: number,"updated_at"?: string,"vat_rate"?: number
                   }
                   Relationships: [
                     
                   ]
                 },"customers": {
                   Row: {
-                    "archived_at": string | null,"city": string,"contact_person": string | null,"country_code": string,"created_at": string,"created_by": string | null,"email": string | null,"id": string,"name": string,"notes": string | null,"postal_code": string,"street": string,"updated_at": string,"vat_id": string | null
+                    "archived_at": string | null,"city": string,"contact_person": string | null,"country_code": string,"created_at": string,"created_by": string | null,"email": string | null,"id": string,"name": string,"notes": string | null,"postal_code": string,"search_text": string | null,"street": string,"updated_at": string,"vat_id": string | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "archived_at"?: string | null,"city"?: string,"contact_person"?: string | null,"country_code"?: string,"created_at"?: string,"created_by"?: string | null,"email"?: string | null,"id"?: string,"name": string,"notes"?: string | null,"postal_code"?: string,"street"?: string,"updated_at"?: string,"vat_id"?: string | null
+                    "archived_at"?: string | null,"city"?: string,"contact_person"?: string | null,"country_code"?: string,"created_at"?: string,"created_by"?: string | null,"email"?: string | null,"id"?: string,"name": string,"notes"?: string | null,"postal_code"?: string,"search_text"?: never,"street"?: string,"updated_at"?: string,"vat_id"?: string | null
                   }
                   Update: {
-                    "archived_at"?: string | null,"city"?: string,"contact_person"?: string | null,"country_code"?: string,"created_at"?: string,"created_by"?: string | null,"email"?: string | null,"id"?: string,"name"?: string,"notes"?: string | null,"postal_code"?: string,"street"?: string,"updated_at"?: string,"vat_id"?: string | null
+                    "archived_at"?: string | null,"city"?: string,"contact_person"?: string | null,"country_code"?: string,"created_at"?: string,"created_by"?: string | null,"email"?: string | null,"id"?: string,"name"?: string,"notes"?: string | null,"postal_code"?: string,"search_text"?: never,"street"?: string,"updated_at"?: string,"vat_id"?: string | null
                   }
                   Relationships: [
                     

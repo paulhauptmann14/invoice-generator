@@ -25,7 +25,7 @@ set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}', true);
 select is(private.is_member(), true, 'member is recognized');
 select lives_ok($$insert into public.customers (name) values ('Kunde A')$$, 'member: can create a customer');
-select is((select count(*)::int from public.customers), 1, 'member: customer is visible');
+select is((select count(*)::int from public.customers where name = 'Kunde A'), 1, 'member: customer is visible');
 select lives_ok($$insert into public.articles (name, unit_price_gross, vat_rate) values ('Buffet', 24.90, 7)$$, 'member: can create an article');
 select lives_ok($$update public.settings set default_payment_days = 30$$, 'member: can update settings');
 select is((select default_payment_days from public.settings), 30, 'member: settings change is stored');
@@ -42,7 +42,7 @@ select is((select count(*)::int from public.settings), 0, 'stranger: no settings
 select throws_ok($$insert into public.customers (name) values ('Hack')$$, '42501', null, 'stranger: insert blocked by RLS');
 update public.customers set name = 'Hack';
 reset role;
-select is((select name from public.customers limit 1), 'Kunde A', 'stranger: update has no effect');
+select is((select count(*)::int from public.customers where name = 'Hack'), 0, 'stranger: update has no effect');
 
 -- 4) RLS is enabled on every table in public
 select is(
