@@ -4,7 +4,7 @@ export const LAYOUTS = ['klassisch', 'modern', 'kompakt'] as const
 export type Layout = (typeof LAYOUTS)[number]
 /** Layouts that have a PDF + DOCX implementation and may be offered in the settings UI. */
 export const IMPLEMENTED_LAYOUTS: readonly Layout[] = ['klassisch']
-export const BUILTIN_FONTS = ['Inter', 'Lato', 'Open Sans', 'Source Serif 4', 'Merriweather'] as const
+export const BUILTIN_FONTS = ['IBM Plex Sans', 'Inter', 'Lato', 'Open Sans', 'Source Serif 4', 'Merriweather'] as const
 
 // Validation messages are user-facing (settings form) and therefore German.
 const hex = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Farbe als #RRGGBB angeben')
@@ -45,7 +45,7 @@ export const themeSchema = z.object({
   font: z
     .object({
       source: z.enum(['builtin', 'custom']).default('builtin'),
-      builtin: z.enum(BUILTIN_FONTS).default('Inter'),
+      builtin: z.enum(BUILTIN_FONTS).default('IBM Plex Sans'),
       customRegularPath: z.string().nullable().default(null),
       customBoldPath: z.string().nullable().default(null),
       baseSizePt: z.number().min(7).max(14).default(9.5),
@@ -86,6 +86,9 @@ export const themeSchema = z.object({
 })
 
 export type Theme = z.infer<typeof themeSchema>
+
+/** Fixed document details that are not user-configurable (hairlines, zebra tint, fold marks); app palette linie/papier/feld. */
+export const DOCUMENT_COLORS = { rule: '#D5D9D3', zebra: '#F4F5F2', mark: '#868C86' } as const
 export const defaultTheme: Theme = themeSchema.parse({})
 
 /** Lenient parse for stored data: falls back to defaults if the stored theme is invalid. */

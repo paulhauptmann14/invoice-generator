@@ -22,6 +22,9 @@ describe('buildCsp', () => {
     expect(directive(prod, 'form-action')).toBe("form-action 'self'")
     expect(directive(prod, 'base-uri')).toBe("base-uri 'self'")
   })
+  test('preview iframes may load same-origin and blob: PDFs', () => {
+    expect(directive(prod, 'frame-src')).toBe("frame-src 'self' blob:")
+  })
   test('upgrade-insecure-requests only over https', () => {
     expect(directive(prod, 'upgrade-insecure-requests')).toBeDefined()
     expect(directive(buildCsp({ nonce: 'abc', isDev: false, isHttps: false }), 'upgrade-insecure-requests')).toBeUndefined()

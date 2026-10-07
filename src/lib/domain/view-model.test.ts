@@ -59,6 +59,7 @@ describe('buildInvoiceViewModel', () => {
   })
 
   test('sender and recipient lines', () => {
+    expect(vm.companyName).toBe('Gasthaus & Metzgerei Beispiel')
     expect(vm.senderLine).toBe('Gasthaus & Metzgerei Beispiel · Hauptstraße 1 · 12345 Musterstadt')
     expect(vm.recipientLines).toEqual(['Müller GmbH', 'z. Hd. Max Muster', 'Nebenweg 5', '54321 Beispielhausen'])
     expect(vm.recipientVatId).toBe('DE999999999')

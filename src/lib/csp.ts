@@ -13,7 +13,8 @@ export function buildCsp({ nonce, isDev, isHttps }: CspOptions): string {
     ['img-src', ["'self'", 'blob:', 'data:']],
     ['font-src', ["'self'"]],
     ['connect-src', ["'self'"]],
-    ['frame-src', ["'self'"]],
+    // blob: for the live PDF preview iframe
+    ['frame-src', ["'self'", 'blob:']],
     ['object-src', ["'none'"]],
     ['base-uri', ["'self'"]],
     ['form-action', ["'self'"]],

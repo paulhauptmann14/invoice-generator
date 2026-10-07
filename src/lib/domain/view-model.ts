@@ -38,6 +38,7 @@ export type InvoiceInput = {
 /** Fully formatted invoice content. Renderers (PDF, DOCX, form preview) must not calculate anything themselves. */
 export type InvoiceViewModel = {
   title: string
+  companyName: string
   number: string
   issueDate: string
   serviceDate: string
@@ -102,6 +103,7 @@ export function buildInvoiceViewModel(input: InvoiceInput, company: Company, the
 
   return {
     title: theme.texts.title,
+    companyName: company.name,
     number: input.number,
     issueDate: formatDateDe(input.issueDate),
     serviceDate,
