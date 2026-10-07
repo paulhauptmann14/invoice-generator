@@ -2,7 +2,7 @@
 
 import { CircleAlert, Eye, EyeOff, Info, X } from 'lucide-react'
 import Link from 'next/link'
-import { useActionState, useEffect, useMemo, useReducer, useRef } from 'react'
+import { useActionState, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { FieldError } from '@/components/field-error'
 import { FormAlert } from '@/components/form-alert'
 import { Button } from '@/components/ui/button'
@@ -15,6 +15,7 @@ import { useMediaQuery } from '@/lib/use-media-query'
 import { useStoredFlag } from '@/lib/use-stored-flag'
 import { type InvoiceFormState, saveInvoice } from './actions'
 import { createDraftReducer, draftTotals, type InvoiceDraft, type NumberContext, type PickerArticle, type PickerCustomer, recipientNotice, toPayload } from './draft'
+import { useReportDirty } from './editor-context'
 import { ItemsEditor } from './items-editor'
 import { LivePreview } from './live-preview'
 import { RecipientSection } from './recipient-section'
@@ -41,7 +42,11 @@ export function InvoiceForm({
   const formRef = useRef<HTMLFormElement>(null)
   const { totals, invalidKeys, lineTotals } = draftTotals(draft)
   const notice = recipientNotice(draft, totals.grossCents)
-  const dirty = draft !== initialDraft
+  // Baseline from the first render: a router.refresh() passes a new (equal) initialDraft object, which must not
+  // count as a change. After a save the page remounts the form (key), which resets the baseline.
+  const [pristine] = useState(initialDraft)
+  const dirty = draft !== pristine
+  useReportDirty(dirty)
   const payloadJson = useMemo(() => JSON.stringify(toPayload(draft)), [draft])
   // Side-by-side preview from 80rem (Tailwind xl, 1280px); below that it opens in a full-screen dialog.
   const wide = useMediaQuery('(min-width: 80rem)')
