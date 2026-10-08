@@ -69,7 +69,7 @@ export default async function EditInvoicePage({ params, searchParams }: { params
         <ExportPanel
           key={invoice.updated_at}
           invoiceId={invoice.id}
-          defaultFilename={defaultFilenames.pdf}
+          defaultFilenames={defaultFilenames}
           missing={documentSettings.missing}
           leading={<InvoiceNumber number={invoice.number} size="lg" />}
         />
