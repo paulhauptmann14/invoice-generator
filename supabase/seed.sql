@@ -39,7 +39,11 @@ update public.settings set company = '{
   "taxNumber": "12/345/67890",
   "iban": "DE89370400440532013000",
   "bic": "COBADEFFXXX",
-  "bankName": "Commerzbank"
+  "bankName": "Commerzbank",
+  "bankAccounts": [
+    { "bankName": "Volksbank Beispiel", "accountNumber": "4711", "iban": "DE02120300000000202051", "bic": "BYLADEM1001" },
+    { "bankName": "Sparkasse Beispiel", "accountNumber": "0815", "iban": "DE02500105170137075030", "bic": "INGDDEFFXXX" }
+  ]
 }'::jsonb;
 
 -- Authenticated but NOT a member: used to verify the "no access" path.
