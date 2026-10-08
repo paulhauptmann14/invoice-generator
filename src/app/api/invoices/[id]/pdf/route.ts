@@ -18,7 +18,7 @@ export async function GET(_request: Request, { params }: Params) {
 
   const doc = await loadInvoiceDocument(auth.supabase, id)
   if (!doc) return notFound()
-  return pdfResponse(await renderInvoicePdf(doc.vm, doc.theme), { type: 'inline', filename: doc.filenames.pdf })
+  return pdfResponse(await renderInvoicePdf(doc.vm, doc.theme, { logo: doc.logo }), { type: 'inline', filename: doc.filenames.pdf })
 }
 
 const exportBody = z.object({ filename: z.string().max(200) })
@@ -40,7 +40,7 @@ export async function POST(request: Request, { params }: Params) {
   }
 
   const filename = parsedBody.data.filename.trim() ? normalizeUserFilename(parsedBody.data.filename, 'pdf') : doc.filenames.pdf
-  const pdf = await renderInvoicePdf(doc.vm, doc.theme)
+  const pdf = await renderInvoicePdf(doc.vm, doc.theme, { logo: doc.logo })
   const storagePath = `${id}/${new Date().toISOString().replace(/[:.]/g, '-')}_${filename}`
   const bucket = auth.supabase.storage.from('invoice-pdfs')
 

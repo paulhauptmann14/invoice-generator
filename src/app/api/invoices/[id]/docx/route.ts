@@ -27,7 +27,7 @@ export async function POST(request: Request, { params }: Params) {
 
   const filename = parsed.data.filename.trim() ? normalizeUserFilename(parsed.data.filename, 'docx') : doc.filenames.docx
   try {
-    return docxResponse(await renderInvoiceDocx(doc.vm, doc.theme), filename)
+    return docxResponse(await renderInvoiceDocx(doc.vm, doc.theme, { logo: doc.logo }), filename)
   } catch (error) {
     console.error('DOCX rendering failed', error)
     return Response.json({ error: 'render failed' }, { status: 500 })

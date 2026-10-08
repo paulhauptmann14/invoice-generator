@@ -1,10 +1,13 @@
 import JSZip from 'jszip'
 import { describe, expect, test, vi } from 'vitest'
 import { parseCompany } from '@/lib/domain/company'
-import { defaultTheme, themeSchema } from '@/lib/domain/theme'
+import { themeSchema } from '@/lib/domain/theme'
 import { buildInvoiceViewModel, type InvoiceInput } from '@/lib/domain/view-model'
 
 vi.mock('server-only', () => ({}))
+
+// These tests cover the "Klassisch" layout; the default layout is "Briefpapier".
+const defaultTheme = themeSchema.parse({ layout: 'klassisch' })
 const { renderInvoiceDocx } = await import('./render-invoice-docx')
 
 const company = parseCompany({
@@ -68,12 +71,13 @@ describe('renderInvoiceDocx', () => {
   test('without payment terms: no due date line, payment note without a date', async () => {
     const { docText } = await parts(await renderInvoiceDocx(buildInvoiceViewModel(input(1, null), company, defaultTheme), defaultTheme))
     expect(docText).not.toContain('Fällig')
-    expect(docText).toContain('unter Angabe der Rechnungsnummer 2026-0001.')
+    expect(docText).toContain('Wir bitten höflich um Überweisung auf eines unserer nachfolgend genannten Konten:')
     expect(docText).not.toContain('bis zum')
   })
 
   test('theme options: hidden columns, no sender line, other font', async () => {
     const theme = themeSchema.parse({
+      layout: 'klassisch',
       page: { din5008: 'A', senderLine: false },
       font: { builtin: 'Source Serif 4' },
       table: { showPosition: false, showUnit: false, showVatRate: false },

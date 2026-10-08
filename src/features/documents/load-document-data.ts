@@ -7,17 +7,25 @@ import { parseTheme, type Theme } from '@/lib/domain/theme'
 import { buildInvoiceViewModel, type InvoiceViewModel } from '@/lib/domain/view-model'
 import type { Database } from '@/lib/supabase/database.types'
 import { inputFromInvoice } from './invoice-input'
+import { type DocumentLogo, loadLogo } from './logo'
 
 type Client = SupabaseClient<Database>
 
-export type DocumentSettings = { company: Company; theme: Theme; filenameTemplate: string; missing: string[] }
-export type InvoiceDocument = { vm: InvoiceViewModel; theme: Theme; filenames: { pdf: string; docx: string }; missing: string[] }
+export type DocumentSettings = { company: Company; theme: Theme; logo: DocumentLogo | null; filenameTemplate: string; missing: string[] }
+export type InvoiceDocument = {
+  vm: InvoiceViewModel
+  theme: Theme
+  logo: DocumentLogo | null
+  filenames: { pdf: string; docx: string }
+  missing: string[]
+}
 
 export async function loadDocumentSettings(supabase: Client): Promise<DocumentSettings> {
   const { data, error } = await supabase.from('settings').select('company, theme, filename_template').single()
   if (error) throw new Error(`Loading settings failed: ${error.message}`)
   const company = parseCompany(data.company)
-  return { company, theme: parseTheme(data.theme), filenameTemplate: data.filename_template, missing: missingCompanyFields(company) }
+  const theme = parseTheme(data.theme)
+  return { company, theme, logo: await loadLogo(supabase, theme), filenameTemplate: data.filename_template, missing: missingCompanyFields(company) }
 }
 
 /** Saved invoice + settings -> everything a renderer and the download need. Null if the invoice does not exist. */
@@ -29,6 +37,7 @@ export async function loadInvoiceDocument(supabase: Client, id: string): Promise
   return {
     vm: buildInvoiceViewModel(input, settings.company, settings.theme),
     theme: settings.theme,
+    logo: settings.logo,
     filenames: {
       pdf: buildFilename(settings.filenameTemplate, ctx, 'pdf'),
       docx: buildFilename(settings.filenameTemplate, ctx, 'docx'),

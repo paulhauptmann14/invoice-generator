@@ -83,6 +83,7 @@ describe('buildInvoiceViewModel', () => {
       unitPrice: `24,90${NBSP}€`,
       vatRate: '7 %',
       total: `49,80${NBSP}€`,
+      line: `2 Pers. Buffet pro Person à 24,90${NBSP}€`,
     })
     expect(vm.items.map((i) => i.position)).toEqual([1, 2, 3])
   })
@@ -99,7 +100,7 @@ describe('buildInvoiceViewModel', () => {
     expect(vm.intro).toBe('Rechnung 2026-0001 für Müller GmbH')
     expect(vm.closing).toBe('')
     expect(vm.paymentNote).toBe(
-      `Bitte überweisen Sie den Betrag von 70,30${NBSP}€ bis zum 21.10.2026 unter Angabe der Rechnungsnummer 2026-0001.`,
+      'Wir bitten höflich um Überweisung bis zum 21.10.2026 auf eines unserer nachfolgend genannten Konten:',
     )
   })
 
@@ -107,7 +108,7 @@ describe('buildInvoiceViewModel', () => {
     const noDue = buildInvoiceViewModel({ ...input, paymentDays: null, introText: 'Fällig: {Faellig}.' }, company, defaultTheme)
     expect(noDue.dueDate).toBeNull()
     expect(noDue.intro).toBe('Fällig: .')
-    expect(noDue.paymentNote).toBe(`Bitte überweisen Sie den Betrag von 70,30${NBSP}€ unter Angabe der Rechnungsnummer 2026-0001.`)
+    expect(noDue.paymentNote).toBe('Wir bitten höflich um Überweisung auf eines unserer nachfolgend genannten Konten:')
   })
 
   test('footer generated from company data', () => {
@@ -122,5 +123,50 @@ describe('buildInvoiceViewModel', () => {
   test('custom footer with placeholders', () => {
     const theme = parseTheme({ texts: { footerColumns: ['Rechnung {Nr}', 'Danke!'] } })
     expect(buildInvoiceViewModel(input, company, theme).footerColumns).toEqual(['Rechnung 2026-0001', 'Danke!'])
+  })
+})
+
+describe('fields for the "Briefpapier" layout', () => {
+  const vm = buildInvoiceViewModel(input, company, defaultTheme)
+
+  test('tax id line prefers the tax number', () => {
+    expect(vm.taxIdLine).toBe('St.-Nr.: 12/345/67890')
+    expect(buildInvoiceViewModel(input, parseCompany({ vatId: 'DE123456789' }), defaultTheme).taxIdLine).toBe('USt-IdNr.: DE123456789')
+    expect(buildInvoiceViewModel(input, parseCompany({}), defaultTheme).taxIdLine).toBe('')
+  })
+
+  test('service date note', () => {
+    expect(vm.serviceDateNote).toBe('Leistungsdatum entspricht Rechnungsdatum.')
+    const other = buildInvoiceViewModel({ ...input, serviceDateFrom: '2026-10-01' }, company, defaultTheme)
+    expect(other.serviceDateNote).toBe('Leistungsdatum: 01.10.2026')
+    const range = buildInvoiceViewModel({ ...input, serviceDateFrom: '2026-09-26', serviceDateTo: '2026-09-28' }, company, defaultTheme)
+    expect(range.serviceDateNote).toBe('Leistungsdatum: 26.09.2026 – 28.09.2026')
+    const sameDayRange = buildInvoiceViewModel({ ...input, serviceDateTo: '2026-10-07' }, company, defaultTheme)
+    expect(sameDayRange.serviceDateNote).toBe('Leistungsdatum entspricht Rechnungsdatum.')
+  })
+
+  test('item line reads like the template', () => {
+    expect(vm.items[0].line).toBe(`2 Pers. Buffet pro Person à 24,90${NBSP}€`)
+    const noUnit = buildInvoiceViewModel(
+      { ...input, items: [{ description: 'Gutschein', quantity: 1, unit: '', unitPriceGross: 60, vatRate: 0 }] },
+      company,
+      defaultTheme,
+    )
+    expect(noUnit.items[0].line).toBe(`1 Gutschein à 60,00${NBSP}€`)
+  })
+
+  test('bank accounts with labelled rows', () => {
+    expect(vm.bankAccounts).toEqual([{ bank: 'Commerzbank', rows: [['IBAN', 'DE89 3704 0044 0532 0130 00'], ['BIC', 'COBADEFFXXX']] }])
+    const two = parseCompany({
+      bankAccounts: [
+        { bankName: 'Volksbank', accountNumber: '4711', iban: 'DE02120300000000202051', bic: 'BYLADEM1001' },
+        { bankName: 'Sparkasse', iban: 'DE02500105170137075030', bic: '' },
+      ],
+    })
+    const twoVm = buildInvoiceViewModel(input, two, defaultTheme)
+    expect(twoVm.bankAccounts).toEqual([
+      { bank: 'Volksbank', rows: [['Kto.-Nr.', '4711'], ['IBAN', 'DE02 1203 0000 0000 2020 51'], ['BIC', 'BYLADEM1001']] },
+      { bank: 'Sparkasse', rows: [['IBAN', 'DE02 5001 0517 0137 0750 30']] },
+    ])
   })
 })

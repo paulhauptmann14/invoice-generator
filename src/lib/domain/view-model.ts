@@ -1,4 +1,4 @@
-import { type Company, formatIban } from './company'
+import { bankAccountsOf, type Company, formatIban } from './company'
 import { addDays, formatDateDe } from './dates'
 import { formatEuro, formatQuantity, formatVatRate, toCents } from './money'
 import { fillPlaceholders } from './placeholders'
@@ -58,10 +58,18 @@ export type InvoiceViewModel = {
     unitPrice: string
     vatRate: string
     total: string
+    /** "1 Gutschein à 60,00 €" – one-line form used by the "Briefpapier" layout. */
+    line: string
   }[]
   taxGroups: { rate: string; net: string; vat: string; gross: string }[]
   totals: { gross: string; net: string; vat: string }
   footerColumns: string[]
+  /** "St.-Nr.: …" (or "USt-IdNr.: …"), shown next to the number in the "Briefpapier" layout. */
+  taxIdLine: string
+  /** Short service date statement (§ 14 UStG) for the "Briefpapier" layout. */
+  serviceDateNote: string
+  /** Bank accounts as label/value rows, printed below the payment note. */
+  bankAccounts: { bank: string; rows: [string, string][] }[]
 }
 
 const regionNames = new Intl.DisplayNames(['de'], { type: 'region' })
@@ -97,6 +105,8 @@ export function buildInvoiceViewModel(input: InvoiceInput, company: Company, the
   }
   const fill = (text: string | null) => fillPlaceholders(text ?? '', placeholders)
 
+  const singleServiceDay = !input.serviceDateTo || input.serviceDateTo === input.serviceDateFrom
+  const serviceDateIsIssueDate = singleServiceDay && input.serviceDateFrom === input.issueDate
   const serviceDate =
     input.serviceDateTo && input.serviceDateTo !== input.serviceDateFrom
       ? `${formatDateDe(input.serviceDateFrom)} – ${formatDateDe(input.serviceDateTo)}`
@@ -123,6 +133,7 @@ export function buildInvoiceViewModel(input: InvoiceInput, company: Company, the
       unitPrice: formatEuro(toCents(item.unitPriceGross)),
       vatRate: formatVatRate(item.vatRate),
       total: formatEuro(totals.lineTotalsCents[i]),
+      line: `${[formatQuantity(item.quantity), item.unit, item.description].filter((part) => part !== '').join(' ')} à ${formatEuro(toCents(item.unitPriceGross))}`,
     })),
     taxGroups: totals.taxGroups.map((g) => ({
       rate: formatVatRate(g.rateBp / 100),
@@ -136,5 +147,15 @@ export function buildInvoiceViewModel(input: InvoiceInput, company: Company, the
       vat: formatEuro(totals.vatCents),
     },
     footerColumns: theme.texts.footerColumns.length > 0 ? theme.texts.footerColumns.map(fill) : autoFooter(company),
+    taxIdLine: company.taxNumber ? `St.-Nr.: ${company.taxNumber}` : company.vatId ? `USt-IdNr.: ${company.vatId}` : '',
+    serviceDateNote: serviceDateIsIssueDate ? 'Leistungsdatum entspricht Rechnungsdatum.' : `Leistungsdatum: ${serviceDate}`,
+    bankAccounts: bankAccountsOf(company).map((b) => ({
+      bank: b.bankName,
+      rows: [
+        ...(b.accountNumber ? [['Kto.-Nr.', b.accountNumber] as [string, string]] : []),
+        ...(b.iban ? [['IBAN', formatIban(b.iban)] as [string, string]] : []),
+        ...(b.bic ? [['BIC', b.bic] as [string, string]] : []),
+      ],
+    })),
   }
 }

@@ -1,9 +1,9 @@
 import { z } from 'zod'
 
-export const LAYOUTS = ['klassisch', 'modern', 'kompakt'] as const
+export const LAYOUTS = ['klassisch', 'briefpapier', 'modern', 'kompakt'] as const
 export type Layout = (typeof LAYOUTS)[number]
 /** Layouts that have a PDF + DOCX implementation and may be offered in the settings UI. */
-export const IMPLEMENTED_LAYOUTS: readonly Layout[] = ['klassisch']
+export const IMPLEMENTED_LAYOUTS: readonly Layout[] = ['klassisch', 'briefpapier']
 export const BUILTIN_FONTS = ['IBM Plex Sans', 'Inter', 'Lato', 'Open Sans', 'Source Serif 4', 'Merriweather'] as const
 
 // Validation messages are user-facing (settings form) and therefore German.
@@ -13,7 +13,8 @@ const label = (def: string) => z.string().trim().max(30).default(def)
 
 // Zod 4: nested objects need .prefault({}) (not .default({})) so their inner defaults are applied.
 export const themeSchema = z.object({
-  layout: z.enum(LAYOUTS).default('klassisch'),
+  // "Briefpapier" mirrors the business's own Word invoice and is the default (2026-10-08).
+  layout: z.enum(LAYOUTS).default('briefpapier'),
   page: z
     .object({
       marginTopMm: mm(5, 50, 15),
@@ -73,17 +74,18 @@ export const themeSchema = z.object({
   texts: z
     .object({
       title: z.string().trim().max(40).default('Rechnung'),
-      intro: z.string().max(2000).default('Vielen Dank für Ihren Auftrag. Wir berechnen Ihnen folgende Leistungen:'),
-      closing: z.string().max(2000).default('Wir freuen uns auf Ihren nächsten Besuch.'),
+      // Defaults follow the business's own invoice: no intro or closing text.
+      intro: z.string().max(2000).default(''),
+      closing: z.string().max(2000).default(''),
       paymentNote: z
         .string()
         .max(1000)
-        .default('Bitte überweisen Sie den Betrag von {Betrag} bis zum {Faellig} unter Angabe der Rechnungsnummer {Nr}.'),
+        .default('Wir bitten höflich um Überweisung bis zum {Faellig} auf eines unserer nachfolgend genannten Konten:'),
       /** Used instead of paymentNote when the invoice has no payment days (and therefore no due date). */
       paymentNoteWithoutDueDate: z
         .string()
         .max(1000)
-        .default('Bitte überweisen Sie den Betrag von {Betrag} unter Angabe der Rechnungsnummer {Nr}.'),
+        .default('Wir bitten höflich um Überweisung auf eines unserer nachfolgend genannten Konten:'),
       /** Empty = footer is generated from the company data. */
       footerColumns: z.array(z.string().max(500)).max(4).default([]),
     })

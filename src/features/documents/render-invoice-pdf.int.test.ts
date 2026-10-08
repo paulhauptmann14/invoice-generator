@@ -1,10 +1,13 @@
 import { extractText, getDocumentProxy } from 'unpdf'
 import { describe, expect, test, vi } from 'vitest'
 import { parseCompany } from '@/lib/domain/company'
-import { defaultTheme, themeSchema } from '@/lib/domain/theme'
+import { themeSchema } from '@/lib/domain/theme'
 import { buildInvoiceViewModel } from '@/lib/domain/view-model'
 
 vi.mock('server-only', () => ({}))
+
+// These tests cover the "Klassisch" layout; the default layout is "Briefpapier".
+const defaultTheme = themeSchema.parse({ layout: 'klassisch' })
 const { renderInvoicePdf } = await import('./render-invoice-pdf')
 
 const company = parseCompany({
@@ -59,11 +62,12 @@ describe('renderInvoicePdf', () => {
     const { text } = await pdfText(await renderInvoicePdf(vm, defaultTheme))
     expect(text).not.toContain('Fällig')
     expect(text).not.toContain('bis zum')
-    expect(text).toMatch(/Bitte überweisen Sie den Betrag von 10,00\s€ unter Angabe der Rechnungsnummer 2026-0001\./)
+    expect(text).toContain('Wir bitten höflich um Überweisung auf eines unserer nachfolgend genannten Konten:')
   })
 
   test('theme options: hidden columns, form A, other font', async () => {
     const theme = themeSchema.parse({
+      layout: 'klassisch',
       page: { din5008: 'A', senderLine: false },
       font: { builtin: 'Source Serif 4' },
       table: { showPosition: false, showUnit: false, showVatRate: false },

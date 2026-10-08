@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { formatIban, missingCompanyFields, parseCompany } from './company'
+import { bankAccountsOf, companySchema, formatIban, missingCompanyFields, parseCompany } from './company'
 
 describe('company', () => {
   test('empty company data', () => {
@@ -23,5 +23,23 @@ describe('company', () => {
   test('formatIban groups into blocks of four', () => {
     expect(formatIban('de89370400440532013000')).toBe('DE89 3704 0044 0532 0130 00')
     expect(formatIban('DE89 3704 0044 0532 0130 00')).toBe('DE89 3704 0044 0532 0130 00')
+  })
+  test('bank accounts: list wins, legacy single account as fallback, empty entries dropped', () => {
+    const legacy = parseCompany({ bankName: 'Commerzbank', iban: 'DE89370400440532013000', bic: 'COBADEFFXXX' })
+    expect(bankAccountsOf(legacy)).toEqual([{ bankName: 'Commerzbank', accountNumber: '', iban: 'DE89370400440532013000', bic: 'COBADEFFXXX' }])
+    const two = parseCompany({
+      iban: 'IGNORED',
+      bankAccounts: [
+        { bankName: 'Volksbank', accountNumber: '123', iban: 'DE02120300000000202051', bic: 'BYLADEM1001' },
+        { bankName: '', accountNumber: '', iban: '', bic: '' },
+        { bankName: 'Sparkasse', iban: 'DE02500105170137075030', bic: 'INGDDEFFXXX' },
+      ],
+    })
+    expect(bankAccountsOf(two).map((b) => b.bankName)).toEqual(['Volksbank', 'Sparkasse'])
+    expect(bankAccountsOf(parseCompany({}))).toEqual([])
+  })
+  test('at most three bank accounts', () => {
+    const four = Array.from({ length: 4 }, () => ({ bankName: 'B', iban: 'DE02120300000000202051' }))
+    expect(companySchema.safeParse({ bankAccounts: four }).success).toBe(false)
   })
 })

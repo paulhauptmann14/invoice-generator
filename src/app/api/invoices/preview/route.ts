@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   try {
     const settings = await loadDocumentSettings(auth.supabase)
     const vm = buildInvoiceViewModel(inputFromPayload(payload, todayIso()), settings.company, settings.theme)
-    return pdfResponse(await renderInvoicePdf(vm, settings.theme))
+    return pdfResponse(await renderInvoicePdf(vm, settings.theme, { logo: settings.logo }))
   } catch (error) {
     console.error('Preview rendering failed', error)
     return Response.json({ error: 'render failed' }, { status: 500 })
