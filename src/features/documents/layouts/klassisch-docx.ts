@@ -4,11 +4,7 @@ import {
   convertMillimetersToTwip as twip,
   Document,
   Footer,
-  FrameAnchorType,
-  FrameWrap,
   Header,
-  HeightRule,
-  type IParagraphOptions,
   LineRuleType,
   PageNumber,
   Paragraph,
@@ -25,30 +21,7 @@ import { DOCUMENT_COLORS, type Theme } from '@/lib/domain/theme'
 import type { InvoiceViewModel } from '@/lib/domain/view-model'
 import { din5008 } from '../din5008'
 
-const PAGE = { widthMm: 210, heightMm: 297 }
-const hex = (color: string) => color.replace('#', '')
-const halfPoints = (pt: number) => Math.round(pt * 2)
-// Line height as a minimum in points (like react-pdf: font size × factor). Word's "auto" factor would multiply the
-// font's own, larger line height and spread everything out compared to the PDF.
-const lineHeight = (fontPt: number, factor: number) => ({ line: Math.round(fontPt * factor * 20), lineRule: LineRuleType.AT_LEAST })
-const NONE = { style: BorderStyle.NONE, size: 0, color: 'auto' } as const
-const NO_BORDERS = { top: NONE, bottom: NONE, left: NONE, right: NONE, insideHorizontal: NONE, insideVertical: NONE }
-
-/** Text frame anchored to the page (mm), used for the DIN 5008 elements. */
-function frame(xMm: number, yMm: number, widthMm: number, heightMm?: number): IParagraphOptions['frame'] {
-  return {
-    type: 'absolute',
-    position: { x: twip(xMm), y: twip(yMm) },
-    width: twip(widthMm),
-    ...(heightMm ? { height: twip(heightMm), rule: HeightRule.EXACT } : {}),
-    anchor: { horizontal: FrameAnchorType.PAGE, vertical: FrameAnchorType.PAGE },
-    wrap: FrameWrap.NONE,
-  }
-}
-
-/** Lines as one paragraph with line breaks (keeps a frame in one piece). */
-const lines = (texts: string[], run: { bold?: boolean; size?: number; color?: string } = {}) =>
-  texts.map((text, i) => new TextRun({ text, break: i > 0 ? 1 : 0, ...run }))
+import { frame, halfPoints, hex, lineHeight, lines, NO_BORDERS, NONE, PAGE } from './docx-helpers'
 
 type Column = { label: string; pct: number; align: (typeof AlignmentType)[keyof typeof AlignmentType]; value: (item: InvoiceViewModel['items'][number]) => string }
 
