@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useId, useRef, useState } from 'react'
 import { FormAlert } from '@/components/form-alert'
+import { useTenant } from '@/features/tenants/tenant-context'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -69,6 +70,7 @@ export function ExportPanel({
   leading?: React.ReactNode
 }) {
   const router = useRouter()
+  const { path, api } = useTenant()
   const dirty = useEditorDirty()
   const [open, setOpen] = useState(false)
   const [format, setFormat] = useState<Format>('pdf')
@@ -97,7 +99,7 @@ export function ExportPanel({
     setPending(true)
     setError(null)
     try {
-      const response = await fetch(`/api/invoices/${invoiceId}/${format}`, {
+      const response = await fetch(api(`invoices/${invoiceId}/${format}`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ filename: name }),
@@ -137,7 +139,7 @@ export function ExportPanel({
             </Button>
           ) : (
             <Button asChild variant="outline" className="gap-2">
-              <a href={`/api/invoices/${invoiceId}/pdf`} target="_blank" rel="noopener">
+              <a href={api(`invoices/${invoiceId}/pdf`)} target="_blank" rel="noopener">
                 <ExternalLink aria-hidden className="size-4" />
                 PDF ansehen
               </a>
@@ -168,7 +170,7 @@ export function ExportPanel({
           {missing.length > 0 ? (
             <span>
               Export gesperrt – Firmendaten unvollständig: {fieldList(missing)}{' '}
-              <Link href="/einstellungen" className="font-medium text-foreground underline underline-offset-4">
+              <Link href={path('einstellungen')} className="font-medium text-foreground underline underline-offset-4">
                 Firmendaten ergänzen
               </Link>
             </span>
@@ -196,7 +198,7 @@ export function ExportPanel({
                 {error.kind === 'missing' ? (
                   <>
                     Firmendaten unvollständig: {fieldList(error.fields)}{' '}
-                    <Link href="/einstellungen" className="font-medium underline underline-offset-4">
+                    <Link href={path('einstellungen')} className="font-medium underline underline-offset-4">
                       Zu den Einstellungen
                     </Link>
                   </>

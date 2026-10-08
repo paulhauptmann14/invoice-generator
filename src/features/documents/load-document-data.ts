@@ -20,17 +20,17 @@ export type InvoiceDocument = {
   missing: string[]
 }
 
-export async function loadDocumentSettings(supabase: Client): Promise<DocumentSettings> {
-  const { data, error } = await supabase.from('settings').select('company, theme, filename_template').single()
+export async function loadDocumentSettings(supabase: Client, tenantId: string): Promise<DocumentSettings> {
+  const { data, error } = await supabase.from('settings').select('company, theme, filename_template').eq('tenant_id', tenantId).single()
   if (error) throw new Error(`Loading settings failed: ${error.message}`)
   const company = parseCompany(data.company)
   const theme = parseTheme(data.theme)
-  return { company, theme, logo: await loadLogo(supabase, theme), filenameTemplate: data.filename_template, missing: missingCompanyFields(company) }
+  return { company, theme, logo: await loadLogo(supabase, tenantId, theme), filenameTemplate: data.filename_template, missing: missingCompanyFields(company) }
 }
 
 /** Saved invoice + settings -> everything a renderer and the download need. Null if the invoice does not exist. */
-export async function loadInvoiceDocument(supabase: Client, id: string): Promise<InvoiceDocument | null> {
-  const [invoice, settings] = await Promise.all([getInvoice(supabase, id), loadDocumentSettings(supabase)])
+export async function loadInvoiceDocument(supabase: Client, tenantId: string, id: string): Promise<InvoiceDocument | null> {
+  const [invoice, settings] = await Promise.all([getInvoice(supabase, tenantId, id), loadDocumentSettings(supabase, tenantId)])
   if (!invoice) return null
   const input = inputFromInvoice(invoice)
   const ctx = { customer: input.recipient.name, number: input.number, issueDate: input.issueDate }

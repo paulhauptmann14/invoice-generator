@@ -2,11 +2,12 @@
 
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
-import { requireMember } from '@/lib/auth/require-member'
+import { requireTenant } from '@/lib/auth/require-tenant'
 import { todayIso, yearOf } from '@/lib/domain/dates'
 import { suggestNextNumber } from '@/lib/domain/invoice-number'
 import { pathErrorsFrom } from '@/lib/form'
 import type { Json } from '@/lib/supabase/database.types'
+import { tenantPath } from '@/lib/tenant-paths'
 import { getInvoice, getInvoiceSettings, listInvoiceNumbers } from './queries'
 import { type InvoiceSubmission, invoiceSchema } from './schema'
 
@@ -40,8 +41,13 @@ function rpcArgs(s: InvoiceSubmission) {
   }
 }
 
-export async function saveInvoice(id: string | null, _prev: InvoiceFormState, formData: FormData): Promise<InvoiceFormState> {
-  const { supabase } = await requireMember()
+export async function saveInvoice(
+  tenantId: string,
+  id: string | null,
+  _prev: InvoiceFormState,
+  formData: FormData,
+): Promise<InvoiceFormState> {
+  const { supabase, tenant } = await requireTenant(tenantId)
   if (id !== null && !idSchema.safeParse(id).success) throw new Error('Invalid invoice id')
 
   let raw: unknown
@@ -56,12 +62,13 @@ export async function saveInvoice(id: string | null, _prev: InvoiceFormState, fo
   }
 
   const { data: savedId, error } = await supabase.rpc('save_invoice', {
+    p_tenant_id: tenant.id,
     p_id: id as unknown as string,
     ...rpcArgs(parsed.data),
   })
   if (error) {
     if (error.code === '23505') {
-      const [settings, numbers] = await Promise.all([getInvoiceSettings(supabase), listInvoiceNumbers(supabase)])
+      const [settings, numbers] = await Promise.all([getInvoiceSettings(supabase, tenant.id), listInvoiceNumbers(supabase, tenant.id)])
       const suggestion = suggestNextNumber(settings.numberFormat, yearOf(parsed.data.issueDate), numbers) || null
       return {
         message: 'Diese Rechnungsnummer ist bereits vergeben.',
@@ -72,20 +79,21 @@ export async function saveInvoice(id: string | null, _prev: InvoiceFormState, fo
     console.error('saveInvoice failed', error)
     return { message: 'Die Rechnung konnte nicht gespeichert werden. Bitte erneut versuchen.', errors: {}, suggestedNumber: null }
   }
-  redirect(`/rechnungen/${savedId}?gespeichert=1`)
+  redirect(tenantPath(tenant.id, `rechnungen/${savedId}?gespeichert=1`))
 }
 
-export async function copyInvoice(id: string): Promise<void> {
-  const { supabase } = await requireMember()
+export async function copyInvoice(tenantId: string, id: string): Promise<void> {
+  const { supabase, tenant } = await requireTenant(tenantId)
   if (!idSchema.safeParse(id).success) throw new Error('Invalid invoice id')
-  const source = await getInvoice(supabase, id)
+  const source = await getInvoice(supabase, tenant.id, id)
   if (!source) throw new Error('Invoice not found')
 
-  const [settings, numbers] = await Promise.all([getInvoiceSettings(supabase), listInvoiceNumbers(supabase)])
+  const [settings, numbers] = await Promise.all([getInvoiceSettings(supabase, tenant.id), listInvoiceNumbers(supabase, tenant.id)])
   const today = todayIso()
   const number = suggestNextNumber(settings.numberFormat, yearOf(today), numbers) || `${source.number}-Kopie`
 
   const { data: newId, error } = await supabase.rpc('save_invoice', {
+    p_tenant_id: tenant.id,
     p_id: null as unknown as string,
     p_invoice: {
       number,
@@ -109,22 +117,23 @@ export async function copyInvoice(id: string): Promise<void> {
     })),
   })
   if (error) throw new Error(`Copying invoice failed: ${error.message}`)
-  redirect(`/rechnungen/${newId}?kopiert=1`)
+  redirect(tenantPath(tenant.id, `rechnungen/${newId}?kopiert=1`))
 }
 
-export async function deleteInvoice(id: string): Promise<void> {
-  const { supabase } = await requireMember()
+export async function deleteInvoice(tenantId: string, id: string): Promise<void> {
+  const { supabase, tenant } = await requireTenant(tenantId)
   if (!idSchema.safeParse(id).success) throw new Error('Invalid invoice id')
 
-  // Archived PDFs live under "<invoice id>/" in the private bucket; remove them first.
-  const { data: files, error: listError } = await supabase.storage.from('invoice-pdfs').list(id, { limit: 1000 })
+  // Archived PDFs live under "<tenant id>/<invoice id>/" in the private bucket; remove them first.
+  const folder = `${tenant.id}/${id}`
+  const { data: files, error: listError } = await supabase.storage.from('invoice-pdfs').list(folder, { limit: 1000 })
   if (listError) throw new Error(`Listing invoice files failed: ${listError.message}`)
   if (files.length > 0) {
-    const { error: removeError } = await supabase.storage.from('invoice-pdfs').remove(files.map((f) => `${id}/${f.name}`))
+    const { error: removeError } = await supabase.storage.from('invoice-pdfs').remove(files.map((f) => `${folder}/${f.name}`))
     if (removeError) throw new Error(`Removing invoice files failed: ${removeError.message}`)
   }
 
-  const { error } = await supabase.from('invoices').delete().eq('id', id)
+  const { error } = await supabase.from('invoices').delete().eq('id', id).eq('tenant_id', tenant.id)
   if (error) throw new Error(`Deleting invoice failed: ${error.message}`)
-  redirect('/rechnungen?geloescht=1')
+  redirect(tenantPath(tenant.id, 'rechnungen?geloescht=1'))
 }

@@ -33,7 +33,7 @@ export async function signIn(_prev: SignInState, formData: FormData): Promise<Si
     return { error: message, fieldErrors: {}, email: raw.email }
   }
 
-  redirect('/rechnungen')
+  redirect('/')
 }
 
 export async function signOut() {

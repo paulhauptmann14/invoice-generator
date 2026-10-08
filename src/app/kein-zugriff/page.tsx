@@ -10,7 +10,7 @@ export default function NoAccessPage() {
       <section className="mt-6 w-full max-w-sm rounded-md border border-border bg-card p-6 sm:p-8">
         <h1 className="font-display text-[2rem] leading-none font-semibold">Kein Zugriff</h1>
         <p className="mt-4 text-sm text-muted-foreground">
-          Dieses Konto ist für die App nicht freigeschaltet. Die Freischaltung erfolgt durch den Inhaber.
+          Diesem Konto ist noch kein Betrieb zugeordnet. Die Freischaltung erfolgt durch den Inhaber.
         </p>
         <div className="-ml-2 mt-6">
           <SignOutButton />

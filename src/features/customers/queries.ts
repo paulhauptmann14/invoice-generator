@@ -8,10 +8,11 @@ export const LIST_LIMIT = 500
 export type CustomerRow = Pick<Tables<'customers'>, 'id' | 'name' | 'contact_person' | 'postal_code' | 'city' | 'email' | 'archived_at'>
 export type CustomerRecord = Tables<'customers'>
 
-export async function listCustomers(supabase: Client, opts: { q: string; archived: boolean }): Promise<CustomerRow[]> {
+export async function listCustomers(supabase: Client, tenantId: string, opts: { q: string; archived: boolean }): Promise<CustomerRow[]> {
   let query = supabase
     .from('customers')
     .select('id, name, contact_person, postal_code, city, email, archived_at')
+    .eq('tenant_id', tenantId)
     .order('name')
     .limit(LIST_LIMIT)
   query = opts.archived ? query.not('archived_at', 'is', null) : query.is('archived_at', null)
@@ -23,17 +24,18 @@ export async function listCustomers(supabase: Client, opts: { q: string; archive
   return data
 }
 
-export async function getCustomer(supabase: Client, id: string): Promise<CustomerRecord | null> {
-  const { data, error } = await supabase.from('customers').select('*').eq('id', id).maybeSingle()
+export async function getCustomer(supabase: Client, tenantId: string, id: string): Promise<CustomerRecord | null> {
+  const { data, error } = await supabase.from('customers').select('*').eq('id', id).eq('tenant_id', tenantId).maybeSingle()
   if (error) throw new Error(`Loading customer failed: ${error.message}`)
   return data
 }
 
 /** Distinguishes "no customers yet" from "all customers are archived" in the empty state. */
-export async function hasArchivedCustomers(supabase: Client): Promise<boolean> {
+export async function hasArchivedCustomers(supabase: Client, tenantId: string): Promise<boolean> {
   const { count, error } = await supabase
     .from('customers')
     .select('id', { count: 'exact', head: true })
+    .eq('tenant_id', tenantId)
     .not('archived_at', 'is', null)
   if (error) throw new Error(`Counting archived customers failed: ${error.message}`)
   return (count ?? 0) > 0

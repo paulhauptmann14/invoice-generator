@@ -3,7 +3,8 @@ create extension if not exists pgtap with schema extensions;
 select plan(6);
 
 insert into auth.users (id, email) values ('11111111-1111-1111-1111-111111111111', 'member@test.local');
-insert into private.members (user_id) values ('11111111-1111-1111-1111-111111111111');
+insert into public.tenants (id, name) values ('aaaaaaaa-0000-4000-8000-00000000000a', 'PGTAP Betrieb A');
+insert into private.tenant_members (tenant_id, user_id) values ('aaaaaaaa-0000-4000-8000-00000000000a', '11111111-1111-1111-1111-111111111111');
 
 create temp table ids (label text, id uuid);
 grant all on ids to authenticated;
@@ -12,6 +13,7 @@ set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}', true);
 
 insert into ids select 'with-customer', public.save_invoice(
+  'aaaaaaaa-0000-4000-8000-00000000000a',
   null,
   '{"number":"PGTAP-06-1","customer_id":null,"save_as_customer":true,
     "recipient":{"name":"Neukunde PGTAP06","contactPerson":"Eva","street":"Weg 1","postalCode":"11111","city":"Ort","countryCode":"AT","vatId":"ATU12345678"},
@@ -19,6 +21,7 @@ insert into ids select 'with-customer', public.save_invoice(
   '[{"description":"Buffet","quantity":1,"unit":"","unit_price_gross":10,"vat_rate":7}]'
 );
 insert into ids select 'without-customer', public.save_invoice(
+  'aaaaaaaa-0000-4000-8000-00000000000a',
   null,
   '{"number":"PGTAP-06-2","customer_id":null,"recipient":{"name":"Laufkunde PGTAP06"},
     "issue_date":"2026-10-07","service_date_from":"2026-10-07","payment_days":14}',

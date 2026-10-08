@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useActionState, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { FieldError } from '@/components/field-error'
 import { FormAlert } from '@/components/form-alert'
+import { useTenant } from '@/features/tenants/tenant-context'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogClose, DialogContent, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -36,9 +37,10 @@ export function InvoiceForm({
   customers: PickerCustomer[]
   articles: PickerArticle[]
 }) {
+  const { tenant, path } = useTenant()
   const reducer = useMemo(() => createDraftReducer(numberContext), [numberContext])
   const [draft, dispatch] = useReducer(reducer, initialDraft)
-  const [state, action, pending] = useActionState(saveInvoice.bind(null, id), initialState)
+  const [state, action, pending] = useActionState(saveInvoice.bind(null, tenant.id, id), initialState)
   const formRef = useRef<HTMLFormElement>(null)
   const { totals, invalidKeys, lineTotals } = draftTotals(draft)
   const notice = recipientNotice(draft, totals.grossCents)
@@ -204,7 +206,7 @@ export function InvoiceForm({
           {pending ? 'Speichern …' : id ? 'Änderungen speichern' : 'Rechnung speichern'}
         </Button>
         <Button asChild variant="ghost">
-          <Link href="/rechnungen">Abbrechen</Link>
+          <Link href={path('rechnungen')}>Abbrechen</Link>
         </Button>
       </div>
     </form>

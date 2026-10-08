@@ -5,6 +5,7 @@ import { useActionState } from 'react'
 import { Field, RequiredNote } from '@/components/form/field'
 import { useBlurValidation } from '@/components/form/use-blur-validation'
 import { FormAlert } from '@/components/form-alert'
+import { useTenant } from '@/features/tenants/tenant-context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { NativeSelect } from '@/components/ui/native-select'
@@ -15,8 +16,9 @@ import { saveCustomer } from './actions'
 import { CUSTOMER_FIELDS, type CustomerField, customerSchema } from './schema'
 
 export function CustomerForm({ id, initial }: { id: string | null; initial: Partial<Record<CustomerField, string>> }) {
+  const { tenant, path } = useTenant()
   const [state, action, pending] = useActionState<FormState<CustomerField>, FormData>(
-    saveCustomer.bind(null, id),
+    saveCustomer.bind(null, tenant.id, id),
     emptyFormState(initial),
   )
   const { errors, formRef, onBlur } = useBlurValidation(customerSchema, state, CUSTOMER_FIELDS)
@@ -81,7 +83,7 @@ export function CustomerForm({ id, initial }: { id: string | null; initial: Part
           {pending ? 'Speichern …' : id ? 'Änderungen speichern' : 'Kunde anlegen'}
         </Button>
         <Button asChild variant="ghost">
-          <Link href="/kunden">Abbrechen</Link>
+          <Link href={path('kunden')}>Abbrechen</Link>
         </Button>
       </div>
     </form>

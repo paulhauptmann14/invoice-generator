@@ -5,6 +5,7 @@ import { useActionState } from 'react'
 import { Field, RequiredNote } from '@/components/form/field'
 import { useBlurValidation } from '@/components/form/use-blur-validation'
 import { FormAlert } from '@/components/form-alert'
+import { useTenant } from '@/features/tenants/tenant-context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { NativeSelect } from '@/components/ui/native-select'
@@ -16,8 +17,9 @@ import { ARTICLE_FIELDS, type ArticleField, articleSchema, VAT_RATES } from './s
 const UNIT_SUGGESTIONS = ['Stk.', 'kg', 'g', 'Pers.', 'Portion', 'Std.', 'Pauschale', 'l', 'Fl.']
 
 export function ArticleForm({ id, initial }: { id: string | null; initial: Partial<Record<ArticleField, string>> }) {
+  const { tenant, path } = useTenant()
   const [state, action, pending] = useActionState<FormState<ArticleField>, FormData>(
-    saveArticle.bind(null, id),
+    saveArticle.bind(null, tenant.id, id),
     emptyFormState(initial),
   )
   const { errors, formRef, onBlur } = useBlurValidation(articleSchema, state, ARTICLE_FIELDS)
@@ -82,7 +84,7 @@ export function ArticleForm({ id, initial }: { id: string | null; initial: Parti
           {pending ? 'Speichern …' : id ? 'Änderungen speichern' : 'Artikel anlegen'}
         </Button>
         <Button asChild variant="ghost">
-          <Link href="/artikel">Abbrechen</Link>
+          <Link href={path('artikel')}>Abbrechen</Link>
         </Button>
       </div>
     </form>

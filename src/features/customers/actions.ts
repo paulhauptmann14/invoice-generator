@@ -2,8 +2,9 @@
 
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
-import { requireMember } from '@/lib/auth/require-member'
+import { requireTenant } from '@/lib/auth/require-tenant'
 import { type FormState, fieldErrorsFrom } from '@/lib/form'
+import { tenantPath } from '@/lib/tenant-paths'
 import { CUSTOMER_FIELDS, type CustomerField, customerSchema } from './schema'
 
 const idSchema = z.uuid()
@@ -13,11 +14,12 @@ function readForm(formData: FormData): Record<CustomerField, string> {
 }
 
 export async function saveCustomer(
+  tenantId: string,
   id: string | null,
   _prev: FormState<CustomerField>,
   formData: FormData,
 ): Promise<FormState<CustomerField>> {
-  const { supabase } = await requireMember()
+  const { supabase, tenant } = await requireTenant(tenantId)
   if (id !== null && !idSchema.safeParse(id).success) throw new Error('Invalid customer id')
 
   const values = readForm(formData)
@@ -39,22 +41,25 @@ export async function saveCustomer(
     notes: c.notes,
   }
   const { error } =
-    id === null ? await supabase.from('customers').insert(row) : await supabase.from('customers').update(row).eq('id', id)
+    id === null
+      ? await supabase.from('customers').insert({ ...row, tenant_id: tenant.id })
+      : await supabase.from('customers').update(row).eq('id', id).eq('tenant_id', tenant.id)
   if (error) {
     console.error('saveCustomer failed', error)
     return { message: 'Der Kunde konnte nicht gespeichert werden. Bitte erneut versuchen.', fieldErrors: {}, values }
   }
-  redirect('/kunden?gespeichert=1')
+  redirect(tenantPath(tenant.id, 'kunden?gespeichert=1'))
 }
 
-export async function setCustomerArchived(id: string, archived: boolean): Promise<void> {
-  const { supabase } = await requireMember()
+export async function setCustomerArchived(tenantId: string, id: string, archived: boolean): Promise<void> {
+  const { supabase, tenant } = await requireTenant(tenantId)
   if (!idSchema.safeParse(id).success) throw new Error('Invalid customer id')
 
   const { error } = await supabase
     .from('customers')
     .update({ archived_at: archived ? new Date().toISOString() : null })
     .eq('id', id)
+    .eq('tenant_id', tenant.id)
   if (error) throw new Error(`Archiving customer failed: ${error.message}`)
-  redirect(archived ? `/kunden?archiviert=${id}` : '/kunden?wiederhergestellt=1')
+  redirect(tenantPath(tenant.id, archived ? `kunden?archiviert=${id}` : 'kunden?wiederhergestellt=1'))
 }

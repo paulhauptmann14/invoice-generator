@@ -3,6 +3,7 @@
 import { CircleAlert, ExternalLink, RefreshCw } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { useTenant } from '@/features/tenants/tenant-context'
 
 type Status = 'loading' | 'ready' | 'error' | 'expired'
 const DEBOUNCE_MS = 700
@@ -30,6 +31,7 @@ export function LivePreview({
   /** Off inside the preview dialog, whose title already says "Vorschau". */
   showLabel?: boolean
 }) {
+  const previewUrl = useTenant().api('invoices/preview')
   const [status, setStatus] = useState<Status>('loading')
   const [url, setUrl] = useState<string | null>(null)
   // The draft the visible PDF was rendered from; differs from `payload` while an update is pending.
@@ -46,7 +48,7 @@ export function LivePreview({
     const timer = window.setTimeout(async () => {
       setStatus('loading')
       try {
-        const response = await fetch('/api/invoices/preview', {
+        const response = await fetch(previewUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: payload,
@@ -70,7 +72,7 @@ export function LivePreview({
       window.clearTimeout(timer)
       controller.abort()
     }
-  }, [payload, attempt])
+  }, [payload, attempt, previewUrl])
 
   // Release the last PDF when the preview goes away.
   useEffect(
