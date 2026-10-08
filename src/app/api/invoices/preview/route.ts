@@ -1,6 +1,6 @@
 import { inputFromPayload } from '@/features/documents/invoice-input'
 import { loadDocumentSettings } from '@/features/documents/load-document-data'
-import { pdfResponse } from '@/features/documents/pdf-response'
+import { pdfResponse } from '@/features/documents/document-response'
 import { renderInvoicePdf } from '@/features/documents/render-invoice-pdf'
 import { requireMemberForRoute } from '@/lib/auth/require-member'
 import { todayIso } from '@/lib/domain/dates'

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { loadInvoiceDocument } from '@/features/documents/load-document-data'
-import { pdfResponse } from '@/features/documents/pdf-response'
+import { pdfResponse } from '@/features/documents/document-response'
 import { renderInvoicePdf } from '@/features/documents/render-invoice-pdf'
 import { requireMemberForRoute } from '@/lib/auth/require-member'
 import { normalizeUserFilename } from '@/lib/domain/filename'
@@ -18,7 +18,7 @@ export async function GET(_request: Request, { params }: Params) {
 
   const doc = await loadInvoiceDocument(auth.supabase, id)
   if (!doc) return notFound()
-  return pdfResponse(await renderInvoicePdf(doc.vm, doc.theme), { type: 'inline', filename: doc.filename })
+  return pdfResponse(await renderInvoicePdf(doc.vm, doc.theme), { type: 'inline', filename: doc.filenames.pdf })
 }
 
 const exportBody = z.object({ filename: z.string().max(200) })
@@ -39,7 +39,7 @@ export async function POST(request: Request, { params }: Params) {
     return Response.json({ error: 'company data incomplete', missing: doc.missing }, { status: 409 })
   }
 
-  const filename = parsedBody.data.filename.trim() ? normalizeUserFilename(parsedBody.data.filename, 'pdf') : doc.filename
+  const filename = parsedBody.data.filename.trim() ? normalizeUserFilename(parsedBody.data.filename, 'pdf') : doc.filenames.pdf
   const pdf = await renderInvoicePdf(doc.vm, doc.theme)
   const storagePath = `${id}/${new Date().toISOString().replace(/[:.]/g, '-')}_${filename}`
   const bucket = auth.supabase.storage.from('invoice-pdfs')

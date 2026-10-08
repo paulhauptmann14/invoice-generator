@@ -40,7 +40,11 @@ export default async function EditInvoicePage({ params, searchParams }: { params
   if (!invoice) notFound()
 
   const recipientName = invoice.recipient && typeof (invoice.recipient as { name?: unknown }).name === 'string' ? (invoice.recipient as { name: string }).name : ''
-  const defaultFilename = buildFilename(documentSettings.filenameTemplate, { customer: recipientName, number: invoice.number, issueDate: invoice.issue_date }, 'pdf')
+  const filenameContext = { customer: recipientName, number: invoice.number, issueDate: invoice.issue_date }
+  const defaultFilenames = {
+    pdf: buildFilename(documentSettings.filenameTemplate, filenameContext, 'pdf'),
+    docx: buildFilename(documentSettings.filenameTemplate, filenameContext, 'docx'),
+  }
 
   // The invoice's own number must not count as "taken" when re-suggesting.
   const numberContext = { format: settings.numberFormat, existing: numbers.filter((n) => n !== invoice.number) }
@@ -65,7 +69,7 @@ export default async function EditInvoicePage({ params, searchParams }: { params
         <ExportPanel
           key={invoice.updated_at}
           invoiceId={invoice.id}
-          defaultFilename={defaultFilename}
+          defaultFilename={defaultFilenames.pdf}
           missing={documentSettings.missing}
           leading={<InvoiceNumber number={invoice.number} size="lg" />}
         />

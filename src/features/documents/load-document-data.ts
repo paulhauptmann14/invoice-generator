@@ -11,7 +11,7 @@ import { inputFromInvoice } from './invoice-input'
 type Client = SupabaseClient<Database>
 
 export type DocumentSettings = { company: Company; theme: Theme; filenameTemplate: string; missing: string[] }
-export type InvoiceDocument = { vm: InvoiceViewModel; theme: Theme; filename: string; missing: string[] }
+export type InvoiceDocument = { vm: InvoiceViewModel; theme: Theme; filenames: { pdf: string; docx: string }; missing: string[] }
 
 export async function loadDocumentSettings(supabase: Client): Promise<DocumentSettings> {
   const { data, error } = await supabase.from('settings').select('company, theme, filename_template').single()
@@ -25,10 +25,14 @@ export async function loadInvoiceDocument(supabase: Client, id: string): Promise
   const [invoice, settings] = await Promise.all([getInvoice(supabase, id), loadDocumentSettings(supabase)])
   if (!invoice) return null
   const input = inputFromInvoice(invoice)
+  const ctx = { customer: input.recipient.name, number: input.number, issueDate: input.issueDate }
   return {
     vm: buildInvoiceViewModel(input, settings.company, settings.theme),
     theme: settings.theme,
-    filename: buildFilename(settings.filenameTemplate, { customer: input.recipient.name, number: input.number, issueDate: input.issueDate }, 'pdf'),
+    filenames: {
+      pdf: buildFilename(settings.filenameTemplate, ctx, 'pdf'),
+      docx: buildFilename(settings.filenameTemplate, ctx, 'docx'),
+    },
     missing: settings.missing,
   }
 }
