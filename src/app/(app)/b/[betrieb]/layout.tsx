@@ -1,6 +1,7 @@
 import { SignOutButton } from '@/components/sign-out-button'
 import { SkipLink } from '@/components/skip-link'
 import { TenantProvider } from '@/features/tenants/tenant-context'
+import { TenantSwitcher } from '@/features/tenants/tenant-switcher'
 import { requireTenant } from '@/lib/auth/require-tenant'
 import { SideNav, TabBar } from './main-nav'
 
@@ -16,11 +17,11 @@ export default async function TenantLayout({ children, params }: Props) {
       <div className="min-h-dvh md:grid md:grid-cols-[14rem_minmax(0,1fr)]">
         <SkipLink />
         <aside className="flex items-center justify-between gap-4 border-b border-border px-4 py-2 md:sticky md:top-0 md:h-dvh md:flex-col md:items-stretch md:justify-start md:border-r md:border-b-0 md:px-0 md:py-0">
-          <p className="font-display text-base leading-tight font-semibold tracking-[0.12em] uppercase md:px-6 md:pt-8 md:pb-6">
-            {tenant.name}
-          </p>
+          <div className="min-w-0 flex-1 md:flex-none md:px-3 md:pt-6 md:pb-4">
+            <TenantSwitcher />
+          </div>
           <SideNav />
-          <div className="md:mt-auto md:px-4 md:py-6">
+          <div className="shrink-0 md:mt-auto md:px-4 md:py-6">
             <p className="hidden truncate px-2 text-xs text-muted-foreground md:block" title={email ?? undefined}>
               {email}
             </p>

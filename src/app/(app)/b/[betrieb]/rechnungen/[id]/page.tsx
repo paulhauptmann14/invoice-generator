@@ -66,8 +66,9 @@ export default async function EditInvoicePage({ params, searchParams }: { params
         }
       />
       <InvoiceEditorProvider>
+        {/* Sibling keys must differ: with the same key as the form, React kept stale panels after a save. */}
         <ExportPanel
-          key={invoice.updated_at}
+          key={`export-${invoice.updated_at}`}
           invoiceId={invoice.id}
           defaultFilenames={defaultFilenames}
           missing={documentSettings.missing}
@@ -76,7 +77,7 @@ export default async function EditInvoicePage({ params, searchParams }: { params
         {query.gespeichert && <StatusBanner>Rechnung gespeichert.</StatusBanner>}
         {query.kopiert && <StatusBanner>Kopie angelegt – mit neuer Nummer und heutigem Datum.</StatusBanner>}
         {/* key: a fresh form (and clean "unsaved changes" state) after every save */}
-        <InvoiceForm key={invoice.updated_at} id={invoice.id} initialDraft={draftFromInvoice(invoice)} numberContext={numberContext} customers={customers} articles={articles} />
+        <InvoiceForm key={`form-${invoice.updated_at}`} id={invoice.id} initialDraft={draftFromInvoice(invoice)} numberContext={numberContext} customers={customers} articles={articles} />
       </InvoiceEditorProvider>
       <ArchiveList tenantId={tenant.id} invoiceId={invoice.id} exports={exports} />
     </>
