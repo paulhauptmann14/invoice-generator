@@ -1,7 +1,12 @@
 import { describe, expect, test } from 'vitest'
 import { createDraftReducer, draftFromInvoice, draftTotals, type InvoiceDraft, newDraft, recipientNotice, toPayload } from './draft'
 
-const ctx = { format: '{JJJJ}-{NNNN}', existing: ['2026-0007', '2027-0002'] }
+const RANGES = [
+  { id: 'r-rechnungen', name: 'Rechnungen', format: '{JJJJ}-{NNNN}', archived: false, isDefault: true },
+  { id: 'r-gutscheine', name: 'Gutscheine', format: 'GU{N}/{JJ}', archived: false, isDefault: false },
+  { id: 'r-alt', name: 'Alt', format: 'A{N}', archived: true, isDefault: false },
+]
+const ctx = { ranges: RANGES, existing: ['2026-0007', '2027-0002', 'GU4/26'] }
 const reduce = createDraftReducer(ctx)
 const base = (): InvoiceDraft =>
   newDraft({ today: '2026-10-07', numberContext: ctx, paymentDays: 14, introText: 'Hallo {Kunde}', closingText: 'Danke' })
@@ -86,6 +91,34 @@ describe('draftReducer', () => {
   })
 })
 
+describe('number ranges', () => {
+  test('a new draft uses the default range', () => {
+    expect(base()).toMatchObject({ numberRangeId: 'r-rechnungen', number: '2026-0008' })
+  })
+  test('without ranges the number is manual', () => {
+    const d = newDraft({ today: '2026-10-07', numberContext: { ranges: [], existing: [] }, paymentDays: null, introText: '', closingText: '' })
+    expect(d).toMatchObject({ numberRangeId: null, number: '' })
+  })
+  test('switching the range suggests its next number', () => {
+    expect(reduce(base(), { type: 'setNumberRange', id: 'r-gutscheine' })).toMatchObject({ numberRangeId: 'r-gutscheine', number: 'GU5/26' })
+  })
+  test('a number typed by hand is kept when the range changes', () => {
+    const d = reduce(reduce(base(), { type: 'setField', field: 'number', value: 'SONDER-1' }), { type: 'setNumberRange', id: 'r-gutscheine' })
+    expect(d).toMatchObject({ numberRangeId: 'r-gutscheine', number: 'SONDER-1' })
+  })
+  test('the year change uses the format of the chosen range', () => {
+    let d = reduce(base(), { type: 'setNumberRange', id: 'r-gutscheine' })
+    d = reduce(d, { type: 'setField', field: 'issueDate', value: '2027-01-03' })
+    expect(d.number).toBe('GU1/27')
+  })
+  test('no range = manual number, nothing is suggested', () => {
+    expect(reduce(base(), { type: 'setNumberRange', id: null })).toMatchObject({ numberRangeId: null, number: '2026-0008' })
+  })
+  test('the payload carries the range', () => {
+    expect(toPayload(reduce(base(), { type: 'setNumberRange', id: 'r-gutscheine' })).numberRangeId).toBe('r-gutscheine')
+  })
+})
+
 describe('draftTotals', () => {
   test('uses German decimals and skips invalid lines', () => {
     let d = base()
@@ -122,6 +155,7 @@ describe('toPayload', () => {
 describe('draftFromInvoice', () => {
   const stored = {
     number: '2026-0001',
+    number_range_id: 'r-gutscheine',
     customer_id: null,
     recipient: { name: 'Bar' },
     issue_date: '2026-10-07',
@@ -137,5 +171,8 @@ describe('draftFromInvoice', () => {
   })
   test('stored payment days are shown as text', () => {
     expect(draftFromInvoice({ ...stored, payment_days: 30 }).paymentDays).toBe('30')
+  })
+  test('keeps the stored number range', () => {
+    expect(draftFromInvoice(stored).numberRangeId).toBe('r-gutscheine')
   })
 })

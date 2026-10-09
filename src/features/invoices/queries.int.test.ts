@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import type { Database } from '@/lib/supabase/database.types'
 import { SEED } from '@/test-support/seed-ids'
-import { getInvoice, listArticleChoices, listInvoiceNumbers, listInvoices } from './queries'
+import { getInvoice, listArticleChoices, listInvoiceNumbers, listInvoices, listNumberRanges } from './queries'
 
 const supabase = createClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, {
   auth: { persistSession: false, autoRefreshToken: false },
@@ -67,5 +67,13 @@ describe('invoice queries (local Supabase)', () => {
     expect(await listInvoices(supabase, SEED.metzgerei, { q: tag.toLowerCase() })).toEqual([])
     expect(await listInvoiceNumbers(supabase, SEED.metzgerei)).not.toContain(`${tag}-1`)
     expect((await listArticleChoices(supabase, SEED.metzgerei)).map((a) => a.id)).not.toContain(articleId)
+  })
+  test('number ranges per tenant, default first', async () => {
+    const gasthaus = await listNumberRanges(supabase, SEED.gasthaus)
+    expect(gasthaus.slice(0, 2).map((r) => [r.name, r.format, r.isDefault])).toEqual([
+      ['Rechnungen', 'G{N}/{JJ}', true],
+      ['Gutscheine', 'GU{N}/{JJ}', false],
+    ])
+    expect((await listNumberRanges(supabase, SEED.metzgerei)).map((r) => r.format)).toEqual(['M{N}/{JJ}'])
   })
 })

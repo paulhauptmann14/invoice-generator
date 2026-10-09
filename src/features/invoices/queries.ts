@@ -3,7 +3,7 @@ import type { Database } from '@/lib/supabase/database.types'
 import { parseTheme, type Theme } from '@/lib/domain/theme'
 import { calcTotals } from '@/lib/domain/totals'
 import { escapeLike, normalizeSearch } from '@/lib/search'
-import type { InvoiceRecordWithItems, PickerArticle, PickerCustomer } from './draft'
+import type { InvoiceRecordWithItems, NumberRangeChoice, PickerArticle, PickerCustomer } from './draft'
 
 type Client = SupabaseClient<Database>
 export const LIST_LIMIT = 500
@@ -55,7 +55,7 @@ export async function getInvoice(
   const { data, error } = await supabase
     .from('invoices')
     .select(
-      'id, updated_at, number, customer_id, recipient, issue_date, service_date_from, service_date_to, payment_days, intro_text, closing_text, invoice_items(id, position, description, quantity, unit, unit_price_gross, vat_rate, article_id)',
+      'id, updated_at, number, number_range_id, customer_id, recipient, issue_date, service_date_from, service_date_to, payment_days, intro_text, closing_text, invoice_items(id, position, description, quantity, unit, unit_price_gross, vat_rate, article_id)',
     )
     .eq('id', id)
     .eq('tenant_id', tenantId)
@@ -74,10 +74,22 @@ export async function listInvoiceNumbers(supabase: Client, tenantId: string): Pr
 export async function getInvoiceSettings(
   supabase: Client,
   tenantId: string,
-): Promise<{ numberFormat: string | null; defaultPaymentDays: number | null; theme: Theme }> {
-  const { data, error } = await supabase.from('settings').select('number_format, default_payment_days, theme').eq('tenant_id', tenantId).single()
+): Promise<{ defaultPaymentDays: number | null; theme: Theme }> {
+  const { data, error } = await supabase.from('settings').select('default_payment_days, theme').eq('tenant_id', tenantId).single()
   if (error) throw new Error(`Loading settings failed: ${error.message}`)
-  return { numberFormat: data.number_format, defaultPaymentDays: data.default_payment_days, theme: parseTheme(data.theme) }
+  return { defaultPaymentDays: data.default_payment_days, theme: parseTheme(data.theme) }
+}
+
+/** All number ranges of the tenant (archived ones too, for invoices that still use them): default first, then by name. */
+export async function listNumberRanges(supabase: Client, tenantId: string): Promise<NumberRangeChoice[]> {
+  const { data, error } = await supabase
+    .from('number_ranges')
+    .select('id, name, format, is_default, archived_at')
+    .eq('tenant_id', tenantId)
+    .order('is_default', { ascending: false })
+    .order('name')
+  if (error) throw new Error(`Loading number ranges failed: ${error.message}`)
+  return data.map((r) => ({ id: r.id, name: r.name, format: r.format, isDefault: r.is_default, archived: r.archived_at !== null }))
 }
 
 export async function listCustomerChoices(supabase: Client, tenantId: string): Promise<PickerCustomer[]> {

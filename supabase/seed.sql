@@ -63,6 +63,12 @@ insert into public.settings (tenant_id, company) values
   ]
 }'::jsonb);
 
+-- Number ranges: the Gasthaus numbers invoices and vouchers separately, like the business's own numbering.
+insert into public.number_ranges (tenant_id, name, format, is_default) values
+  ('c0000000-0000-4000-8000-000000000001', 'Rechnungen', 'G{N}/{JJ}', true),
+  ('c0000000-0000-4000-8000-000000000001', 'Gutscheine', 'GU{N}/{JJ}', false),
+  ('c0000000-0000-4000-8000-000000000002', 'Rechnungen', 'M{N}/{JJ}', true);
+
 -- Authenticated but without any business: used to verify the "no access" path.
 -- stranger@invoice.localhost / lokales-dev-passwort-123
 insert into auth.users (

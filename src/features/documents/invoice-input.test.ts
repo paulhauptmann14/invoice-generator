@@ -5,6 +5,7 @@ describe('inputFromInvoice', () => {
   test('maps the stored record and sorts items', () => {
     const input = inputFromInvoice({
       number: '2026-0001',
+      number_range_id: null,
       customer_id: null,
       recipient: { name: 'Müller', contactPerson: 'Max', street: 'Weg 1', postalCode: '1', city: 'Ort', countryCode: 'DE', vatId: 'DE1' },
       issue_date: '2026-10-07',

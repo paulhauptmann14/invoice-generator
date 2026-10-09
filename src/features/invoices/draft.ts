@@ -27,6 +27,8 @@ export type DraftItem = {
 }
 
 export type InvoiceDraft = {
+  /** null = manual number (no range). */
+  numberRangeId: string | null
   number: string
   numberEdited: boolean
   customerId: string | null
@@ -61,13 +63,27 @@ export type PickerArticle = {
   vatRate: number
 }
 
-export type NumberContext = { format: string | null; existing: string[] }
+export type NumberRangeChoice = { id: string; name: string; format: string; archived: boolean; isDefault: boolean }
+
+/** The tenant's number ranges and all its existing invoice numbers (for the next-number suggestion). */
+export type NumberContext = { ranges: NumberRangeChoice[]; existing: string[] }
+
+export function defaultRange(ranges: NumberRangeChoice[]): NumberRangeChoice | null {
+  return ranges.find((r) => r.isDefault && !r.archived) ?? ranges.find((r) => !r.archived) ?? null
+}
+
+/** Next number of a range for the year of the given date; '' without a range (manual entry). */
+export function suggestForRange(ctx: NumberContext, rangeId: string | null, isoDate: string): string {
+  const format = ctx.ranges.find((r) => r.id === rangeId)?.format ?? null
+  return suggestNextNumber(format, yearOf(isoDate), ctx.existing)
+}
 
 type TextField = 'number' | 'issueDate' | 'serviceDateFrom' | 'paymentDays' | 'introText' | 'closingText'
 type ItemField = 'description' | 'quantity' | 'unit' | 'unitPriceGross' | 'vatRate'
 
 export type DraftAction =
   | { type: 'setField'; field: TextField; value: string }
+  | { type: 'setNumberRange'; id: string | null }
   | { type: 'setServiceDateTo'; value: string | null }
   | { type: 'setRecipient'; field: keyof DraftRecipient; value: string }
   | { type: 'selectCustomer'; customer: PickerCustomer }
@@ -102,8 +118,10 @@ export function newDraft(opts: {
   closingText: string
   firstItemKey?: string
 }): InvoiceDraft {
+  const rangeId = defaultRange(opts.numberContext.ranges)?.id ?? null
   return {
-    number: suggestNextNumber(opts.numberContext.format, yearOf(opts.today), opts.numberContext.existing),
+    numberRangeId: rangeId,
+    number: suggestForRange(opts.numberContext, rangeId, opts.today),
     numberEdited: false,
     customerId: null,
     saveAsCustomer: false,
@@ -120,6 +138,7 @@ export function newDraft(opts: {
 
 export type InvoiceRecordWithItems = {
   number: string
+  number_range_id: string | null
   customer_id: string | null
   recipient: unknown
   issue_date: string
@@ -147,6 +166,7 @@ function str(value: unknown): string {
 export function draftFromInvoice(invoice: InvoiceRecordWithItems): InvoiceDraft {
   const r = (invoice.recipient ?? {}) as Record<string, unknown>
   return {
+    numberRangeId: invoice.number_range_id,
     number: invoice.number,
     numberEdited: true,
     customerId: invoice.customer_id,
@@ -194,12 +214,19 @@ export function createDraftReducer(ctx: NumberContext) {
           const next = { ...state, issueDate: action.value }
           // Re-suggest the number when the year changes, unless it was typed by hand.
           if (!state.numberEdited && /^\d{4}-/.test(action.value) && action.value.slice(0, 4) !== state.issueDate.slice(0, 4)) {
-            next.number = suggestNextNumber(ctx.format, Number(action.value.slice(0, 4)), ctx.existing)
+            next.number = suggestForRange(ctx, state.numberRangeId, action.value)
           }
           return next
         }
         return { ...state, [action.field]: action.value }
       }
+      case 'setNumberRange':
+        // Like the year change: a number typed by hand is never replaced.
+        return {
+          ...state,
+          numberRangeId: action.id,
+          number: state.numberEdited || action.id === null ? state.number : suggestForRange(ctx, action.id, state.issueDate),
+        }
       case 'setServiceDateTo':
         return { ...state, serviceDateTo: action.value }
       case 'setRecipient':
@@ -270,6 +297,7 @@ export function createDraftReducer(ctx: NumberContext) {
 /** What the server receives: the draft without client-only fields (numberEdited, item keys). */
 export function toPayload(draft: InvoiceDraft) {
   return {
+    numberRangeId: draft.numberRangeId,
     number: draft.number,
     customerId: draft.customerId,
     saveAsCustomer: draft.saveAsCustomer,

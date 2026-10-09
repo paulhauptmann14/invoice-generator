@@ -105,14 +105,14 @@ isOneToOne: false
                   ]
                 },"invoices": {
                   Row: {
-                    "closing_text": string | null,"created_at": string,"created_by": string | null,"customer_id": string | null,"due_date": string | null,"id": string,"intro_text": string | null,"issue_date": string,"number": string,"payment_days": number | null,"recipient": NonNullable<Json>,"search_text": string | null,"service_date_from": string,"service_date_to": string | null,"tenant_id": string,"updated_at": string
+                    "closing_text": string | null,"created_at": string,"created_by": string | null,"customer_id": string | null,"due_date": string | null,"id": string,"intro_text": string | null,"issue_date": string,"number": string,"number_range_id": string | null,"payment_days": number | null,"recipient": NonNullable<Json>,"search_text": string | null,"service_date_from": string,"service_date_to": string | null,"tenant_id": string,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "closing_text"?: string | null,"created_at"?: string,"created_by"?: string | null,"customer_id"?: string | null,"due_date"?: never,"id"?: string,"intro_text"?: string | null,"issue_date"?: string,"number": string,"payment_days"?: number | null,"recipient": NonNullable<Json>,"search_text"?: never,"service_date_from": string,"service_date_to"?: string | null,"tenant_id": string,"updated_at"?: string
+                    "closing_text"?: string | null,"created_at"?: string,"created_by"?: string | null,"customer_id"?: string | null,"due_date"?: never,"id"?: string,"intro_text"?: string | null,"issue_date"?: string,"number": string,"number_range_id"?: string | null,"payment_days"?: number | null,"recipient": NonNullable<Json>,"search_text"?: never,"service_date_from": string,"service_date_to"?: string | null,"tenant_id": string,"updated_at"?: string
                   }
                   Update: {
-                    "closing_text"?: string | null,"created_at"?: string,"created_by"?: string | null,"customer_id"?: string | null,"due_date"?: never,"id"?: string,"intro_text"?: string | null,"issue_date"?: string,"number"?: string,"payment_days"?: number | null,"recipient"?: NonNullable<Json>,"search_text"?: never,"service_date_from"?: string,"service_date_to"?: string | null,"tenant_id"?: string,"updated_at"?: string
+                    "closing_text"?: string | null,"created_at"?: string,"created_by"?: string | null,"customer_id"?: string | null,"due_date"?: never,"id"?: string,"intro_text"?: string | null,"issue_date"?: string,"number"?: string,"number_range_id"?: string | null,"payment_days"?: number | null,"recipient"?: NonNullable<Json>,"search_text"?: never,"service_date_from"?: string,"service_date_to"?: string | null,"tenant_id"?: string,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -122,7 +122,33 @@ isOneToOne: false
       referencedRelation: "customers"
       referencedColumns: ["id","tenant_id"]
     },{
+      foreignKeyName: "invoices_number_range_fkey"
+      columns: ["number_range_id","tenant_id"]
+isOneToOne: false
+      referencedRelation: "number_ranges"
+      referencedColumns: ["id","tenant_id"]
+    },{
       foreignKeyName: "invoices_tenant_fkey"
+      columns: ["tenant_id"]
+isOneToOne: false
+      referencedRelation: "tenants"
+      referencedColumns: ["id"]
+    }
+                  ]
+                },"number_ranges": {
+                  Row: {
+                    "archived_at": string | null,"created_at": string,"format": string,"id": string,"is_default": boolean,"name": string,"tenant_id": string,"updated_at": string
+                  }
+                  ComputedFields: never
+                  Insert: {
+                    "archived_at"?: string | null,"created_at"?: string,"format": string,"id"?: string,"is_default"?: boolean,"name": string,"tenant_id": string,"updated_at"?: string
+                  }
+                  Update: {
+                    "archived_at"?: string | null,"created_at"?: string,"format"?: string,"id"?: string,"is_default"?: boolean,"name"?: string,"tenant_id"?: string,"updated_at"?: string
+                  }
+                  Relationships: [
+                    {
+      foreignKeyName: "number_ranges_tenant_id_fkey"
       columns: ["tenant_id"]
 isOneToOne: false
       referencedRelation: "tenants"
@@ -131,14 +157,14 @@ isOneToOne: false
                   ]
                 },"settings": {
                   Row: {
-                    "company": NonNullable<Json>,"default_payment_days": number | null,"filename_template": string,"number_format": string | null,"tenant_id": string,"theme": NonNullable<Json>,"updated_at": string
+                    "company": NonNullable<Json>,"default_payment_days": number | null,"filename_template": string,"tenant_id": string,"theme": NonNullable<Json>,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "company"?: NonNullable<Json>,"default_payment_days"?: number | null,"filename_template"?: string,"number_format"?: string | null,"tenant_id": string,"theme"?: NonNullable<Json>,"updated_at"?: string
+                    "company"?: NonNullable<Json>,"default_payment_days"?: number | null,"filename_template"?: string,"tenant_id": string,"theme"?: NonNullable<Json>,"updated_at"?: string
                   }
                   Update: {
-                    "company"?: NonNullable<Json>,"default_payment_days"?: number | null,"filename_template"?: string,"number_format"?: string | null,"tenant_id"?: string,"theme"?: NonNullable<Json>,"updated_at"?: string
+                    "company"?: NonNullable<Json>,"default_payment_days"?: number | null,"filename_template"?: string,"tenant_id"?: string,"theme"?: NonNullable<Json>,"updated_at"?: string
                   }
                   Relationships: [
                     {
@@ -174,6 +200,9 @@ isOneToOne: true
                            },
 "save_invoice":
 { Args: { "p_id": string,"p_invoice": Json,"p_items": Json,"p_tenant_id": string }; Returns: string
+                           },
+"set_default_number_range":
+{ Args: { "p_id": string,"p_tenant_id": string }; Returns: undefined
                            }
           }
           Enums: {

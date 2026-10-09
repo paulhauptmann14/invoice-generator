@@ -3,12 +3,12 @@
 import { redirect } from 'next/navigation'
 import { z } from 'zod'
 import { requireTenant } from '@/lib/auth/require-tenant'
-import { todayIso, yearOf } from '@/lib/domain/dates'
-import { suggestNextNumber } from '@/lib/domain/invoice-number'
+import { todayIso } from '@/lib/domain/dates'
 import { pathErrorsFrom } from '@/lib/form'
 import type { Json } from '@/lib/supabase/database.types'
 import { tenantPath } from '@/lib/tenant-paths'
-import { getInvoice, getInvoiceSettings, listInvoiceNumbers } from './queries'
+import { defaultRange, suggestForRange } from './draft'
+import { getInvoice, listInvoiceNumbers, listNumberRanges } from './queries'
 import { type InvoiceSubmission, invoiceSchema } from './schema'
 
 export type InvoiceFormState = { message: string | null; errors: Record<string, string>; suggestedNumber: string | null }
@@ -19,6 +19,7 @@ function rpcArgs(s: InvoiceSubmission) {
   return {
     p_invoice: {
       number: s.number,
+      number_range_id: s.numberRangeId,
       customer_id: s.customerId,
       save_as_customer: s.saveAsCustomer,
       recipient: s.recipient,
@@ -68,8 +69,8 @@ export async function saveInvoice(
   })
   if (error) {
     if (error.code === '23505') {
-      const [settings, numbers] = await Promise.all([getInvoiceSettings(supabase, tenant.id), listInvoiceNumbers(supabase, tenant.id)])
-      const suggestion = suggestNextNumber(settings.numberFormat, yearOf(parsed.data.issueDate), numbers) || null
+      const [ranges, existing] = await Promise.all([listNumberRanges(supabase, tenant.id), listInvoiceNumbers(supabase, tenant.id)])
+      const suggestion = suggestForRange({ ranges, existing }, parsed.data.numberRangeId, parsed.data.issueDate) || null
       return {
         message: 'Diese Rechnungsnummer ist bereits vergeben.',
         errors: { number: 'Diese Rechnungsnummer ist bereits vergeben.' },
@@ -88,15 +89,19 @@ export async function copyInvoice(tenantId: string, id: string): Promise<void> {
   const source = await getInvoice(supabase, tenant.id, id)
   if (!source) throw new Error('Invoice not found')
 
-  const [settings, numbers] = await Promise.all([getInvoiceSettings(supabase, tenant.id), listInvoiceNumbers(supabase, tenant.id)])
+  const [ranges, existing] = await Promise.all([listNumberRanges(supabase, tenant.id), listInvoiceNumbers(supabase, tenant.id)])
   const today = todayIso()
-  const number = suggestNextNumber(settings.numberFormat, yearOf(today), numbers) || `${source.number}-Kopie`
+  // The copy keeps the range of the original; an archived (or missing) range falls back to the default.
+  const sourceRange = ranges.find((r) => r.id === source.number_range_id && !r.archived)
+  const rangeId = sourceRange?.id ?? defaultRange(ranges)?.id ?? null
+  const number = suggestForRange({ ranges, existing }, rangeId, today) || `${source.number}-Kopie`
 
   const { data: newId, error } = await supabase.rpc('save_invoice', {
     p_tenant_id: tenant.id,
     p_id: null as unknown as string,
     p_invoice: {
       number,
+      number_range_id: rangeId,
       customer_id: source.customer_id,
       // Copied verbatim from the jsonb column it was read from.
       recipient: source.recipient as Json,

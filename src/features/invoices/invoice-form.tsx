@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogClose, DialogContent, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { NativeSelect } from '@/components/ui/native-select'
 import { Textarea } from '@/components/ui/textarea'
 import { addDays, formatDateDe } from '@/lib/domain/dates'
 import { useMediaQuery } from '@/lib/use-media-query'
@@ -40,6 +41,8 @@ export function InvoiceForm({
   const { tenant, path } = useTenant()
   const reducer = useMemo(() => createDraftReducer(numberContext), [numberContext])
   const [draft, dispatch] = useReducer(reducer, initialDraft)
+  // Archived ranges stay selectable only for an invoice that already uses them.
+  const rangeChoices = numberContext.ranges.filter((r) => !r.archived || r.id === draft.numberRangeId)
   const [state, action, pending] = useActionState(saveInvoice.bind(null, tenant.id, id), initialState)
   const formRef = useRef<HTMLFormElement>(null)
   const { totals, invalidKeys, lineTotals } = draftTotals(draft)
@@ -133,6 +136,23 @@ export function InvoiceForm({
 
         <fieldset className="space-y-5">
           <legend className="font-display text-xl font-semibold">Rechnung</legend>
+          {rangeChoices.length > 1 && (
+            <div className="space-y-1.5">
+              <Label htmlFor="inv-numberRange">Nummernkreis</Label>
+              <NativeSelect
+                id="inv-numberRange"
+                value={draft.numberRangeId ?? ''}
+                onChange={(e) => dispatch({ type: 'setNumberRange', id: e.target.value || null })}
+              >
+                {draft.numberRangeId === null && <option value="">Ohne (manuelle Nummer)</option>}
+                {rangeChoices.map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.archived ? `${r.name} (archiviert)` : r.name}
+                  </option>
+                ))}
+              </NativeSelect>
+            </div>
+          )}
           <div className="space-y-1.5">
             <Label htmlFor="inv-number">
               Rechnungsnummer<span aria-hidden className="text-stamp"> *</span>

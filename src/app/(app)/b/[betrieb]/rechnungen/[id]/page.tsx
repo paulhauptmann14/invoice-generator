@@ -15,7 +15,7 @@ import { InvoiceEditorProvider } from '@/features/invoices/editor-context'
 import { ExportPanel } from '@/features/invoices/export-panel'
 import { listExports } from '@/features/invoices/exports-queries'
 import { InvoiceForm } from '@/features/invoices/invoice-form'
-import { getInvoice, getInvoiceSettings, listArticleChoices, listCustomerChoices, listInvoiceNumbers } from '@/features/invoices/queries'
+import { getInvoice, listArticleChoices, listCustomerChoices, listInvoiceNumbers, listNumberRanges } from '@/features/invoices/queries'
 import { requireTenant } from '@/lib/auth/require-tenant'
 import { buildFilename } from '@/lib/domain/filename'
 
@@ -27,9 +27,9 @@ export default async function EditInvoicePage({ params, searchParams }: { params
   const { betrieb, id } = await params
   const { supabase, tenant } = await requireTenant(betrieb)
   if (!z.uuid().safeParse(id).success) notFound()
-  const [invoice, settings, documentSettings, exports, numbers, customers, articles, query] = await Promise.all([
+  const [invoice, ranges, documentSettings, exports, numbers, customers, articles, query] = await Promise.all([
     getInvoice(supabase, tenant.id, id),
-    getInvoiceSettings(supabase, tenant.id),
+    listNumberRanges(supabase, tenant.id),
     loadDocumentSettings(supabase, tenant.id),
     listExports(supabase, tenant.id, id),
     listInvoiceNumbers(supabase, tenant.id),
@@ -47,7 +47,7 @@ export default async function EditInvoicePage({ params, searchParams }: { params
   }
 
   // The invoice's own number must not count as "taken" when re-suggesting.
-  const numberContext = { format: settings.numberFormat, existing: numbers.filter((n) => n !== invoice.number) }
+  const numberContext = { ranges, existing: numbers.filter((n) => n !== invoice.number) }
   return (
     <>
       <PageHeader

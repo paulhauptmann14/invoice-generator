@@ -43,6 +43,8 @@ export const invoiceItemSchema = z.object({
 
 export const invoiceSchema = z
   .object({
+    // null = manual number; the database checks that the range belongs to the same business.
+    numberRangeId: z.uuid().nullable().default(null),
     number: z.string().trim().min(1, 'Bitte eine Rechnungsnummer eingeben.').max(50, 'Höchstens 50 Zeichen.'),
     customerId: z.uuid().nullable(),
     saveAsCustomer: z.boolean(),
