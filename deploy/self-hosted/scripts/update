@@ -41,7 +41,9 @@ main() {
   info "Applying database migrations ..."
   "$scripts/migrate"
 
-  compose up -d app
+  # All services: compose recreates only those whose image, compose.yml entry or .env values changed (e.g. a new
+  # REGISTRATION value for auth); unchanged ones keep running.
+  compose up -d
   wait_healthy app
 
   # Every build leaves the previous app image behind (dangling) and adds build cache; on an SD card that adds up. Only

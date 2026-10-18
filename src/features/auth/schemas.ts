@@ -16,6 +16,14 @@ export const newPasswordSchema = z
   })
   .refine((v) => v.password === v.confirm, { path: ['confirm'], message: 'Die Passwörter stimmen nicht überein.' })
 
+export const registerSchema = z
+  .object({
+    email: resetRequestSchema.shape.email,
+    password: newPasswordSchema.shape.password,
+    confirm: newPasswordSchema.shape.confirm,
+  })
+  .refine((v) => v.password === v.confirm, { path: ['confirm'], message: 'Die Passwörter stimmen nicht überein.' })
+
 export type Notice = { kind: 'error' | 'info'; text: string }
 
 const NOTICES: Record<string, Notice> = {

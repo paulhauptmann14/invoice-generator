@@ -7,3 +7,8 @@
 export function isPasswordResetEnabled(env: Record<string, string | undefined> = process.env): boolean {
   return env.PASSWORD_RESET_EMAIL !== 'off'
 }
+
+/** Self-registration is off unless `REGISTRATION=on` (default off, so local development is unchanged). */
+export function isRegistrationEnabled(env: Record<string, string | undefined> = process.env): boolean {
+  return env.REGISTRATION === 'on'
+}

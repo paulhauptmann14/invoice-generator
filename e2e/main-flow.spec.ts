@@ -3,6 +3,8 @@ import { expect, test, type Page } from '@playwright/test'
 // Runs against the self-hosted stack (HTTPS through Caddy), see deploy/self-hosted/tests/stack-test.sh e2e.
 const email = process.env.E2E_EMAIL ?? ''
 const password = process.env.E2E_PASSWORD ?? ''
+// The stack was installed with REGISTRATION=on: the flow starts with creating the account and the first business.
+const registration = process.env.E2E_REGISTRATION === 'on'
 
 declare global {
   interface Window {
@@ -33,13 +35,38 @@ test('main flow', async ({ page }) => {
   const violations: string[] = []
   await prepare(page, violations)
 
-  // Login (Server Action behind the HTTPS proxy, session cookie set)
-  await page.goto('/login')
-  await page.getByLabel('E-Mail').fill(email)
-  await page.getByLabel('Passwort', { exact: true }).fill(password)
-  await page.getByRole('button', { name: 'Anmelden', exact: true }).click()
-  await page.waitForURL(/\/b\/[0-9a-f-]{36}\//)
-  const tenantBase = new URL(page.url()).pathname.match(/^\/b\/[0-9a-f-]{36}/)![0]
+  let tenantBase: string
+  if (registration) {
+    // Sign-up (Server Action behind the HTTPS proxy), welcome page, first business, then its company settings.
+    await page.goto('/login')
+    await page.getByRole('link', { name: 'Neu hier? Konto anlegen' }).click()
+    await page.waitForURL(/\/registrieren$/)
+    await page.getByLabel('E-Mail').fill(email)
+    await page.getByLabel('Passwort', { exact: true }).fill(password)
+    await page.getByLabel('Passwort wiederholen').fill(`${password}-anders`)
+    await page.getByRole('button', { name: 'Konto anlegen', exact: true }).click()
+    await expect(page.getByText('Die Passwörter stimmen nicht überein.')).toBeVisible()
+    // A rejected submit clears the password fields (form reset): type both again.
+    await page.getByLabel('Passwort', { exact: true }).fill(password)
+    await page.getByLabel('Passwort wiederholen').fill(password)
+    await page.getByRole('button', { name: 'Konto anlegen', exact: true }).click()
+    await page.waitForURL(/\/willkommen$/)
+    await expect(page.getByRole('heading', { name: 'Willkommen!' })).toBeVisible()
+    await page.getByLabel('Name des Betriebs').fill('E2E Betrieb')
+    await page.getByRole('button', { name: 'Betrieb anlegen' }).click()
+    await page.waitForURL(/\/b\/[0-9a-f-]{36}\/einstellungen\/firma\?angelegt=1/)
+    await expect(page.getByText('Betrieb angelegt. Ergänze jetzt die Firmendaten.')).toBeVisible()
+    tenantBase = new URL(page.url()).pathname.match(/^\/b\/[0-9a-f-]{36}/)![0]
+  } else {
+    // Login (Server Action behind the HTTPS proxy, session cookie set)
+    await page.goto('/login')
+    await expect(page.getByRole('link', { name: 'Neu hier? Konto anlegen' })).toHaveCount(0)
+    await page.getByLabel('E-Mail').fill(email)
+    await page.getByLabel('Passwort', { exact: true }).fill(password)
+    await page.getByRole('button', { name: 'Anmelden', exact: true }).click()
+    await page.waitForURL(/\/b\/[0-9a-f-]{36}\//)
+    tenantBase = new URL(page.url()).pathname.match(/^\/b\/[0-9a-f-]{36}/)![0]
+  }
 
   // Company data (export stays locked until street, postal code, city and tax number are set)
   await page.goto(`${tenantBase}/einstellungen/firma`)
@@ -109,4 +136,12 @@ test('password reset disabled', async ({ page }) => {
   await expect(page.getByRole('link', { name: 'Passwort vergessen?' })).toHaveCount(0)
   const response = await page.goto('/passwort-vergessen')
   expect(response?.status()).toBe(404)
+})
+
+test('registration page follows the switch', async ({ page }) => {
+  await prepare(page, [])
+  await page.goto('/login')
+  await expect(page.getByRole('link', { name: 'Neu hier? Konto anlegen' })).toHaveCount(registration ? 1 : 0)
+  const response = await page.goto('/registrieren')
+  expect(response?.status()).toBe(registration ? 200 : 404)
 })

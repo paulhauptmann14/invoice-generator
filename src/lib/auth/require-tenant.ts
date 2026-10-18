@@ -13,12 +13,20 @@ const loadAccess = cache(async () => {
 
 const tenantIdSchema = z.uuid()
 
-/** Signed-in user with at least one tenant (root redirects, creating tenants). */
+/** Signed-in user with at least one tenant (root redirects, creating tenants). New accounts without a business start at /willkommen. */
 export async function requireUser() {
   const { supabase, access } = await loadAccess()
   if (access.status === 'anonymous') redirect('/login')
-  if (access.status === 'no-tenant') redirect('/kein-zugriff')
+  if (access.status === 'no-tenant') redirect('/willkommen')
   return { supabase, userId: access.userId, email: access.email, tenants: access.tenants }
+}
+
+/** Signed-in user who has no business yet (welcome page, creating the first one). Users with a business go to the app. */
+export async function requireUserWithoutTenant() {
+  const { supabase, access } = await loadAccess()
+  if (access.status === 'anonymous') redirect('/login')
+  if (access.status === 'ok') redirect('/')
+  return { supabase, userId: access.userId, email: access.email }
 }
 
 /** For pages, layouts and server actions below /b/[betrieb]. Unknown or foreign tenants are a 404. */

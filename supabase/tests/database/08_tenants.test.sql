@@ -84,10 +84,10 @@ select results_eq(
   'A: update on B had no effect');
 select is((select name from public.tenants where id = 'bbbbbbbb-0000-4000-8000-00000000000b'), 'PGTAP Betrieb B', 'A: rename of B had no effect');
 
--- 3) User without any tenant may not create one (M10 rule, spec 3a)
+-- 3) User without any tenant may create one (open registration, see 11_registration.test.sql)
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"33333333-3333-4333-8333-333333333333","role":"authenticated"}', true);
-select throws_ok($$select public.create_tenant('Fremd')$$, '42501', null, 'user without tenant cannot create one');
+select lives_ok($$select public.create_tenant('Fremd')$$, 'user without tenant can create one');
 reset role;
 
 set local role anon;

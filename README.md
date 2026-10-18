@@ -17,12 +17,14 @@ git clone https://github.com/paulhauptmann14/invoice-generator.git ~/docker/invo
 cd ~/docker/invoice-generator/deploy/self-hosted && scripts/setup
 ```
 
-The setup asks for the name the app is reached at (for example `raspberrypi.local`; it must resolve to this machine), the
-e-mail address and password (at least 12 characters, typed twice) of your account, and the name of your first business. The
-first build takes several minutes on a Pi; if it stops with "did not become healthy", run it again or allow more time with
+The setup asks only for the name the app is reached at (for example `raspberrypi.local`; it must resolve to this machine). It
+creates no account: open the app and choose "Konto anlegen" to create yours (password of at least 12 characters), then name your
+first business. The first build takes several minutes on a Pi; if it stops with "did not become healthy", run it again or allow more time with
 `HEALTH_TIMEOUT=900 scripts/setup`. Do not delete `.env` to start over (that creates secrets that do not match the data).
 
-Then open `https://<name>` in a browser and continue past the certificate warning. Done. Backups are **off** until you turn
+Then open `https://<name>` in a browser, continue past the certificate warning and choose "Konto anlegen". Done. Everyone who
+can reach the app in your network can create an account, and every account only sees its own businesses. To switch registration
+off once your accounts exist, set `REGISTRATION=off` in `deploy/self-hosted/.env` and run `docker compose up -d` there. Backups are **off** until you turn
 them on ([Backups](#backups)).
 
 ## Contents
@@ -218,6 +220,6 @@ deploy/self-hosted/tests/stack-test.sh all
 `KEEP=1` leaves the stack running afterwards.
 
 The Playwright test (`npm run test:e2e`) can also be pointed at any running instance with the environment variables
-`E2E_BASE_URL`, `E2E_EMAIL` and `E2E_PASSWORD`.
+`E2E_BASE_URL`, `E2E_EMAIL` and `E2E_PASSWORD` (add `E2E_REGISTRATION=on` for an instance with open registration: the flow then starts by creating the account).
 
 Shell scripts must pass `shellcheck`.

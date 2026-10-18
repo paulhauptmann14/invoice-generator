@@ -44,6 +44,7 @@ check_env_value() { # check_env_value <KEY> <value>
     APP_HOST) [[ "$value" =~ ^[A-Za-z0-9.-]+$ ]] || die "APP_HOST may only contain letters, digits, dots and hyphens" ;;
     HTTP_PORT | HTTPS_PORT) [[ "$value" =~ ^[0-9]+$ ]] || die "$key must be a number" ;;
     BACKUPS) [[ "$value" = on || "$value" = off ]] || die "BACKUPS must be 'on' or 'off'" ;;
+    REGISTRATION) [[ "$value" = on || "$value" = off ]] || die "REGISTRATION must be 'on' or 'off'" ;;
     AGE_RECIPIENT)
       [ -z "$value" ] || [[ "$value" =~ ^age1[a-z0-9]+$ ]] || die "AGE_RECIPIENT must be an age public key starting with age1 (or empty for unencrypted backups)"
       ;;

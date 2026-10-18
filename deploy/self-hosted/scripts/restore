@@ -2,7 +2,7 @@
 # Replaces ALL data on this machine with the content of a backup made by scripts/backup. Also the way to move the app to a new
 # machine: install Docker and this repository there (and age, for encrypted backups), then run restore (no setup needed first).
 #
-#   [APP_HOST=...] [HTTP_PORT=...] [HTTPS_PORT=...] [BACKUPS=on|off] [BACKUP_DIR=...] [AGE_RECIPIENT=...] restore [--yes] [--no-safety-backup] <backup file>
+#   [APP_HOST=...] [HTTP_PORT=...] [HTTPS_PORT=...] [BACKUPS=on|off] [REGISTRATION=on|off] [BACKUP_DIR=...] [AGE_RECIPIENT=...] restore [--yes] [--no-safety-backup] <backup file>
 #
 # The backed-up .env comes back as it was. When the machine is different (new name, backups to switch off, other key), set the
 # matching variable in the environment: each one that is set (an empty AGE_RECIPIENT means "no encryption", an empty BACKUP_DIR
@@ -43,7 +43,7 @@ done
 
 # Overrides for the restored .env (see the header). Checked now, before anything is touched.
 OVERRIDE_KEYS=""
-for key in APP_HOST HTTP_PORT HTTPS_PORT BACKUPS BACKUP_DIR AGE_RECIPIENT; do
+for key in APP_HOST HTTP_PORT HTTPS_PORT BACKUPS REGISTRATION BACKUP_DIR AGE_RECIPIENT; do
   if [ -n "${!key+x}" ]; then
     value="${!key}"
     if [ "$key" = BACKUP_DIR ] && [ -z "$value" ]; then

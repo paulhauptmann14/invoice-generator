@@ -7,7 +7,7 @@ export const metadata: Metadata = { title: 'Kein Zugriff' }
 export default function NoAccessPage() {
   return (
     <AuthShell title="Kein Zugriff">
-      <p className="text-sm text-muted-foreground">Diesem Konto ist noch kein Betrieb zugeordnet. Die Freischaltung erfolgt durch den Inhaber.</p>
+      <p className="text-sm text-muted-foreground">Dieses Konto hat keinen Zugriff auf diesen Betrieb.</p>
       <div className="mt-6 -ml-2">
         <SignOutButton />
       </div>

@@ -6,8 +6,13 @@
 #   setup --restore  everything except account/business (data comes from a backup)
 #   setup --restore --until <version>  same, but migrates only up to that version (restore loads the data first, then migrates the rest)
 #
-# Unattended runs can set APP_HOST, HTTP_PORT, HTTPS_PORT, COMPOSE_PROJECT_NAME, OWNER_EMAIL, OWNER_PASSWORD and
-# TENANT_NAME in the environment. A new .env has BACKUPS=off (backups are switched on later, see README "Turn on backups")
+# A new .env has REGISTRATION=on (override with REGISTRATION=off in the environment): people create their own account in
+# the browser ("Konto anlegen"), so setup asks for no account or business. With REGISTRATION=off setup creates the owner
+# account and the first business itself (asks for OWNER_EMAIL, OWNER_PASSWORD, TENANT_NAME). An existing .env without the
+# line counts as off.
+#
+# Unattended runs can set APP_HOST, HTTP_PORT, HTTPS_PORT, COMPOSE_PROJECT_NAME, REGISTRATION, OWNER_EMAIL, OWNER_PASSWORD
+# and TENANT_NAME in the environment. A new .env has BACKUPS=off (backups are switched on later, see README "Turn on backups")
 # and an empty AGE_RECIPIENT (no backup encryption); setup never asks about either. A pre-set AGE_RECIPIENT in the
 # environment is validated and written.
 set -euo pipefail
@@ -78,6 +83,13 @@ validate_env_file() {
       *) die "BACKUPS must be 'on' or 'off' (found '$(env_get BACKUPS)' in $ENV_FILE)" ;;
     esac
   fi
+  # REGISTRATION may be missing (older .env files count as off), but a value must be on or off.
+  if grep -q '^REGISTRATION=' "$ENV_FILE"; then
+    case "$(env_get REGISTRATION)" in
+      on | off) ;;
+      *) die "REGISTRATION must be 'on' or 'off' (found '$(env_get REGISTRATION)' in $ENV_FILE)" ;;
+    esac
+  fi
   [ -z "$missing" ] || die "$ENV_FILE is incomplete (empty or missing:$missing). Fix it or delete it, then re-run setup; a deleted .env means new secrets."
 }
 
@@ -95,6 +107,8 @@ create_env_file() {
     [[ "$AGE_RECIPIENT" =~ ^age1[a-z0-9]+$ ]] || die "AGE_RECIPIENT must be an age public key starting with age1 (or empty for unencrypted backups)"
     command -v age >/dev/null 2>&1 || die "'age' is required for encrypted backups but not installed (install it, or leave AGE_RECIPIENT empty)"
   fi
+  local registration=${REGISTRATION:-on}
+  check_env_value REGISTRATION "$registration"
   local http_port=${HTTP_PORT:-80} https_port=${HTTPS_PORT:-443} project=${COMPOSE_PROJECT_NAME:-rechnungen}
   [[ "$http_port" =~ ^[0-9]+$ && "$https_port" =~ ^[0-9]+$ ]] || die "HTTP_PORT and HTTPS_PORT must be numbers"
   [[ "$project" =~ ^[a-z0-9][a-z0-9_-]*$ ]] || die "COMPOSE_PROJECT_NAME may only contain lowercase letters, digits, hyphens and underscores"
@@ -122,6 +136,7 @@ JWT_EXPIRY=3600
 BACKUP_DIR=${BACKUP_DIR:-./backups}
 AGE_RECIPIENT=$AGE_RECIPIENT
 BACKUPS=off
+REGISTRATION=$registration
 COMPOSE_PROJECT_NAME=$project
 ENV
   mv "$tmp" "$ENV_FILE"
@@ -161,7 +176,7 @@ wait_healthy db auth rest storage caddy
 
 "$(dirname "${BASH_SOURCE[0]}")/migrate" ${MIGRATE_ARGS[@]+"${MIGRATE_ARGS[@]}"}
 
-if [ "$RESTORE" = 0 ]; then
+if [ "$RESTORE" = 0 ] && [ "$(env_get REGISTRATION off)" = off ]; then
   create_owner
 fi
 
@@ -177,5 +192,8 @@ if [ "$port" != 443 ]; then
 fi
 echo
 echo "Done. Open $url in a browser."
+if [ "$RESTORE" = 0 ] && [ "$(env_get REGISTRATION off)" = on ]; then
+  echo "Open $url and choose 'Konto anlegen' to create the first account."
+fi
 echo "The browser warns about the certificate until you install the root certificate:"
 echo "  $(dirname "${BASH_SOURCE[0]}")/cert   (writes ./rechnungen-root.crt; install it on every device)"

@@ -14,6 +14,7 @@ export default async function CompanySettingsPage({ params, searchParams }: Prop
   const [settings, query] = await Promise.all([loadSettings(supabase, tenant.id), searchParams])
   return (
     <>
+      {query.angelegt && <StatusBanner>Betrieb angelegt. Ergänze jetzt die Firmendaten.</StatusBanner>}
       {query.gespeichert && <StatusBanner>Firmendaten gespeichert.</StatusBanner>}
       {/* key: a fresh form (and clean "unsaved changes" state) after every save */}
       <CompanyForm key={`company-${settings.updatedAt}`} initial={companyFormValues(settings.company, settings.tenantName)} />

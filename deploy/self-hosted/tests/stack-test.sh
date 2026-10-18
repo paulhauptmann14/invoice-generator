@@ -5,6 +5,9 @@
 # Usage: stack-test.sh setup | backup | e2e | lint | all
 #   e2e [lint]  Playwright main flow against https://<host>:8443, then (if given) the Supabase security lint, on ONE fresh stack
 #   all         setup, backup, then "e2e lint" - three fresh stacks one after another, each torn down before the next
+# The setup and e2e parts install with the new-install default REGISTRATION=on (the account is created through sign-up, setup asks for
+# none); the setup part later switches registration off to check the closed state. The backup part uses REGISTRATION=off, so
+# setup creates the owner account itself (private.bootstrap_owner) - that covers the bootstrap path.
 # KEEP=1 leaves the stack running afterwards (the temp env file path is printed).
 set -euo pipefail
 
@@ -112,24 +115,81 @@ published_ports_only_test_ports() {
 # Starts the stack through scripts/setup; the age key pair stays in the temp directory (backup tests need the private key).
 # "nokey" leaves AGE_RECIPIENT out of the environment (setup does not ask for it; new installs have no key). Setup then writes
 # BACKUPS=off; the backup tests switch it on in their env file.
-run_setup() { # run_setup [nokey]
+# "register" is a new install with the default REGISTRATION=on (no owner account, no business; people sign up in the browser).
+# Without it the install uses REGISTRATION=off and setup creates the owner account and the business (bootstrap path).
+run_setup() { # run_setup [nokey] [register]
   require_free_ports
-  local envs=(APP_HOST="$TEST_HOST" HTTP_PORT="$TEST_HTTP_PORT" HTTPS_PORT="$TEST_HTTPS_PORT" COMPOSE_PROJECT_NAME="$TEST_PROJECT"
-    OWNER_EMAIL="$TEST_EMAIL" OWNER_PASSWORD="$TEST_PASSWORD" TENANT_NAME="$TEST_TENANT")
-  local unset_args=()
-  if [ "${1:-}" = nokey ]; then
-    unset_args=(-u AGE_RECIPIENT)
+  local envs=(APP_HOST="$TEST_HOST" HTTP_PORT="$TEST_HTTP_PORT" HTTPS_PORT="$TEST_HTTPS_PORT" COMPOSE_PROJECT_NAME="$TEST_PROJECT")
+  local unset_args=() nokey=0 register=0 arg
+  for arg in "$@"; do
+    case "$arg" in
+      nokey) nokey=1 ;;
+      register) register=1 ;;
+    esac
+  done
+  if [ "$register" = 1 ]; then
+    unset_args+=(-u REGISTRATION -u OWNER_EMAIL -u OWNER_PASSWORD -u TENANT_NAME)
+  else
+    envs+=(REGISTRATION=off OWNER_EMAIL="$TEST_EMAIL" OWNER_PASSWORD="$TEST_PASSWORD" TENANT_NAME="$TEST_TENANT")
+  fi
+  if [ "$nokey" = 1 ]; then
+    unset_args+=(-u AGE_RECIPIENT)
   else
     age-keygen -o "$TMP_DIR/age.key" >/dev/null 2>&1
     envs+=(AGE_RECIPIENT="$(age-keygen -y "$TMP_DIR/age.key")")
   fi
-  echo "== running setup${1:+ ($1)}"
-  env ${unset_args[@]+"${unset_args[@]}"} "${envs[@]}" bash "$SCRIPTS_DIR/setup" </dev/null
+  echo "== running setup${*:+ ($*)}"
+  env ${unset_args[@]+"${unset_args[@]}"} "${envs[@]}" bash "$SCRIPTS_DIR/setup" </dev/null 2>&1 | tee "$TMP_DIR/setup.out"
+  return "${PIPESTATUS[0]}"
 }
 
+# Sign-up through the internal gateway (not published). Prints the response with headers; the status line is the first one.
+gateway_signup() { # gateway_signup <email> <password>
+  compose exec -T caddy wget -S -O- --header 'Content-Type: application/json' --header "apikey: $(sed -n 's/^ANON_KEY=//p' "$ENV_FILE")" \
+    --post-data "{\"email\":\"$1\",\"password\":\"$2\"}" http://localhost:8000/auth/v1/signup 2>&1 || true
+}
+
+signup_status() { grep -oE 'HTTP/[0-9.]+ [0-9]+' <<<"$1" | head -n 1 | grep -oE '[0-9]+$' || true; }
+
+# Writes REGISTRATION=<on|off> to the test .env and recreates the services that read it (app and auth).
+switch_registration() { # switch_registration on|off
+  sed -i.bak "s|^REGISTRATION=.*|REGISTRATION=$1|" "$ENV_FILE" && rm -f "$ENV_FILE.bak"
+  compose up -d --force-recreate auth app >/dev/null 2>&1
+  compose up -d --wait auth app >/dev/null 2>&1 || true
+  wait_for_login_page
+}
+
+# Fetches the login page into $TMP_DIR/login.html; succeeds when it links to the registration.
+login_page_has_signup_link() {
+  curl -ksS --resolve "$TEST_HOST:$TEST_HTTPS_PORT:127.0.0.1" -o "$TMP_DIR/login.html" "https://$TEST_HOST:$TEST_HTTPS_PORT/login"
+  grep -q 'Konto anlegen' "$TMP_DIR/login.html"
+}
+
+login_page_without_signup_link() { ! login_page_has_signup_link; }
+
 cmd_setup() {
-  # The setup part runs with an empty AGE_RECIPIENT: the key is optional.
-  run_setup nokey
+  # The setup part runs with an empty AGE_RECIPIENT (the key is optional) and the new-install default REGISTRATION=on.
+  run_setup nokey register
+
+  echo "== registration is on after a fresh setup"
+  check "(an) a new install writes REGISTRATION=on" grep -qx 'REGISTRATION=on' "$ENV_FILE"
+  check "(an) setup asked for no account and points to 'Konto anlegen'" grep -q "choose 'Konto anlegen'" "$TMP_DIR/setup.out"
+  check "(an) setup created no account (users: $(compose exec -T db psql -U postgres -qtA -c 'select count(*) from auth.users' | tr -d '[:space:]'))" \
+    test "$(compose exec -T db psql -U postgres -qtA -c 'select count(*) from auth.users' | tr -d '[:space:]')" = 0
+  local status signup_out
+  status="$(https_get /registrieren -w '%{http_code}')"
+  check "(an) /registrieren returns 200 (got $status)" test "$status" = 200
+  check "(an) the login page offers 'Konto anlegen'" login_page_has_signup_link
+  signup_out="$(gateway_signup "$TEST_EMAIL" "$TEST_PASSWORD")"
+  check "(an) sign-up through the gateway succeeds with a session (status $(signup_status "$signup_out"))" grep -q '"access_token"' <<<"$signup_out"
+  signup_out="$(gateway_signup "$TEST_EMAIL" "$TEST_PASSWORD")"
+  check "(an) a second sign-up with the same address is rejected (status $(signup_status "$signup_out"))" grep -qE 'HTTP/[0-9.]+ 4[0-9][0-9]' <<<"$signup_out"
+  # The business of the new account: created by the account itself (RLS applies), like the welcome page does.
+  local token
+  token="$(password_login "$TEST_EMAIL" "$TEST_PASSWORD" | sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p')"
+  signup_out="$(compose exec -T caddy wget -qO- --header 'Content-Type: application/json' --header "apikey: $(sed -n 's/^ANON_KEY=//p' "$ENV_FILE")" \
+    --header "Authorization: Bearer $token" --post-data "{\"p_name\":\"$TEST_TENANT\"}" http://localhost:8000/rest/v1/rpc/create_tenant 2>&1 || true)"
+  check "(an) the new account can create its business through the API" grep -qE '^"[0-9a-f-]{36}"$' <<<"$signup_out"
 
   echo "== checks"
   check "(a) HTTPS /login returns 200 with a nonce CSP" login_page_ok
@@ -138,7 +198,6 @@ cmd_setup() {
   body="$(password_login "$TEST_EMAIL" "$TEST_PASSWORD")"
   check "(b) password login through the gateway returns an access token" grep -q '"access_token"' <<<"$body"
 
-  local status
   status="$(https_get /passwort-vergessen -w '%{http_code}')"
   check "(c) /passwort-vergessen returns 404 (got $status)" test "$status" = 404
 
@@ -152,15 +211,22 @@ cmd_setup() {
   compose restart >/dev/null 2>&1
   check "(f) /login works again after a full restart" wait_for_login_page
 
-  echo "== sign-up and password rules"
-  local anon_key signup_out users
-  anon_key="$(sed -n 's/^ANON_KEY=//p' "$ENV_FILE")"
-  signup_out="$(compose exec -T caddy wget -S -O- --header 'Content-Type: application/json' --header "apikey: $anon_key" \
-    --post-data '{"email":"intruder@stack-test.localhost","password":"intruder-password-12"}' http://localhost:8000/auth/v1/signup 2>&1 || true)"
+  echo "== registration off: sign-up and password rules"
+  local users
+  switch_registration off || fail "(k) the stack comes up with REGISTRATION=off"
+  signup_out="$(gateway_signup "intruder@stack-test.localhost" "intruder-password-12")"
   echo "  sign-up response: $(grep -oE 'HTTP/[0-9.]+ [0-9]+.*' <<<"$signup_out" | head -n 1)"
   check "(k) sign-up through the gateway is rejected with a 4xx" grep -qE 'HTTP/[0-9.]+ 4[0-9][0-9]' <<<"$signup_out"
   users="$(compose exec -T db psql -U postgres -qtA -c 'select count(*) from auth.users' | tr -d '[:space:]')"
   check "(k) the rejected sign-up created no account (users: $users)" test "$users" = 1
+  status="$(https_get /registrieren -w '%{http_code}')"
+  check "(k) /registrieren returns 404 (got $status)" test "$status" = 404
+  check "(k) the login page has no 'Konto anlegen' link" login_page_without_signup_link
+  check "(k) the login page still works" login_page_ok
+  switch_registration on || fail "(an) the stack comes up with REGISTRATION=on again"
+  check "(an) switching REGISTRATION back to on reopens sign-up (login link)" login_page_has_signup_link
+  switch_registration off || fail "(k) the stack comes up with REGISTRATION=off again"
+  check "(k) switching it off again removes the 'Konto anlegen' link" login_page_without_signup_link
 
   echo "== set-password"
   local err
@@ -191,6 +257,11 @@ cmd_setup() {
   sed 's/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=/' "$ENV_FILE" >"$TMP_DIR/partial.env"
   err="$(ENV_FILE="$TMP_DIR/partial.env" bash "$SCRIPTS_DIR/setup" 2>&1 || true)"
   check "(l) setup refuses an existing .env with an empty secret" grep -q 'incomplete (empty or missing: POSTGRES_PASSWORD)' <<<"$err"
+  sed 's/^REGISTRATION=.*/REGISTRATION=maybe/' "$ENV_FILE" >"$TMP_DIR/bad-registration.env"
+  err="$(ENV_FILE="$TMP_DIR/bad-registration.env" bash "$SCRIPTS_DIR/setup" 2>&1 </dev/null || true)"
+  check "(an) setup refuses an existing .env with REGISTRATION other than on/off" grep -q "REGISTRATION must be 'on' or 'off'" <<<"$err"
+  err="$(ENV_FILE="$TMP_DIR/never-written-3.env" APP_HOST=rechnungen.localhost REGISTRATION=sometimes bash "$SCRIPTS_DIR/setup" 2>&1 </dev/null || true)"
+  check "(an) setup refuses REGISTRATION=sometimes in the environment and writes no .env" bash -c "[ ! -e '$TMP_DIR/never-written-3.env' ] && grep -q \"REGISTRATION must be\" <<<\"\$1\"" _ "$err"
   err="$(ENV_FILE="$TMP_DIR/never-written.env" APP_HOST='bad host' AGE_RECIPIENT=age1abc bash "$SCRIPTS_DIR/setup" 2>&1 || true)"
   check "(m) setup refuses an APP_HOST with a space and writes no .env" refused_without_env "$TMP_DIR/never-written.env" "$err"
 
@@ -785,7 +856,7 @@ SPLINTER_SHA256=d8d558baad3e03832e521c527907fa50a9a172fabd899dd0f5c2504a5a0e9349
 run_e2e() {
   echo "== end-to-end test (Playwright, https://$TEST_HOST:$TEST_HTTPS_PORT)"
   wait_for_login_page || { fail "(e2e) the login page does not come up"; return; }
-  if (cd "$REPO_DIR" && E2E_BASE_URL="https://$TEST_HOST:$TEST_HTTPS_PORT" E2E_EMAIL="$TEST_EMAIL" E2E_PASSWORD="$TEST_PASSWORD" npx playwright test); then
+  if (cd "$REPO_DIR" && E2E_BASE_URL="https://$TEST_HOST:$TEST_HTTPS_PORT" E2E_REGISTRATION=on E2E_EMAIL="$TEST_EMAIL" E2E_PASSWORD="$TEST_PASSWORD" npx playwright test); then
     pass "(e2e) main flow and password-reset-disabled test"
   else
     fail "(e2e) Playwright run"
@@ -835,7 +906,7 @@ run_lint() {
 
 cmd_app_checks() { # cmd_app_checks e2e|lint...: one stack for all requested parts
   local part
-  run_setup
+  run_setup register
   for part in "$@"; do
     case "$part" in
       e2e) run_e2e ;;

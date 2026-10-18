@@ -53,8 +53,8 @@ services:
       GOTRUE_DB_DRIVER: postgres
       GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD:?}@db:5432/postgres
       GOTRUE_SITE_URL: https://${APP_HOST:?}
-      # Accounts are created by scripts/setup only
-      GOTRUE_DISABLE_SIGNUP: 'true'
+      # Sign-ups are allowed only with REGISTRATION=on (derived in the command below, so one switch rules app and auth)
+      REGISTRATION: ${REGISTRATION:-off}
       GOTRUE_JWT_ADMIN_ROLES: service_role
       GOTRUE_JWT_AUD: authenticated
       GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
@@ -67,6 +67,10 @@ services:
       GOTRUE_MAILER_AUTOCONFIRM: 'true'
       GOTRUE_EXTERNAL_PHONE_ENABLED: 'false'
       GOTRUE_EXTERNAL_ANONYMOUS_USERS_ENABLED: 'false'
+    command:
+      - sh
+      - -c
+      - 'if [ "$$REGISTRATION" = on ]; then GOTRUE_DISABLE_SIGNUP=false; else GOTRUE_DISABLE_SIGNUP=true; fi; export GOTRUE_DISABLE_SIGNUP; exec auth'
     healthcheck:
       test: [CMD, wget, --no-verbose, --tries=1, --spider, 'http://127.0.0.1:9999/health']
       interval: 5s
@@ -156,6 +160,7 @@ services:
       NEXT_PUBLIC_SUPABASE_URL: http://caddy:8000
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${ANON_KEY:?}
       PASSWORD_RESET_EMAIL: 'off'
+      REGISTRATION: ${REGISTRATION:-off}
     healthcheck:
       test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/login').then((r) => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
       interval: 10s
