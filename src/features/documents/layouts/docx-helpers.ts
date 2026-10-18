@@ -1,4 +1,5 @@
 import {
+  AlignmentType,
   BorderStyle,
   convertMillimetersToTwip as twip,
   FrameAnchorType,
@@ -8,6 +9,8 @@ import {
   LineRuleType,
   TextRun,
 } from 'docx'
+import type { Theme } from '@/lib/domain/theme'
+import type { InvoiceViewModel } from '@/lib/domain/view-model'
 
 // Shared building blocks for the Word layouts (findings from the M8 spike, see roadmap).
 export const PAGE = { widthMm: 210, heightMm: 297 }
@@ -40,3 +43,32 @@ export const lines = (texts: string[], run: { bold?: boolean; size?: number; col
 
 /** Empty paragraph of exact height: Word drops spacing.before at the top of a page (M8 spike). */
 export const spacer = (heightMm: number) => ({ spacing: { line: twip(heightMm), lineRule: LineRuleType.EXACTLY, after: 0 }, children: [] })
+
+export type Column = {
+  label: string
+  pct: number
+  align: (typeof AlignmentType)[keyof typeof AlignmentType]
+  value: (item: InvoiceViewModel['items'][number]) => string
+}
+
+/** Columns of the items table (Klassisch, Kompakt, Modern) in the same order and widths as the PDF. */
+export function itemColumns(theme: Theme): Column[] {
+  const L = theme.table.labels
+  const fixedColumns: (Column | false)[] = [
+    theme.table.showPosition && { label: L.position, pct: 7, align: AlignmentType.LEFT, value: (i) => String(i.position) },
+    { label: L.quantity, pct: 9, align: AlignmentType.RIGHT, value: (i) => i.quantity },
+    theme.table.showUnit && { label: L.unit, pct: 9, align: AlignmentType.LEFT, value: (i) => i.unit },
+    { label: L.unitPrice, pct: 15, align: AlignmentType.RIGHT, value: (i) => i.unitPrice },
+    theme.table.showVatRate && { label: L.vatRate, pct: 9, align: AlignmentType.RIGHT, value: (i) => i.vatRate },
+    { label: L.total, pct: 15, align: AlignmentType.RIGHT, value: (i) => i.total },
+  ]
+  const others = fixedColumns.filter((col): col is Column => col !== false)
+  const description: Column = {
+    label: L.description,
+    pct: 100 - others.reduce((sum, col) => sum + col.pct, 0),
+    align: AlignmentType.LEFT,
+    value: (i) => i.description,
+  }
+  // Description is second when the position column is shown, otherwise first (same order as the PDF).
+  return theme.table.showPosition ? [others[0], description, ...others.slice(1)] : [description, ...others]
+}

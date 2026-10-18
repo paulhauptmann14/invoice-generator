@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { parseGermanDecimal } from '@/lib/domain/decimal'
 import { isValidIban, normalizeIban } from '@/lib/domain/iban'
 import { validateNumberFormat } from '@/lib/domain/invoice-number'
-import { BUILTIN_FONTS } from '@/lib/domain/theme'
+import { BUILTIN_FONTS, LAYOUTS } from '@/lib/domain/theme'
 
 // Form schemas of the settings tabs. Messages are shown next to the fields (German UI).
 // The forms send structured JSON (like the invoice form), so nested paths ("bankAccounts.0.iban") carry the errors.
@@ -100,8 +100,7 @@ export const filenameFormSchema = z.object({
 const label = text(30)
 
 export const appearanceFormSchema = z.object({
-  // Only layouts with a PDF + Word implementation can be chosen.
-  layout: z.enum(['briefpapier', 'klassisch'], 'Bitte ein Layout wählen.'),
+  layout: z.enum(LAYOUTS, 'Bitte ein Layout wählen.'),
   logo: z.object({
     position: z.enum(['links', 'mitte', 'rechts'], 'Bitte eine Position wählen.'),
     widthMm: rangeNumber(10, 120),
@@ -129,7 +128,7 @@ export const appearanceFormSchema = z.object({
       .max(4, 'Höchstens 4 Spalten.')
       .transform((columns) => columns.filter((c) => c !== '')),
   }),
-  colors: z.object({ primary: hex, text: hex, tableHeaderBg: hex, zebra: z.boolean() }),
+  colors: z.object({ primary: hex, accent: hex, text: hex, tableHeaderBg: hex, zebra: z.boolean() }),
   table: z.object({
     showPosition: z.boolean(),
     showUnit: z.boolean(),

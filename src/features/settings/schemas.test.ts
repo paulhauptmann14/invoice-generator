@@ -89,7 +89,7 @@ describe('appearanceFormSchema', () => {
     font: { builtin: 'IBM Plex Sans', baseSizePt: '9,5', headingSizePt: '16' },
     page: { marginTopMm: '15', marginRightMm: '20', marginBottomMm: '20', marginLeftMm: '25', din5008: 'B', senderLine: true },
     texts: { title: 'Rechnung', intro: '', closing: '', footerColumns: [] },
-    colors: { primary: '#17191C', text: '#17191C', tableHeaderBg: '#ECEEE9', zebra: false },
+    colors: { primary: '#17191C', accent: '#1F5F74', text: '#17191C', tableHeaderBg: '#ECEEE9', zebra: false },
     table: {
       showPosition: true,
       showUnit: true,
@@ -102,8 +102,11 @@ describe('appearanceFormSchema', () => {
     expect(data.font.baseSizePt).toBe(9.5)
     expect(data.logo.widthMm).toBe(45)
   })
-  test('rejects values out of range and unimplemented layouts', () => {
-    const errors = errorsOf(appearanceFormSchema.safeParse({ ...appearance, layout: 'modern', logo: { position: 'rechts', widthMm: '500' } }))
+  test('all four layouts can be chosen', () => {
+    for (const layout of ['briefpapier', 'klassisch', 'kompakt', 'modern']) expect(appearanceFormSchema.parse({ ...appearance, layout }).layout).toBe(layout)
+  })
+  test('rejects values out of range and unknown layouts', () => {
+    const errors = errorsOf(appearanceFormSchema.safeParse({ ...appearance, layout: 'fancy', logo: { position: 'rechts', widthMm: '500' } }))
     expect(errors).toHaveProperty('layout')
     expect(errors['logo.widthMm']).toBe('Bitte einen Wert von 10 bis 120 eingeben.')
   })
@@ -113,5 +116,6 @@ describe('appearanceFormSchema', () => {
   })
   test('rejects colors that are not #RRGGBB', () => {
     expect(errorsOf(appearanceFormSchema.safeParse({ ...appearance, colors: { ...appearance.colors, primary: 'rot' } }))).toHaveProperty('colors.primary')
+    expect(errorsOf(appearanceFormSchema.safeParse({ ...appearance, colors: { ...appearance.colors, accent: '#12' } }))).toHaveProperty('colors.accent')
   })
 })

@@ -78,7 +78,7 @@ const decimal = (n: number) => String(n).replace('.', ',')
 /** Form values of the appearance tab; the footer always offers four columns (empty ones are dropped on save). */
 export function appearanceFormValues(theme: Theme): AppearanceFormInput {
   return {
-    layout: theme.layout === 'klassisch' ? 'klassisch' : 'briefpapier',
+    layout: theme.layout,
     logo: { position: theme.logo.position, widthMm: decimal(theme.logo.widthMm) },
     font: { builtin: theme.font.builtin, baseSizePt: decimal(theme.font.baseSizePt), headingSizePt: decimal(theme.font.headingSizePt) },
     page: {
@@ -90,7 +90,7 @@ export function appearanceFormValues(theme: Theme): AppearanceFormInput {
       senderLine: theme.page.senderLine,
     },
     texts: { title: theme.texts.title, intro: theme.texts.intro, closing: theme.texts.closing, footerColumns: [...theme.texts.footerColumns, '', '', '', ''].slice(0, 4) },
-    colors: { primary: theme.colors.primary, text: theme.colors.text, tableHeaderBg: theme.colors.tableHeaderBg, zebra: theme.colors.zebra },
+    colors: { ...theme.colors },
     table: {
       showPosition: theme.table.showPosition,
       showUnit: theme.table.showUnit,
@@ -100,7 +100,7 @@ export function appearanceFormValues(theme: Theme): AppearanceFormInput {
   }
 }
 
-/** The logo path (logo route only) and the unused accent color are kept. */
+/** The logo path is kept (it is changed by the logo route only). */
 export function applyAppearanceForm(theme: Theme, form: AppearanceForm): Theme {
   return themeSchema.parse({
     ...theme,

@@ -48,21 +48,27 @@ describe('applyPaymentForm', () => {
 })
 
 describe('appearanceFormValues', () => {
+  test('keeps every implemented layout and the accent color', () => {
+    for (const layout of ['briefpapier', 'klassisch', 'kompakt', 'modern'] as const) {
+      expect(appearanceFormValues(themeSchema.parse({ layout })).layout).toBe(layout)
+    }
+    expect(appearanceFormValues(themeSchema.parse({ colors: { accent: '#123456' } })).colors.accent).toBe('#123456')
+  })
   test('always offers four footer columns', () => {
     expect(appearanceFormValues(themeSchema.parse({ texts: { footerColumns: ['A'] } })).texts.footerColumns).toEqual(['A', '', '', ''])
   })
 })
 
 describe('applyAppearanceForm', () => {
-  test('keeps the logo path and the (unused) accent color', () => {
+  test('keeps the logo path and takes the accent color from the form', () => {
     const theme = themeSchema.parse({ logo: { path: 'c0000000-0000-4000-8000-000000000001/logo.png' }, colors: { accent: '#123456' } })
     const form = appearanceFormSchema.parse({
-      layout: 'klassisch',
+      layout: 'modern',
       logo: { position: 'links', widthMm: '30' },
       font: { builtin: 'Inter', baseSizePt: '10', headingSizePt: '18' },
       page: { marginTopMm: '10', marginRightMm: '20', marginBottomMm: '20', marginLeftMm: '25', din5008: 'A', senderLine: false },
       texts: { title: 'Rechnung', intro: 'Hallo', closing: '', footerColumns: ['Spalte 1'] },
-      colors: { primary: '#000000', text: '#111111', tableHeaderBg: '#EEEEEE', zebra: true },
+      colors: { primary: '#000000', accent: '#654321', text: '#111111', tableHeaderBg: '#EEEEEE', zebra: true },
       table: {
         showPosition: false,
         showUnit: true,
@@ -72,8 +78,8 @@ describe('applyAppearanceForm', () => {
     })
     const next = applyAppearanceForm(theme, form)
     expect(next.logo).toEqual({ path: 'c0000000-0000-4000-8000-000000000001/logo.png', position: 'links', widthMm: 30 })
-    expect(next.colors).toEqual({ primary: '#000000', accent: '#123456', text: '#111111', tableHeaderBg: '#EEEEEE', zebra: true })
-    expect(next).toMatchObject({ layout: 'klassisch', font: { builtin: 'Inter', baseSizePt: 10 }, page: { din5008: 'A', senderLine: false } })
+    expect(next.colors).toEqual({ primary: '#000000', accent: '#654321', text: '#111111', tableHeaderBg: '#EEEEEE', zebra: true })
+    expect(next).toMatchObject({ layout: 'modern', font: { builtin: 'Inter', baseSizePt: 10 }, page: { din5008: 'A', senderLine: false } })
     expect(next.texts).toMatchObject({ intro: 'Hallo', footerColumns: ['Spalte 1'], paymentNote: theme.texts.paymentNote })
     expect(next.table.labels.total).toBe('Summe')
   })

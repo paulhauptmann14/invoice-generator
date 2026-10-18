@@ -15,6 +15,8 @@ const placeholders = 'Platzhalter: {Nr}, {Kunde}, {Datum}, {Faellig}, {Betrag}'
 const LAYOUT_OPTIONS = [
   { value: 'briefpapier', label: 'Briefpapier', description: 'Wie die eigene Word-Rechnung: Kopf nur mit Logo, Positionen als Zeilen, keine Fußzeile.' },
   { value: 'klassisch', label: 'Klassisch', description: 'Positionstabelle mit Spaltenköpfen, Fußzeile mit Firmenangaben.' },
+  { value: 'kompakt', label: 'Kompakt', description: 'Wie Klassisch, aber dichter gesetzt – für lange Rechnungen mit vielen Positionen.' },
+  { value: 'modern', label: 'Modern', description: 'Großer Firmenname, Linie und Gesamtbetrag in der Akzentfarbe, Logo oben rechts.' },
 ] as const
 
 const POSITIONS = [
@@ -44,7 +46,10 @@ export function AppearanceForm({ initial, logo }: { initial: AppearanceFormInput
   const preview = usePreviewMode('einstellungen-vorschau')
   const previewUrl = api('settings/preview')
   const previewPayload = JSON.stringify({ tab: 'erscheinungsbild', form: form.draft })
-  const klassisch = form.draft.layout === 'klassisch'
+  const { layout } = form.draft
+  // Table layouts share colors, columns and footer; only some parts differ (spec 3d).
+  const tableLayout = layout !== 'briefpapier'
+  const hasLogo = layout === 'briefpapier' || layout === 'modern'
 
   return (
     <WithPreview mode={preview} url={previewUrl} payload={previewPayload}>
@@ -62,9 +67,11 @@ export function AppearanceForm({ initial, logo }: { initial: AppearanceFormInput
 
         <fieldset className="space-y-5">
           <legend className={legend}>Logo</legend>
+          {!hasLogo && <p className="text-sm text-muted-foreground">Das Layout {layout === 'kompakt' ? 'Kompakt' : 'Klassisch'} druckt kein Logo.</p>}
           <LogoField hasLogo={logo.present} version={logo.version} />
           <div className="grid gap-5 @lg:grid-cols-2">
-            <SelectField form={form} path="logo.position" label="Position" options={POSITIONS} />
+            {/* "Modern" always places the logo top right. */}
+            {layout === 'briefpapier' && <SelectField form={form} path="logo.position" label="Position" options={POSITIONS} />}
             <TextField form={form} path="logo.widthMm" label="Breite (mm)" inputMode="decimal" autoComplete="off" hint="10 bis 120 mm" />
           </div>
         </fieldset>
@@ -74,7 +81,7 @@ export function AppearanceForm({ initial, logo }: { initial: AppearanceFormInput
           <SelectField form={form} path="font.builtin" label="Schriftart" options={BUILTIN_FONTS.map((f) => ({ value: f, label: f }))} />
           <div className="grid gap-5 @lg:grid-cols-2">
             <TextField form={form} path="font.baseSizePt" label="Größe Fließtext (pt)" inputMode="decimal" autoComplete="off" hint="7 bis 14 pt" />
-            {klassisch && <TextField form={form} path="font.headingSizePt" label="Größe Überschrift (pt)" inputMode="decimal" autoComplete="off" hint="10 bis 28 pt" />}
+            {tableLayout && <TextField form={form} path="font.headingSizePt" label="Größe Überschrift (pt)" inputMode="decimal" autoComplete="off" hint="10 bis 28 pt" />}
           </div>
         </fieldset>
 
@@ -97,16 +104,21 @@ export function AppearanceForm({ initial, logo }: { initial: AppearanceFormInput
           <TextAreaField form={form} path="texts.closing" label="Schlusstext" hint={`Vorbelegung für neue Rechnungen. ${placeholders}`} />
         </fieldset>
 
-        {klassisch && (
+        {tableLayout && (
           <>
             <fieldset className="space-y-5">
               <legend className={legend}>Farben</legend>
               <div className="grid gap-5 @lg:grid-cols-3">
-                <ColorField form={form} path="colors.primary" label="Überschriften und Linien" />
+                <ColorField form={form} path="colors.primary" label={layout === 'modern' ? 'Firmenname und Überschriften' : 'Überschriften und Linien'} />
                 <ColorField form={form} path="colors.text" label="Text" />
-                <ColorField form={form} path="colors.tableHeaderBg" label="Tabellenkopf" />
+                {layout === 'klassisch' && <ColorField form={form} path="colors.tableHeaderBg" label="Tabellenkopf" />}
+                {layout === 'modern' && <ColorField form={form} path="colors.accent" label="Akzent (Linie und Gesamtbetrag)" />}
               </div>
-              <CheckboxField form={form} path="colors.zebra" label="Positionen abwechselnd hinterlegen" />
+              {layout === 'modern' ? (
+                <p className="text-sm text-muted-foreground">Die Schrift auf dem Gesamtbetrag wird automatisch hell oder dunkel gesetzt, damit sie lesbar bleibt.</p>
+              ) : (
+                <CheckboxField form={form} path="colors.zebra" label="Positionen abwechselnd hinterlegen" />
+              )}
             </fieldset>
 
             <fieldset className="space-y-5">

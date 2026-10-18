@@ -3,7 +3,7 @@ import { z } from 'zod'
 export const LAYOUTS = ['klassisch', 'briefpapier', 'modern', 'kompakt'] as const
 export type Layout = (typeof LAYOUTS)[number]
 /** Layouts that have a PDF + DOCX implementation and may be offered in the settings UI. */
-export const IMPLEMENTED_LAYOUTS: readonly Layout[] = ['klassisch', 'briefpapier']
+export const IMPLEMENTED_LAYOUTS: readonly Layout[] = LAYOUTS
 export const BUILTIN_FONTS = ['IBM Plex Sans', 'Inter', 'Lato', 'Open Sans', 'Source Serif 4', 'Merriweather'] as const
 
 // Validation messages are user-facing (settings form) and therefore German.
@@ -33,11 +33,11 @@ export const themeSchema = z.object({
     })
     .prefault({}),
   // Invoice document colors are user data rendered into PDF/DOCX (no CSS variables there), so they are hex values.
-  // Defaults follow the app palette: tinte, stempel, tinte, wash.
+  // Defaults follow the app palette (tinte, wash); the accent is only used by "Modern" and deliberately not red.
   colors: z
     .object({
       primary: hex.default('#17191C'),
-      accent: hex.default('#B3261E'),
+      accent: hex.default('#1F5F74'),
       text: hex.default('#17191C'),
       tableHeaderBg: hex.default('#ECEEE9'),
       zebra: z.boolean().default(false),
@@ -94,9 +94,31 @@ export const themeSchema = z.object({
 
 export type Theme = z.infer<typeof themeSchema>
 
-/** Fixed document details that are not user-configurable (hairlines, zebra tint, fold marks); app palette linie/papier/feld. */
-export const DOCUMENT_COLORS = { rule: '#D5D9D3', zebra: '#F4F5F2', mark: '#868C86' } as const
+/**
+ * Fixed document details that are not user-configurable: hairlines, zebra tint, fold marks (app palette linie/papier/feld)
+ * and muted small text in "Modern" (6:1 on white).
+ */
+export const DOCUMENT_COLORS = { rule: '#D5D9D3', zebra: '#F4F5F2', mark: '#868C86', muted: '#5F6368' } as const
 export const defaultTheme: Theme = themeSchema.parse({})
+
+const INK = '#17191C'
+const WHITE = '#FFFFFF'
+
+function luminance(color: string): number {
+  const [r, g, b] = [1, 3, 5].map((i) => {
+    const c = parseInt(color.slice(i, i + 2), 16) / 255
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+  })
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+
+const contrast = (a: number, b: number) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)
+
+/** Text color for a colored band (#RRGGBB): white or ink, whichever has the higher WCAG contrast. */
+export function readableTextOn(background: string): string {
+  const bg = luminance(background)
+  return contrast(bg, luminance(WHITE)) >= contrast(bg, luminance(INK)) ? WHITE : INK
+}
 
 /** Lenient parse for stored data: falls back to defaults if the stored theme is invalid. */
 export function parseTheme(raw: unknown): Theme {

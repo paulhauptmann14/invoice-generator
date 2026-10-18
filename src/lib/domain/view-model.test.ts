@@ -120,6 +120,17 @@ describe('buildInvoiceViewModel', () => {
     ])
   })
 
+  test('the footer takes the bank from the account list (the legacy single fields are empty since M11)', () => {
+    const listed = parseCompany({
+      name: 'Gasthaus',
+      bankAccounts: [
+        { bankName: 'Volksbank', accountNumber: '4711', iban: 'DE02120300000000202051', bic: 'BYLADEM1001' },
+        { bankName: 'Sparkasse', accountNumber: '', iban: 'DE02500105170137075030', bic: '' },
+      ],
+    })
+    expect(buildInvoiceViewModel(input, listed, defaultTheme).footerColumns).toContain('Volksbank\nIBAN DE02 1203 0000 0000 2020 51\nBIC BYLADEM1001')
+  })
+
   test('custom footer with placeholders', () => {
     const theme = parseTheme({ texts: { footerColumns: ['Rechnung {Nr}', 'Danke!'] } })
     expect(buildInvoiceViewModel(input, company, theme).footerColumns).toEqual(['Rechnung 2026-0001', 'Danke!'])

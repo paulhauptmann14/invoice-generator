@@ -84,10 +84,12 @@ function recipientLines(r: Recipient): string[] {
 }
 
 function autoFooter(c: Company): string[] {
+  // The first account only (four columns at most); all accounts are listed below the payment note.
+  const bank = bankAccountsOf(c)[0]
   return [
     joinLines([c.name, c.owner, c.street, `${c.postalCode} ${c.city}`.trim()]),
     joinLines([c.phone && `Tel. ${c.phone}`, c.email, c.web]),
-    joinLines([c.bankName, c.iban && `IBAN ${formatIban(c.iban)}`, c.bic && `BIC ${c.bic}`]),
+    bank ? joinLines([bank.bankName, bank.iban && `IBAN ${formatIban(bank.iban)}`, bank.bic && `BIC ${bank.bic}`]) : '',
     joinLines([c.taxNumber && `St.-Nr. ${c.taxNumber}`, c.vatId && `USt-IdNr. ${c.vatId}`, c.commercialRegister]),
   ].filter(Boolean)
 }

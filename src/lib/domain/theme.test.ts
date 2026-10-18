@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { defaultTheme, IMPLEMENTED_LAYOUTS, parseTheme, themeSchema } from './theme'
+import { defaultTheme, IMPLEMENTED_LAYOUTS, LAYOUTS, parseTheme, readableTextOn, themeSchema } from './theme'
 
 describe('theme', () => {
   test('an empty object yields complete defaults, including nested values', () => {
@@ -23,9 +23,18 @@ describe('theme', () => {
   test('at most 4 footer columns', () => {
     expect(themeSchema.safeParse({ texts: { footerColumns: ['a', 'b', 'c', 'd', 'e'] } }).success).toBe(false)
   })
-  test('"Briefpapier" is the default layout; both layouts are implemented', () => {
+  test('"Briefpapier" is the default layout; all layouts are implemented', () => {
     expect(defaultTheme.layout).toBe('briefpapier')
-    expect(IMPLEMENTED_LAYOUTS).toEqual(['klassisch', 'briefpapier'])
+    expect(IMPLEMENTED_LAYOUTS).toEqual(LAYOUTS)
+  })
+  test('the default accent color is not red (the user rejected red accents)', () => {
+    expect(defaultTheme.colors.accent).toBe('#1F5F74')
+  })
+  test('readableTextOn picks white or ink, whichever contrasts more with the background', () => {
+    expect(readableTextOn('#1F5F74')).toBe('#FFFFFF')
+    expect(readableTextOn('#17191C')).toBe('#FFFFFF')
+    expect(readableTextOn('#F2C94C')).toBe('#17191C')
+    expect(readableTextOn('#FFFFFF')).toBe('#17191C')
   })
   test('default texts follow the business template', () => {
     expect(defaultTheme.texts.intro).toBe('')
