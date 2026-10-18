@@ -1,0 +1,6 @@
+<!-- Password reset e-mail (German). The link carries the one-time token hash; the app verifies it
+     server-side at /auth/bestaetigen, so it also works when opened in another browser. -->
+<p>Hallo,</p>
+<p>für dieses Konto wurde ein neues Passwort angefordert. Über den folgenden Link lässt es sich festlegen:</p>
+<p><a href="{{ .SiteURL }}/auth/bestaetigen?token_hash={{ .TokenHash }}&amp;type=recovery">Neues Passwort festlegen</a></p>
+<p>Der Link gilt eine Stunde und nur einmal. Wurde kein neues Passwort angefordert, kann diese E-Mail ignoriert werden – das bisherige Passwort bleibt gültig.</p>

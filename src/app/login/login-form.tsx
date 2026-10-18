@@ -1,11 +1,12 @@
 'use client'
 
-import { Eye, EyeOff } from 'lucide-react'
+import Link from 'next/link'
 import { useActionState, useEffect, useRef, useState } from 'react'
 import { FieldError } from '@/components/field-error'
 import { FormAlert } from '@/components/form-alert'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { PasswordInput } from '@/components/password-input'
 import { Label } from '@/components/ui/label'
 import { signIn, type SignInState } from './actions'
 
@@ -48,29 +49,23 @@ export function LoginForm() {
 
       <div className="space-y-1.5">
         <Label htmlFor="password">Passwort</Label>
-        <div className="relative">
-          <Input
-            ref={passwordRef}
-            id="password"
-            name="password"
-            type={showPassword ? 'text' : 'password'}
-            autoComplete="current-password"
-            required
-            className="pr-12"
-            aria-invalid={Boolean(state.fieldErrors.password)}
-            aria-describedby={state.fieldErrors.password ? 'password-error' : undefined}
-          />
-          <button
-            type="button"
-            onClick={() => setShowPassword((v) => !v)}
-            aria-label={showPassword ? 'Passwort verbergen' : 'Passwort anzeigen'}
-            aria-pressed={showPassword}
-            className="absolute inset-y-0 right-0 flex w-11 items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:text-foreground"
-          >
-            {showPassword ? <EyeOff aria-hidden className="size-4" /> : <Eye aria-hidden className="size-4" />}
-          </button>
-        </div>
+        <PasswordInput
+          ref={passwordRef}
+          id="password"
+          name="password"
+          autoComplete="current-password"
+          required
+          visible={showPassword}
+          onToggle={() => setShowPassword((v) => !v)}
+          aria-invalid={Boolean(state.fieldErrors.password)}
+          aria-describedby={state.fieldErrors.password ? 'password-error' : undefined}
+        />
         {state.fieldErrors.password && <FieldError id="password-error">{state.fieldErrors.password}</FieldError>}
+        <div className="flex justify-end">
+          <Link href="/passwort-vergessen" className="inline-flex min-h-11 items-center text-sm underline underline-offset-4 md:min-h-9">
+            Passwort vergessen?
+          </Link>
+        </div>
       </div>
 
       <Button type="submit" className="w-full" size="lg" disabled={pending} aria-busy={pending}>

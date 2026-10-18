@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { buildCsp, createNonce } from '@/lib/csp'
 import { updateSession } from '@/lib/supabase/proxy'
+import { isPublicPath, redirectsWhenSignedIn } from '@/lib/public-paths'
 import { LAST_TENANT_COOKIE, tenantIdFromPath } from '@/lib/tenant-paths'
 
 // Convenience layer only (session refresh, redirects, CSP). It is NOT a security boundary:
@@ -22,14 +23,13 @@ export async function proxy(request: NextRequest) {
 
   const { response, hasSession } = await updateSession(request, forward)
   const { pathname } = request.nextUrl
-  const isLogin = pathname === '/login'
 
   let result: NextResponse = response
-  if (!hasSession && !isLogin) {
+  if (!hasSession && !isPublicPath(pathname)) {
     result = pathname.startsWith('/api/')
       ? NextResponse.json({ error: 'unauthorized' }, { status: 401 })
       : NextResponse.redirect(new URL('/login', request.url))
-  } else if (hasSession && isLogin) {
+  } else if (hasSession && redirectsWhenSignedIn(pathname)) {
     result = NextResponse.redirect(new URL('/', request.url))
   }
 
