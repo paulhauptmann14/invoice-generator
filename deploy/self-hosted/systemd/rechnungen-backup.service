@@ -1,13 +1,13 @@
 # Template: replace @USER@ (a user that may run docker) and @REPO_DIR@ (path of this repository), then copy to
 # /etc/systemd/system/. The README describes the steps.
 [Unit]
-Description=Encrypted backup of the invoice app
+Description=Invoice app: nightly backup
 Wants=docker.service
 After=docker.service
 
 [Service]
 Type=oneshot
 User=@USER@
-ExecStart=@REPO_DIR@/deploy/self-hosted/scripts/backup
+ExecStart=@REPO_DIR@/deploy/self-hosted/scripts/backup --if-enabled
 Nice=10
 IOSchedulingClass=idle

@@ -1,11 +1,17 @@
 #!/usr/bin/env bash
 # Replaces ALL data on this machine with the content of a backup made by scripts/backup. Also the way to move the app to a new
-# machine: install Docker, age and this repository there, then run restore (no setup needed first).
+# machine: install Docker and this repository there (and age, for encrypted backups), then run restore (no setup needed first).
 #
-#   restore [--yes] [--no-safety-backup] <backup file>
+#   [APP_HOST=...] [HTTP_PORT=...] [HTTPS_PORT=...] [BACKUPS=on|off] [BACKUP_DIR=...] [AGE_RECIPIENT=...] restore [--yes] [--no-safety-backup] <backup file>
 #
-# Asks for the path of your private age key (or reads AGE_IDENTITY). --yes skips the confirmation question (tests).
-# Before it deletes anything it makes a safety copy of the current data (rechnungen-safety-*.tar.age in the backup directory,
+# The backed-up .env comes back as it was. When the machine is different (new name, backups to switch off, other key), set the
+# matching variable in the environment: each one that is set (an empty AGE_RECIPIENT means "no encryption", an empty BACKUP_DIR
+# means ./backups) replaces that line in the restored .env. Values are validated like in setup, before anything is changed.
+# Example: APP_HOST=raspberrypi.local BACKUPS=off AGE_RECIPIENT= scripts/restore backup.tar
+#
+# A backup named *.tar.age is encrypted: restore asks for the path of your private age key (or reads AGE_IDENTITY). A backup
+# named *.tar is not encrypted and needs no key. --yes skips the confirmation question (tests).
+# Before it deletes anything it makes a safety copy of the current data (rechnungen-safety-*.tar.age or .tar in the backup directory,
 # never pruned; skipped when the database has no accounts yet, or with --no-safety-backup, e.g. when the old installation is
 # too broken to back up). If the restore fails half way, run it again with the same file.
 #
@@ -35,17 +41,55 @@ done
 [ -n "$FILE" ] || die "$USAGE"
 [ -f "$FILE" ] || die "backup file not found: $FILE"
 
-for tool in docker age tar; do
+# Overrides for the restored .env (see the header). Checked now, before anything is touched.
+OVERRIDE_KEYS=""
+for key in APP_HOST HTTP_PORT HTTPS_PORT BACKUPS BACKUP_DIR AGE_RECIPIENT; do
+  if [ -n "${!key+x}" ]; then
+    value="${!key}"
+    if [ "$key" = BACKUP_DIR ] && [ -z "$value" ]; then
+      value=./backups
+    fi
+    check_env_value "$key" "$value"
+    OVERRIDE_KEYS="$OVERRIDE_KEYS $key"
+  fi
+done
+if [ -n "${AGE_RECIPIENT:-}" ]; then
+  command -v age >/dev/null 2>&1 || die "'age' is required for encrypted backups but not installed (install it, or set AGE_RECIPIENT to an empty value)"
+fi
+
+# The file name tells whether the backup is encrypted.
+case "$FILE" in
+  *.tar.age) ENCRYPTED=1 ;;
+  *.tar) ENCRYPTED=0 ;;
+  *) die "the backup file name must end in .tar.age or .tar (.tar.age is encrypted, .tar is not): $FILE" ;;
+esac
+
+for tool in docker tar; do
   command -v "$tool" >/dev/null 2>&1 || die "'$tool' is required but not installed"
 done
+if [ "$ENCRYPTED" = 1 ]; then
+  command -v age >/dev/null 2>&1 || die "'age' is required to open an encrypted backup but not installed"
+fi
 docker info >/dev/null 2>&1 || die "cannot talk to the Docker daemon (is it running, are you in the docker group?)"
 
-identity="${AGE_IDENTITY:-}"
-if [ -z "$identity" ]; then
-  [ -t 0 ] || die "no terminal to ask for the private age key; set AGE_IDENTITY to its path"
-  read -r -p "Path to your private age key file: " identity
+identity=""
+if [ "$ENCRYPTED" = 1 ]; then
+  identity="${AGE_IDENTITY:-}"
+  if [ -z "$identity" ]; then
+    [ -t 0 ] || die "no terminal to ask for the private age key; set AGE_IDENTITY to its path"
+    read -r -p "Path to your private age key file: " identity
+  fi
+  [ -f "$identity" ] || die "age key file not found: $identity"
 fi
-[ -f "$identity" ] || die "age key file not found: $identity"
+
+# The tar stream of the backup: decrypted for .tar.age, as is for .tar.
+archive_stream() {
+  if [ "$ENCRYPTED" = 1 ]; then
+    age -d -i "$identity" "$FILE"
+  else
+    cat "$FILE"
+  fi
+}
 
 work="$(mktemp -d)"
 DESTROYED=0 # set once the old data is gone
@@ -58,7 +102,12 @@ on_exit() {
       echo
       echo "RESTORE INCOMPLETE. The old data on this machine has been deleted and the backup was not fully restored."
       echo "The app is not running. Fix the cause named above, then run restore again with the same backup file:"
-      echo "  $0 $FILE"
+      # Repeat the environment overrides, otherwise the retry restores the backup's own values (e.g. the old APP_HOST).
+      local retry="" key
+      for key in $OVERRIDE_KEYS; do
+        retry="$retry$key=$(printf '%q' "${!key}") "
+      done
+      echo "  $retry$0 $(printf '%q' "$FILE")"
       if [ -n "$SAFETY_FILE" ]; then
         echo "The data this machine had before the restore is saved in: $SAFETY_FILE"
       fi
@@ -72,15 +121,21 @@ trap on_exit EXIT
 
 # Everything is decrypted and checked before anything on this machine is touched. Only the expected members are unpacked.
 # Archives from before the migration list existed have no migrations.txt/commit.txt: list first, then unpack what is there.
-info "Decrypting the backup ..."
-members="$(age -d -i "$identity" "$FILE" | tar -tf -)" || die "could not decrypt or unpack the backup (wrong key or damaged file); nothing was changed"
+if [ "$ENCRYPTED" = 1 ]; then
+  info "Decrypting the backup ..."
+  open_error="could not decrypt or unpack the backup (wrong key or damaged file); nothing was changed"
+else
+  info "Reading the backup (not encrypted) ..."
+  open_error="could not unpack the backup (damaged file?); nothing was changed"
+fi
+members="$(archive_stream | tar -tf -)" || die "$open_error"
 unpack=(data.sql storage.tar caddy.tar .env)
 for part in migrations.txt commit.txt; do
   if grep -qx "$part" <<<"$members"; then
     unpack+=("$part")
   fi
 done
-age -d -i "$identity" "$FILE" | tar -x -C "$work" "${unpack[@]}" || die "could not decrypt or unpack the backup (wrong key or damaged file); nothing was changed"
+archive_stream | tar -x -C "$work" "${unpack[@]}" || die "$open_error"
 for part in data.sql storage.tar caddy.tar .env; do
   [ -s "$work/$part" ] || die "the backup is incomplete ($part is missing); nothing was changed"
 done
@@ -102,10 +157,24 @@ else
   echo "this copy of the repository; that only works if the schema has not changed since the backup was made." >&2
 fi
 
+# Whether a safety copy of the current data is made is decided now, so the confirmation can say it. With backups switched off
+# there is none (like --no-safety-backup). A machine without a .env has nothing to save anyway.
+SAFETY_NOTE=""
+if [ "$SAFETY_BACKUP" = 0 ]; then
+  SAFETY_NOTE="No safety backup of the current data will be made (--no-safety-backup)."
+elif [ -f "$ENV_FILE" ] && ! backups_enabled; then
+  SAFETY_BACKUP=0
+  SAFETY_NOTE="Backups are off - restoring without a safety backup of the current data."
+fi
+if [ -n "$OVERRIDE_KEYS" ]; then
+  info "The restored .env gets these values from the environment:$OVERRIDE_KEYS"
+fi
+[ -z "$SAFETY_NOTE" ] || info "$SAFETY_NOTE"
+
 if [ "$ASSUME_YES" = 0 ]; then
   [ -t 0 ] || die "no terminal to ask for confirmation; use --yes to confirm"
   echo "All data on this device will be replaced by the content of $(basename "$FILE")."
-  read -r -p "Type 'yes' to continue: " answer
+  read -r -p "${SAFETY_NOTE:+$SAFETY_NOTE }Type 'yes' to continue: " answer
   [ "$answer" = yes ] || die "cancelled; nothing was changed"
 fi
 
@@ -147,6 +216,13 @@ if [ -f "$ENV_FILE" ]; then
 fi
 DESTROYED=1
 (umask 077 && cp "$work/.env" "$ENV_FILE")
+for key in $OVERRIDE_KEYS; do
+  value="${!key}"
+  if [ "$key" = BACKUP_DIR ] && [ -z "$value" ]; then
+    value=./backups
+  fi
+  set_env_value "$ENV_FILE" "$key" "$value"
+done
 # A stack of the restored project name may still exist from an earlier attempt.
 compose down -v --remove-orphans
 

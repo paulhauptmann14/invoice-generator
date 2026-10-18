@@ -5,6 +5,13 @@ set -euo pipefail
 # shellcheck source=lib/common.sh
 . "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 
+if backups_enabled; then
+  echo "Backups: on"
+else
+  echo "Backups: OFF (enable: see README 'Turn on backups')"
+fi
+echo
+
 echo "== containers"
 compose ps
 
@@ -24,19 +31,31 @@ dir="$(backup_dir)"
 latest=""
 if [ -d "$dir" ]; then
   # Only finished archives count: the lock file is touched by every run (also a failed one) and .partial.* files are unfinished.
-  # rechnungen-<digit>... excludes the safety copies that restore makes (rechnungen-safety-...).
-  latest="$(find "$dir" -maxdepth 1 -type f -name 'rechnungen-[0-9]*.tar.age' -exec ls -t {} + 2>/dev/null | head -n 1 || true)"
+  # rechnungen-<digit>... excludes the safety copies that restore makes (rechnungen-safety-...). Encrypted (.tar.age) and
+  # unencrypted (.tar) backups both count.
+  latest="$(find "$dir" -maxdepth 1 -type f \( -name 'rechnungen-[0-9]*.tar.age' -o -name 'rechnungen-[0-9]*.tar' \) -exec ls -t {} + 2>/dev/null | head -n 1 || true)"
 fi
 if [ -n "$latest" ]; then
-  echo "$latest ($(date -r "$latest" '+%Y-%m-%d %H:%M'))"
+  case "$latest" in
+    *.age) kind="encrypted" ;;
+    *) kind="NOT encrypted" ;;
+  esac
+  echo "$latest ($(date -r "$latest" '+%Y-%m-%d %H:%M')) - $kind"
 else
   echo "none in $dir"
+fi
+if backups_enabled; then
+  if [ -n "$(env_get AGE_RECIPIENT)" ]; then
+    echo "new backups: encrypted (AGE_RECIPIENT is set)"
+  else
+    echo "new backups: NOT encrypted (AGE_RECIPIENT is empty; set a key in .env before backups go to an external disk)"
+  fi
 fi
 
 # Safety copies made by restore: they are never pruned, so list them for the user to delete when no longer needed.
 safety=""
 if [ -d "$dir" ]; then
-  safety="$(find "$dir" -maxdepth 1 -type f -name 'rechnungen-safety-*.tar.age' | LC_ALL=C sort)"
+  safety="$(find "$dir" -maxdepth 1 -type f \( -name 'rechnungen-safety-*.tar.age' -o -name 'rechnungen-safety-*.tar' \) | LC_ALL=C sort)"
 fi
 if [ -n "$safety" ]; then
   echo

@@ -31,6 +31,35 @@ env_get() { # env_get <KEY> [default]
   echo "${value:-${2:-}}"
 }
 
+# True unless .env says BACKUPS=off. A .env without the key (made before the switch existed) counts as on, so installations
+# that already had backups keep them. Manual `backup` ignores this; the timer, update and restore honour it.
+backups_enabled() {
+  [ "$(env_get BACKUPS on)" != off ]
+}
+
+# Validates a value for one of the .env keys that restore may override (same rules as setup). Dies with a message otherwise.
+check_env_value() { # check_env_value <KEY> <value>
+  local key=$1 value=$2
+  case "$key" in
+    APP_HOST) [[ "$value" =~ ^[A-Za-z0-9.-]+$ ]] || die "APP_HOST may only contain letters, digits, dots and hyphens" ;;
+    HTTP_PORT | HTTPS_PORT) [[ "$value" =~ ^[0-9]+$ ]] || die "$key must be a number" ;;
+    BACKUPS) [[ "$value" = on || "$value" = off ]] || die "BACKUPS must be 'on' or 'off'" ;;
+    AGE_RECIPIENT)
+      [ -z "$value" ] || [[ "$value" =~ ^age1[a-z0-9]+$ ]] || die "AGE_RECIPIENT must be an age public key starting with age1 (or empty for unencrypted backups)"
+      ;;
+    BACKUP_DIR) [[ "$value" != *$'\n'* ]] || die "BACKUP_DIR must be a single line" ;;
+  esac
+}
+
+# Sets KEY=value in an env file (replaces the line or appends it). The file keeps its mode.
+set_env_value() { # set_env_value <file> <KEY> <value>
+  local file=$1 key=$2 value=$3 tmp
+  tmp="$(umask 077 && mktemp "$file.XXXXXX")"
+  grep -v "^$key=" "$file" >"$tmp" || true
+  printf '%s=%s\n' "$key" "$value" >>"$tmp"
+  mv "$tmp" "$file"
+}
+
 # Runs psql as the database owner inside the db container; the script comes from stdin.
 # Secrets must not travel in arguments (visible in the process list): export them and list their names in
 # PSQL_PASS_ENV, then read them in the script with \getenv and use them as :'variable'.

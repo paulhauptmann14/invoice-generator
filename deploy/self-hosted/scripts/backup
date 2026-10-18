@@ -1,14 +1,19 @@
 #!/usr/bin/env bash
-# Encrypted backup of everything that is not in git: the database (data only), the storage files, Caddy's certificate
-# authority and the .env file. Writes $BACKUP_DIR/rechnungen-YYYY-MM-DD-HHMM.tar.age, readable only with the private
-# age key that belongs to AGE_RECIPIENT, and prunes old backups. The app keeps running.
+# Backup of everything that is not in git: the database (data only), the storage files, Caddy's certificate authority and
+# the .env file. Prunes old backups afterwards. The app keeps running.
+#
+# With AGE_RECIPIENT set in .env the archive is encrypted: $BACKUP_DIR/rechnungen-YYYY-MM-DD-HHMM.tar.age, readable only with
+# the private age key that belongs to it. With AGE_RECIPIENT empty it is written as plain $BACKUP_DIR/rechnungen-YYYY-MM-DD-HHMM.tar
+# (readable by the owner only, file mode 600) and a warning says so. Pruning counts both kinds together.
 #
 # The archive also holds migrations.txt (the applied migration versions) and commit.txt (git commit of this checkout), so a
 # restore knows which schema the data belongs to.
 #
-#   backup           regular backup, followed by pruning
-#   backup --safety  the safety copy that restore makes of the current data: named rechnungen-safety-YYYY-MM-DD-HHMM.tar.age,
-#                    never pruned and not counted by pruning, so it can neither delete nor crowd out a real backup
+#   backup           regular backup, followed by pruning. Always works, also with BACKUPS=off in .env (an explicit command; it is
+#                    how data is moved to a new machine)
+#   backup --if-enabled  the same, but does nothing (exit 0, one message) when .env says BACKUPS=off; the nightly timer uses this
+#   backup --safety  the safety copy that restore makes of the current data: named rechnungen-safety-YYYY-MM-DD-HHMM.tar.age
+#                    (or .tar), never pruned and not counted by pruning, so it can neither delete nor crowd out a real backup
 set -euo pipefail
 
 # shellcheck source=lib/common.sh
@@ -23,18 +28,30 @@ MIN_YEAR=2026
 LOCK_TIMEOUT="${BACKUP_LOCK_TIMEOUT:-600}"
 
 SAFETY=0
-case "${1:-}" in
-  --safety) SAFETY=1 ;;
-  "") ;;
-  *) die "usage: backup [--safety]" ;;
-esac
+IF_ENABLED=0
+for arg in "$@"; do
+  case "$arg" in
+    --safety) SAFETY=1 ;;
+    --if-enabled) IF_ENABLED=1 ;;
+    *) die "usage: backup [--if-enabled] [--safety]" ;;
+  esac
+done
 
-for tool in docker age tar; do
+[ -f "$ENV_FILE" ] || die "$ENV_FILE does not exist (run setup first)"
+if [ "$IF_ENABLED" = 1 ] && ! backups_enabled; then
+  info "Backups are off (BACKUPS=off in $ENV_FILE); nothing was done. To switch them on see the README, chapter 'Turn on backups'."
+  exit 0
+fi
+
+for tool in docker tar; do
   command -v "$tool" >/dev/null 2>&1 || die "'$tool' is required but not installed"
 done
-[ -f "$ENV_FILE" ] || die "$ENV_FILE does not exist (run setup first)"
+# Empty means: no encryption.
 recipient="$(env_get AGE_RECIPIENT)"
-[[ "$recipient" =~ ^age1[a-z0-9]+$ ]] || die "AGE_RECIPIENT in $ENV_FILE is not an age public key"
+if [ -n "$recipient" ]; then
+  [[ "$recipient" =~ ^age1[a-z0-9]+$ ]] || die "AGE_RECIPIENT in $ENV_FILE is not an age public key (it must start with age1, or be empty for unencrypted backups)"
+  command -v age >/dev/null 2>&1 || die "'age' is required for encrypted backups but not installed (install it, or leave AGE_RECIPIENT empty)"
+fi
 
 year="$(date +%Y)"
 [[ "$year" =~ ^[0-9]{4}$ ]] && [ "$year" -ge "$MIN_YEAR" ] || die "the system clock says year '$year'; refusing to back up with a clock that is clearly wrong (wait for the time sync, or set the date)"
@@ -87,14 +104,15 @@ stamp() { # stamp <epoch>
 }
 
 # Keeps the newest KEEP_RECENT backups plus the newest backup of each of the last KEEP_MONTHS calendar months (counted back from
-# the current one). Only files named like our backups are touched. Works on the timestamp in the name, no date arithmetic.
+# the current one). Encrypted (.tar.age) and unencrypted (.tar) backups are counted together. Only files named like our
+# backups are touched (not the safety copies). Works on the timestamp in the name, no date arithmetic.
 prune() { # prune <dir> <file name that must stay>
   local dir=$1 protected=$2 file name month seen=" " position=0 month_index cutoff keep
   cutoff=$(( 10#$(date +%Y) * 12 + 10#$(date +%m) - KEEP_MONTHS ))
   # Newest first (names sort chronologically).
   while IFS= read -r file; do
     name="$(basename "$file")"
-    [[ "$name" =~ ^rechnungen-([0-9]{4})-([0-9]{2})-[0-9]{2}-[0-9]{4}\.tar\.age$ ]] || continue
+    [[ "$name" =~ ^rechnungen-([0-9]{4})-([0-9]{2})-[0-9]{2}-[0-9]{4}\.tar(\.age)?$ ]] || continue
     position=$((position + 1))
     month="${BASH_REMATCH[1]}-${BASH_REMATCH[2]}"
     month_index=$(( 10#${BASH_REMATCH[1]} * 12 + 10#${BASH_REMATCH[2]} ))
@@ -114,7 +132,7 @@ prune() { # prune <dir> <file name that must stay>
       rm -f "$file"
       info "Removed old backup $name"
     fi
-  done < <(find "$dir" -maxdepth 1 -type f -name 'rechnungen-*.tar.age' | LC_ALL=C sort -r)
+  done < <(find "$dir" -maxdepth 1 -type f \( -name 'rechnungen-*.tar.age' -o -name 'rechnungen-*.tar' \) | LC_ALL=C sort -r)
 }
 
 acquire_lock
@@ -146,17 +164,33 @@ name_prefix=rechnungen
 if [ "$SAFETY" = 1 ]; then
   name_prefix=rechnungen-safety
 fi
+extension=tar
+if [ -n "$recipient" ]; then
+  extension=tar.age
+fi
 epoch="$(date +%s)"
-name="$name_prefix-$(stamp "$epoch").tar.age"
-while [ -e "$dest_dir/$name" ]; do
+# A minute is taken when a backup of either kind has it, so the timestamps in the names stay unique.
+while [ -e "$dest_dir/$name_prefix-$(stamp "$epoch").tar" ] || [ -e "$dest_dir/$name_prefix-$(stamp "$epoch").tar.age" ]; do
   epoch=$((epoch + 60))
-  name="$name_prefix-$(stamp "$epoch").tar.age"
 done
-partial="$(mktemp "$dest_dir/.partial.XXXXXX")"
-tar -C "$work" -cf - data.sql storage.tar caddy.tar .env migrations.txt commit.txt | age -r "$recipient" >"$partial"
+name="$name_prefix-$(stamp "$epoch").$extension"
+partial="$(mktemp "$dest_dir/.partial.XXXXXX")" # created with mode 600 (umask 077)
+if [ -n "$recipient" ]; then
+  tar -C "$work" -cf - data.sql storage.tar caddy.tar .env migrations.txt commit.txt | age -r "$recipient" >"$partial"
+else
+  tar -C "$work" -cf "$partial" data.sql storage.tar caddy.tar .env migrations.txt commit.txt
+fi
 mv "$partial" "$dest_dir/$name"
 partial=""
 info "Backup written: $dest_dir/$name ($(wc -c <"$dest_dir/$name" | tr -d ' ') bytes)"
+if [ -z "$recipient" ]; then
+  # A backup directory outside this installation is probably an external disk: anyone who plugs it in can read the backup
+  # (file modes mean nothing on exFAT, NTFS and FAT).
+  case "$dest_dir/" in
+    "$DEPLOY_DIR"/*) echo "warning: this backup is NOT encrypted (AGE_RECIPIENT in $ENV_FILE is empty); set a key before backups go to an external disk" >&2 ;;
+    *) echo "warning: this backup is NOT encrypted and $dest_dir is outside this installation (an external disk?): anyone who can plug that disk in can read it; set AGE_RECIPIENT in $ENV_FILE first" >&2 ;;
+  esac
+fi
 
 if [ "$SAFETY" = 0 ]; then
   prune "$dest_dir" "$name"

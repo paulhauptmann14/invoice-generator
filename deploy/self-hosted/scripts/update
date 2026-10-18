@@ -4,6 +4,8 @@
 #   update            git pull (fast-forward only), then as above
 #   update --no-pull  skip git pull (tests, or code you updated yourself)
 #
+# With BACKUPS=off in .env the pre-update backup is skipped (with a message) and the update continues.
+#
 # The running app keeps serving until the new image is built. The build comes before the migrations, so a failed backup, pull
 # or build changes neither the running app nor the database. A failed migration is rolled back (one transaction per file) and
 # the old app keeps running: do not restore the backup, fix the cause and run update again. At the end, old images and
@@ -21,8 +23,12 @@ main() {
     *) die "usage: update [--no-pull]" ;;
   esac
 
-  info "Backing up before the update ..."
-  "$scripts/backup" || die "the backup failed; nothing was changed"
+  if backups_enabled; then
+    info "Backing up before the update ..."
+    "$scripts/backup" || die "the backup failed; nothing was changed"
+  else
+    info "Backups are off - updating without a backup."
+  fi
 
   if [ "$pull" = 1 ]; then
     info "Fetching the new version ..."

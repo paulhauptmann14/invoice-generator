@@ -110,19 +110,26 @@ published_ports_only_test_ports() {
 }
 
 # Starts the stack through scripts/setup; the age key pair stays in the temp directory (backup tests need the private key).
-run_setup() {
+# "nokey" leaves AGE_RECIPIENT out of the environment (setup does not ask for it; new installs have no key). Setup then writes
+# BACKUPS=off; the backup tests switch it on in their env file.
+run_setup() { # run_setup [nokey]
   require_free_ports
-  local age_recipient
-  age-keygen -o "$TMP_DIR/age.key" >/dev/null 2>&1
-  age_recipient="$(age-keygen -y "$TMP_DIR/age.key")"
-  echo "== running setup"
-  AGE_RECIPIENT="$age_recipient" APP_HOST="$TEST_HOST" HTTP_PORT="$TEST_HTTP_PORT" HTTPS_PORT="$TEST_HTTPS_PORT" \
-    COMPOSE_PROJECT_NAME="$TEST_PROJECT" OWNER_EMAIL="$TEST_EMAIL" OWNER_PASSWORD="$TEST_PASSWORD" TENANT_NAME="$TEST_TENANT" \
-    bash "$SCRIPTS_DIR/setup"
+  local envs=(APP_HOST="$TEST_HOST" HTTP_PORT="$TEST_HTTP_PORT" HTTPS_PORT="$TEST_HTTPS_PORT" COMPOSE_PROJECT_NAME="$TEST_PROJECT"
+    OWNER_EMAIL="$TEST_EMAIL" OWNER_PASSWORD="$TEST_PASSWORD" TENANT_NAME="$TEST_TENANT")
+  local unset_args=()
+  if [ "${1:-}" = nokey ]; then
+    unset_args=(-u AGE_RECIPIENT)
+  else
+    age-keygen -o "$TMP_DIR/age.key" >/dev/null 2>&1
+    envs+=(AGE_RECIPIENT="$(age-keygen -y "$TMP_DIR/age.key")")
+  fi
+  echo "== running setup${1:+ ($1)}"
+  env ${unset_args[@]+"${unset_args[@]}"} "${envs[@]}" bash "$SCRIPTS_DIR/setup" </dev/null
 }
 
 cmd_setup() {
-  run_setup
+  # The setup part runs with an empty AGE_RECIPIENT: the key is optional.
+  run_setup nokey
 
   echo "== checks"
   check "(a) HTTPS /login returns 200 with a nonce CSP" login_page_ok
@@ -187,9 +194,58 @@ cmd_setup() {
   err="$(ENV_FILE="$TMP_DIR/never-written.env" APP_HOST='bad host' AGE_RECIPIENT=age1abc bash "$SCRIPTS_DIR/setup" 2>&1 || true)"
   check "(m) setup refuses an APP_HOST with a space and writes no .env" refused_without_env "$TMP_DIR/never-written.env" "$err"
 
+  echo "== optional backup key"
+  check "(af) setup with an empty AGE_RECIPIENT wrote the line AGE_RECIPIENT= (empty) to .env" grep -qx 'AGE_RECIPIENT=' "$ENV_FILE"
+  grep -v '^AGE_RECIPIENT=' "$ENV_FILE" >"$TMP_DIR/no-key-line.env"
+  err="$(ENV_FILE="$TMP_DIR/no-key-line.env" bash "$SCRIPTS_DIR/setup" 2>&1 || true)"
+  check "(af) setup refuses an existing .env without the AGE_RECIPIENT line" grep -q 'incomplete (empty or missing: AGE_RECIPIENT)' <<<"$err"
+  err="$(ENV_FILE="$TMP_DIR/never-written-2.env" APP_HOST=rechnungen.localhost AGE_RECIPIENT=notakey bash "$SCRIPTS_DIR/setup" 2>&1 </dev/null || true)"
+  check "(af) setup still rejects a non-empty AGE_RECIPIENT that is not an age key, and writes no .env" \
+    bash -c "[ ! -e '$TMP_DIR/never-written-2.env' ] && grep -q 'AGE_RECIPIENT must be' <<<\"\$1\"" _ "$err"
+  # Re-running setup on the existing .env with the empty key keeps the .env and works.
+  err="$(bash "$SCRIPTS_DIR/setup" </dev/null 2>&1)" || { echo "$err" | tail -n 5; fail "(af) re-running setup with an empty AGE_RECIPIENT succeeds"; }
+  check "(af) the re-run kept the existing .env" grep -q 'Keeping the existing' <<<"$err"
+
   echo "== status and cert"
   check "(i) status runs" quietly bash "$SCRIPTS_DIR/status"
   check "(j) cert exports the root certificate" cert_exported
+
+  echo "== backups are off by default"
+  check "(al) a new install has BACKUPS=off and an empty AGE_RECIPIENT, and setup did not ask for a key" \
+    bash -c "grep -qx 'BACKUPS=off' '$ENV_FILE' && grep -qx 'AGE_RECIPIENT=' '$ENV_FILE'"
+  sed 's/^BACKUPS=.*/BACKUPS=maybe/' "$ENV_FILE" >"$TMP_DIR/bad-backups.env"
+  err="$(ENV_FILE="$TMP_DIR/bad-backups.env" bash "$SCRIPTS_DIR/setup" 2>&1 </dev/null || true)"
+  check "(al) setup refuses an existing .env with BACKUPS other than on/off" grep -q "BACKUPS must be 'on' or 'off'" <<<"$err"
+  local off_dir="$TMP_DIR/off-backups" rc=0 off_files tenant off_archive
+  sed -i.bak "s|^BACKUP_DIR=.*|BACKUP_DIR=$off_dir|" "$ENV_FILE" && rm -f "$ENV_FILE.bak"
+  err="$(bash "$SCRIPTS_DIR/status" 2>&1)"
+  check "(al) status: the first line says 'Backups: OFF' and points to the README" bash -c "head -n 1 <<<\"\$1\" | grep -q '^Backups: OFF (enable: see README .Turn on backups.)\$'" _ "$err"
+  err="$(bash "$SCRIPTS_DIR/backup" --if-enabled 2>&1)" || rc=$?
+  check "(al) backup --if-enabled does nothing and exits 0 while backups are off" test "$rc" = 0 -a -z "$(find "$off_dir" -type f 2>/dev/null)"
+  check "(al) it says so in one line" test "$(grep -c 'Backups are off' <<<"$err")" = 1
+  tenant="$(psql_test -c 'select id from public.tenants limit 1')"
+  psql_test -c "insert into public.customers (tenant_id, name) values ('$tenant', 'Off Kunde')" >/dev/null
+  err="$(bash "$SCRIPTS_DIR/backup" 2>&1)" || { echo "$err"; fail "(al) a manual backup works while backups are off"; }
+  off_archive="$(find "$off_dir" -maxdepth 1 -type f -name 'rechnungen-[0-9]*.tar' | sort | tail -n 1)"
+  check "(al) a manual backup still works while backups are off (rechnungen-....tar)" test -s "$off_archive"
+  err="$(bash "$SCRIPTS_DIR/status" 2>&1)"
+  check "(al) status still lists the existing backup while backups are off" grep -qF "$(basename "$off_archive")" <<<"$err"
+  err="$(bash "$SCRIPTS_DIR/update" --no-pull 2>&1)" || { echo "$err" | tail -n 8; fail "(al) update --no-pull succeeds while backups are off"; }
+  check "(al) update says it continues without a backup" grep -qi 'backups are off - updating without a backup' <<<"$err"
+  off_files="$(find "$off_dir" -type f ! -name .backup.lock | wc -l | tr -d ' ')"
+  check "(al) update made no backup" test "$off_files" = 1
+  check "(al) the app serves the login page after the update" wait_for_login_page
+  psql_test -c "delete from public.customers where name = 'Off Kunde'" >/dev/null
+  psql_test -c "insert into public.customers (tenant_id, name) values ('$tenant', 'Added after off backup')" >/dev/null
+  err="$(env -u AGE_IDENTITY bash "$SCRIPTS_DIR/restore" --yes "$off_archive" 2>&1 </dev/null)" || { echo "$err" | tail -n 12; fail "(al) restore succeeds while backups are off"; }
+  check "(al) restore says it skips the safety backup because backups are off" grep -q 'Backups are off - restoring without a safety backup' <<<"$err"
+  check "(al) the notice comes BEFORE the destructive step (and so before any confirmation)" bash -c "
+    notice=\$(grep -n 'Backups are off - restoring without a safety backup' <<<\"\$1\" | head -n 1 | cut -d: -f1); stop=\$(grep -n 'Stopping the current stack' <<<\"\$1\" | head -n 1 | cut -d: -f1)
+    [ -n \"\$notice\" ] && [ -n \"\$stop\" ] && [ \"\$notice\" -lt \"\$stop\" ]" _ "$err"
+  check "(al) restore made no safety backup" bash -c "! grep -q 'Making a safety backup' <<<\"\$1\" && [ -z \"\$(find '$off_dir' -name 'rechnungen-safety-*')\" ]" _ "$err"
+  check "(al) restored: the customer from the backup is back, the later one is gone" test \
+    "$(psql_test -c "select count(*) filter (where name = 'Off Kunde')::text || count(*) filter (where name = 'Added after off backup')::text from public.customers")" = 10
+  check "(ao) the systemd service runs the backup with --if-enabled" grep -qE '^ExecStart=.*/scripts/backup --if-enabled$' "$DEPLOY_DIR/systemd/rechnungen-backup.service"
 }
 
 # ---- backup / restore / update ----
@@ -220,16 +276,24 @@ days_ago() {
 backup_files() { find "$1" -maxdepth 1 -name 'rechnungen-[0-9]*.tar.age' | sort; }
 safety_files() { find "$1" -maxdepth 1 -name 'rechnungen-safety-*.tar.age' | sort; }
 
+# The tar stream of a backup: decrypted for .tar.age, as is for .tar.
+archive_stream() { case "$1" in *.age) age -d -i "$TMP_DIR/age.key" "$1" ;; *) cat "$1" ;; esac; }
+
+file_mode() { stat -c %a "$1" 2>/dev/null || stat -f %Lp "$1"; }
+
+# Regular backups of both kinds (not the safety copies).
+all_backup_files() { find "$1" -maxdepth 1 -type f \( -name 'rechnungen-[0-9]*.tar.age' -o -name 'rechnungen-[0-9]*.tar' \) | sort; }
+
 archive_lists() { # archive_lists <file>: the decrypted archive holds the expected entries
   local listing
-  listing="$(age -d -i "$TMP_DIR/age.key" "$1" | tar -tf -)"
+  listing="$(archive_stream "$1" | tar -tf -)"
   echo "  archive entries: $(tr '\n' ' ' <<<"$listing")"
   grep -qE '(^|/)data\.sql$' <<<"$listing" && grep -qE '(^|/)storage\.tar$' <<<"$listing" \
     && grep -qE '(^|/)caddy\.tar$' <<<"$listing" && grep -qE '(^|/)\.env$' <<<"$listing" \
     && grep -qE '(^|/)migrations\.txt$' <<<"$listing" && grep -qE '(^|/)commit\.txt$' <<<"$listing"
 }
 
-archive_member() { age -d -i "$TMP_DIR/age.key" "$1" | tar -xOf - "$2"; } # archive_member <file> <member>
+archive_member() { archive_stream "$1" | tar -xOf - "$2"; } # archive_member <file> <member>
 
 # True when the migration list stored in the archive equals the versions of the files in the repository.
 archive_manifest_matches_repo() {
@@ -252,7 +316,9 @@ cmd_backup() {
   run_setup
   local backups="$TMP_DIR/backups" tenant token logo
   mkdir -p "$backups"
-  sed -i.bak "s|^BACKUP_DIR=.*|BACKUP_DIR=$backups|" "$ENV_FILE" && rm -f "$ENV_FILE.bak"
+  # Setup wrote BACKUPS=off; the backup checks run with backups on.
+  sed -i.bak -e "s|^BACKUP_DIR=.*|BACKUP_DIR=$backups|" -e 's|^BACKUPS=.*|BACKUPS=on|' "$ENV_FILE" && rm -f "$ENV_FILE.bak"
+  check "(am) the test env has BACKUPS=on" grep -qx 'BACKUPS=on' "$ENV_FILE"
 
   echo "== test data"
   tenant="$(psql_test -c 'select id from public.tenants limit 1')"
@@ -448,6 +514,117 @@ cmd_backup() {
   check "(s) restored: Caddy's root certificate is unchanged" cmp -s "$TMP_DIR/root-before.crt" "$TMP_DIR/rechnungen-root.crt"
   check "(s) restored: migrations are all applied (nothing left)" grep -q '^0 applied' <(bash "$SCRIPTS_DIR/migrate")
 
+  echo "== backups on: legacy .env without a BACKUPS line counts as on"
+  mkdir -p "$TMP_DIR/legacy-backups"
+  grep -v '^BACKUPS=' "$ENV_FILE" | sed "s|^BACKUP_DIR=.*|BACKUP_DIR=$TMP_DIR/legacy-backups|" >"$TMP_DIR/legacy.env"
+  ENV_FILE="$TMP_DIR/legacy.env" bash "$SCRIPTS_DIR/backup" --if-enabled >/dev/null 2>&1 || true
+  check "(am) backup --if-enabled makes a backup when the .env has no BACKUPS line" test "$(find "$TMP_DIR/legacy-backups" -name 'rechnungen-[0-9]*.tar.age' -size +0 | wc -l | tr -d ' ')" = 1
+  ENV_FILE="$TMP_DIR/legacy.env" bash "$SCRIPTS_DIR/status" >"$TMP_DIR/status-legacy.log"
+  check "(am) status says 'Backups: on' for it" bash -c "head -n 1 '$TMP_DIR/status-legacy.log' | grep -q '^Backups: on\$'"
+
+  echo "== status shows whether the newest backup is encrypted"
+  ENV_FILE="$ENV_FILE" bash "$SCRIPTS_DIR/status" >"$TMP_DIR/status-key.log"
+  check "(ag) status: the newest backup line ends with '- encrypted' (key set)" \
+    bash -c "awk '/^== newest backup/ { getline; print; exit }' '$TMP_DIR/status-key.log' | grep -qE 'tar\.age \(.*\) - encrypted\$'"
+  check "(ag) status: says that AGE_RECIPIENT is set" grep -q 'AGE_RECIPIENT is set' "$TMP_DIR/status-key.log"
+
+  echo "== unencrypted backups (empty AGE_RECIPIENT)"
+  local plain="$TMP_DIR/plain" plain_archive plain_out plain_restore_out plain_logo="$TMP_DIR/logo2.png" fakeage="$TMP_DIR/fakeage"
+  mkdir -p "$plain" "$fakeage"
+  # An "age" that records every call and fails: nothing in the unencrypted path may run it.
+  printf '#!/bin/sh\necho called >>"%s/age-called"\nexit 99\n' "$TMP_DIR" >"$fakeage/age"
+  chmod +x "$fakeage/age"
+  sed -e 's|^AGE_RECIPIENT=.*|AGE_RECIPIENT=|' -e "s|^BACKUP_DIR=.*|BACKUP_DIR=$plain|" "$ENV_FILE" >"$TMP_DIR/nokey.env"
+  check "(ah) the test env has an empty AGE_RECIPIENT line" grep -qx 'AGE_RECIPIENT=' "$TMP_DIR/nokey.env"
+  psql_test -c "insert into public.customers (tenant_id, name) values ('$tenant', 'Plain Kunde')" >/dev/null
+  token="$(access_token "$TEST_EMAIL" "$TEST_PASSWORD")"
+  head -c 3000 /dev/urandom | base64 >"$plain_logo"
+  storage_upload "$token" "$tenant/logo-2.png" "$plain_logo" >/dev/null
+  plain_out="$(ENV_FILE="$TMP_DIR/nokey.env" PATH="$fakeage:$PATH" bash "$SCRIPTS_DIR/backup" 2>&1)" || { echo "$plain_out"; fail "(ah) backup with an empty AGE_RECIPIENT succeeds"; }
+  printf '%s\n' "$plain_out" | sed 's/^/  | /'
+  plain_archive="$(find "$plain" -maxdepth 1 -type f -name 'rechnungen-[0-9]*.tar' | sort | tail -n 1)"
+  check "(ah) backup wrote rechnungen-YYYY-MM-DD-HHMM.tar (no .age)" grep -qE '/rechnungen-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{4}\.tar$' <<<"$plain_archive"
+  check "(ah) the unencrypted archive is mode 600" test "$(file_mode "$plain_archive")" = 600
+  check "(ah) it holds data.sql, storage.tar, caddy.tar, .env, migrations.txt and commit.txt" archive_lists "$plain_archive"
+  check "(ah) its migrations.txt lists exactly the applied migrations" archive_manifest_matches_repo "$plain_archive"
+  check "(ah) its data.sql holds the customer" bash -c "tar -xOf '$plain_archive' data.sql | grep -q 'Plain Kunde'"
+  check "(ah) its storage.tar holds the second logo" bash -c "tar -xOf '$plain_archive' storage.tar | tar -tf - | grep -q 'logo-2.png'"
+  check "(ah) a one-line warning says the backup is NOT encrypted" test "$(grep -c 'NOT encrypted' <<<"$plain_out")" = 1
+  check "(ah) the warning says the directory is outside this installation and to set AGE_RECIPIENT first" bash -c "grep 'NOT encrypted' <<<\"\$1\" | grep -q 'outside this installation.*set AGE_RECIPIENT'" _ "$plain_out"
+  # A backup directory below the deploy directory (the default) gets the shorter warning.
+  local inside_out
+  inside_out="$(sed "s|^BACKUP_DIR=.*|BACKUP_DIR=./.stack-test-backups|" "$TMP_DIR/nokey.env" >"$TMP_DIR/inside.env"; ENV_FILE="$TMP_DIR/inside.env" PATH="$fakeage:$PATH" bash "$SCRIPTS_DIR/backup" 2>&1)" \
+    || fail "(ah) backup into a directory below the deploy directory succeeds"
+  rm -rf "${DEPLOY_DIR:?}/.stack-test-backups"
+  check "(ah) inside the deploy directory the warning is the short one (no 'outside')" bash -c "grep 'NOT encrypted' <<<\"\$1\" | grep -qv 'outside this installation'" _ "$inside_out"
+  check "(ah) the age program was never called" test ! -e "$TMP_DIR/age-called"
+  check "(ah) no work files are left in the backup directory" test "$(find "$plain" -type f ! -name .backup.lock | wc -l | tr -d ' ')" = 1
+  ENV_FILE="$TMP_DIR/nokey.env" bash "$SCRIPTS_DIR/status" >"$TMP_DIR/status-nokey.log"
+  check "(ai) status: the newest backup line names the .tar and ends with '- NOT encrypted'" \
+    bash -c "awk '/^== newest backup/ { getline; print; exit }' '$TMP_DIR/status-nokey.log' | grep -qE '$(basename "$plain_archive") \(.*\) - NOT encrypted\$'"
+  check "(ai) status: says that AGE_RECIPIENT is empty" grep -q 'AGE_RECIPIENT is empty' "$TMP_DIR/status-nokey.log"
+
+  echo "== retention counts .tar and .tar.age together"
+  local mixed="$TMP_DIR/mixed" ext
+  mkdir -p "$mixed"
+  for i in $(seq 3 22); do
+    if [ $((i % 2)) = 0 ]; then ext=tar; else ext=tar.age; fi
+    : >"$mixed/rechnungen-$(days_ago "$i")-0315.$ext"
+  done
+  for i in $(seq 1 15); do
+    if [ $((i % 2)) = 0 ]; then ext=tar; else ext=tar.age; fi
+    : >"$mixed/rechnungen-$(days_ago $((i * 31 + 20)))-0315.$ext"
+  done
+  # Never touched: a foreign file, a look-alike with another extension and the safety copies of both kinds (all very old).
+  : >"$mixed/notes-do-not-delete.txt"
+  : >"$mixed/rechnungen-2020-01-01-0000.tar.gz"
+  : >"$mixed/rechnungen-safety-2020-01-01-0000.tar"
+  : >"$mixed/rechnungen-safety-2020-01-01-0001.tar.age"
+  sed "s|^BACKUP_DIR=.*|BACKUP_DIR=$mixed|" "$TMP_DIR/nokey.env" >"$TMP_DIR/mixed.env"
+  ENV_FILE="$TMP_DIR/mixed.env" PATH="$fakeage:$PATH" bash "$SCRIPTS_DIR/backup" >/dev/null 2>&1
+  local mixed_kept
+  mixed_kept="$(all_backup_files "$mixed" | wc -l | tr -d ' ')"
+  echo "  kept $mixed_kept backup files"
+  check "(aj) the new backup is a .tar" test "$(find "$mixed" -maxdepth 1 -type f -name "rechnungen-$(date +%Y-%m-%d)-*.tar" -size +0 | wc -l | tr -d ' ')" = 1
+  check "(aj) the 13 newest dummies (days 3 to 15, both kinds) are kept" bash -c "
+    for i in \$(seq 3 15); do
+      d=\$(date -u -d \"\$i days ago\" +%Y-%m-%d 2>/dev/null || date -u -v-\"\$i\"d +%Y-%m-%d)
+      [ -e '$mixed'/rechnungen-\$d-0315.tar ] || [ -e '$mixed'/rechnungen-\$d-0315.tar.age ] || exit 1
+    done"
+  check "(aj) older daily files (days 16 to 22) are gone unless the newest of their month" retention_oldest_daily_pruned "$mixed"
+  check "(aj) no more than 14 + 12 monthly files remain ($mixed_kept)" test "$mixed_kept" -le 26
+  check "(aj) nothing older than 12 months remains" retention_nothing_ancient "$mixed"
+  check "(aj) foreign files, the look-alike and both safety copies survive" test -f "$mixed/notes-do-not-delete.txt" \
+    -a -f "$mixed/rechnungen-2020-01-01-0000.tar.gz" -a -f "$mixed/rechnungen-safety-2020-01-01-0000.tar" -a -f "$mixed/rechnungen-safety-2020-01-01-0001.tar.age"
+
+  echo "== restore of an unencrypted backup needs no key"
+  psql_test -c "delete from public.customers where name = 'Plain Kunde'" >/dev/null
+  psql_test -c "insert into public.customers (tenant_id, name) values ('$tenant', 'Added after plain backup')" >/dev/null
+  # No AGE_IDENTITY, no terminal (stdin is /dev/null) and an age that fails when called.
+  plain_restore_out="$(env -u AGE_IDENTITY ENV_FILE="$TMP_DIR/nokey.env" PATH="$fakeage:$PATH" bash "$SCRIPTS_DIR/restore" --yes "$plain_archive" 2>&1 </dev/null)" \
+    || { echo "$plain_restore_out" | tail -n 15; fail "(ak) restore of the .tar without a key succeeds"; }
+  tail -n 4 <<<"$plain_restore_out" | sed 's/^/  | /'
+  check "(ak) it never asked for a key" bash -c "! grep -qi 'age key' <<<\"\$1\"" _ "$plain_restore_out"
+  check "(ak) the age program was never called (restore and its safety backup)" test ! -e "$TMP_DIR/age-called"
+  check "(ak) restored: the customer from the backup is back, the later one is gone" test \
+    "$(psql_test -c "select count(*) filter (where name = 'Plain Kunde')::text || count(*) filter (where name = 'Added after plain backup')::text from public.customers")" = 10
+  wait_for_login_page || true
+  token="$(access_token "$TEST_EMAIL" "$TEST_PASSWORD")"
+  check "(ak) restored: login with the old password works" test -n "$token"
+  storage_download "$token" "$tenant/logo-2.png" "$TMP_DIR/logo2.after" || true
+  check "(ak) restored: the storage object comes back with identical bytes" cmp -s "$plain_logo" "$TMP_DIR/logo2.after"
+  check "(ak) the safety copy of the old data is an unencrypted rechnungen-safety-....tar, mode 600" bash -c "
+    f=\$(find '$plain' -maxdepth 1 -type f -name 'rechnungen-safety-*.tar'); [ -n \"\$f\" ] &&
+    [ \"\$(echo \"\$f\" | wc -l | tr -d ' ')\" = 1 ] && tar -xOf \"\$f\" data.sql | grep -q 'Added after plain backup'"
+  check "(ak) the safety copy has mode 600" test "$(file_mode "$(find "$plain" -maxdepth 1 -type f -name 'rechnungen-safety-*.tar')")" = 600
+  ENV_FILE="$TMP_DIR/nokey.env" bash "$SCRIPTS_DIR/status" >"$TMP_DIR/status-nokey2.log"
+  check "(ak) status lists the .tar safety copy separately" bash -c "sed -n '/^== safety copies/,\$p' '$TMP_DIR/status-nokey2.log' | grep -qE 'rechnungen-safety-.*\.tar\$'"
+  if env -u AGE_IDENTITY ENV_FILE="$TMP_DIR/nokey.env" bash "$SCRIPTS_DIR/restore" --yes "$TMP_DIR/logo2.after" >"$TMP_DIR/badname.log" 2>&1 </dev/null; then
+    fail "(ak) restore of a file that is neither .tar nor .tar.age is refused"
+  else
+    check "(ak) restore of a file that is neither .tar nor .tar.age is refused with a clear message" grep -q '\.tar\.age or \.tar' "$TMP_DIR/badname.log"
+  fi
+
   echo "== restore of a backup from an older schema (migration list, migrate --until)"
   # A copy of the migrations with one extra file stands in for "the checkout is newer than the backup". The file renames a
   # column (the old data.sql would no longer fit if it ran before the load) and backfills a column from the restored rows
@@ -538,18 +715,53 @@ SQL
   check "(aa) the running app container is the same one" test -n "$app_before" -a "$app_before" = "$app_after"
   check "(aa) the migrations did not run (the build failed first)" bash -c "! grep -q 'Applying database migrations' <<<\"\$1\"" _ "$out"
   check "(aa) the old app still serves the login page" login_page_ok
+
+  echo "== restore with machine overrides (moving to another machine)"
+  local ov_env="$TMP_DIR/nokey.env" ov_out bad ov_rc
+  cp "$ov_env" "$TMP_DIR/ov-before.env"
+  psql_test -c "insert into public.customers (tenant_id, name) values ('$tenant', 'Must survive refused overrides')" >/dev/null
+  for bad in "APP_HOST=bad host" "BACKUPS=maybe" "AGE_RECIPIENT=notakey" "HTTPS_PORT=abc"; do
+    ov_rc=0
+    ov_out="$(env "$bad" ENV_FILE="$ov_env" bash "$SCRIPTS_DIR/restore" --yes "$plain_archive" 2>&1 </dev/null)" || ov_rc=$?
+    check "(an) restore refuses the override '$bad' before destroying anything" bash -c "
+      [ '$ov_rc' != 0 ] && ! grep -qE 'Stopping the current stack|Making a safety backup|RESTORE INCOMPLETE' <<<\"\$1\"" _ "$ov_out"
+  done
+  check "(an) the refused overrides left the .env untouched" cmp -s "$TMP_DIR/ov-before.env" "$ov_env"
+  check "(an) the refused overrides left the data untouched" test \
+    "$(psql_test -c "select count(*) from public.customers where name = 'Must survive refused overrides'")" = 1
+  ov_out="$(env APP_HOST=other.localhost BACKUPS=off AGE_RECIPIENT= ENV_FILE="$ov_env" PATH="$fakeage:$PATH" bash "$SCRIPTS_DIR/restore" --yes "$plain_archive" 2>&1 </dev/null)" \
+    || { echo "$ov_out" | tail -n 15; fail "(an) restore with overrides succeeds"; }
+  tail -n 3 <<<"$ov_out" | sed 's/^/  | /'
+  check "(an) it prints which keys it overrides" grep -q 'restored .env gets these values from the environment: APP_HOST BACKUPS AGE_RECIPIENT' <<<"$ov_out"
+  check "(an) the restored .env has the new values" bash -c "grep -qx 'APP_HOST=other.localhost' '$ov_env' && grep -qx 'BACKUPS=off' '$ov_env' && [ \"\$(grep -c '^AGE_RECIPIENT=\$' '$ov_env')\" = 1 ] && [ \"\$(grep -c '^BACKUPS=' '$ov_env')\" = 1 ]"
+  check "(an) every other value (secrets, ports) is the one from the backup" bash -c "
+    for k in POSTGRES_PASSWORD JWT_SECRET ANON_KEY SERVICE_ROLE_KEY HTTPS_PORT HTTP_PORT COMPOSE_PROJECT_NAME BACKUP_DIR; do
+      [ \"\$(grep \"^\$k=\" '$TMP_DIR/ov-before.env')\" = \"\$(grep \"^\$k=\" '$ov_env')\" ] || exit 1
+    done"
+  ov_rc=0
+  for _ in $(seq 1 30); do
+    ov_rc="$(curl -ksS --resolve "other.localhost:$TEST_HTTPS_PORT:127.0.0.1" -o /dev/null -w '%{http_code}' "https://other.localhost:$TEST_HTTPS_PORT/login" 2>/dev/null || true)"
+    [ "$ov_rc" = 200 ] && break
+    sleep 2
+  done
+  check "(an) Caddy serves /login under the new name (got $ov_rc)" test "$ov_rc" = 200
+  check "(an) the restored data is there" test "$(psql_test -c "select count(*) from public.customers where name = 'Plain Kunde'")" = 1
+  check "(an) status reports backups off afterwards" bash -c "ENV_FILE='$ov_env' bash '$SCRIPTS_DIR/status' | head -n 1 | grep -q '^Backups: OFF'"
+  check "(an) the age program was never called" test ! -e "$TMP_DIR/age-called"
 }
 
-retention_oldest_daily_pruned() { # day 16..22 daily files must be gone unless they are the newest file of an older month
-  local dir=$1 i name month other newest
-  for i in 16 18 20 22; do
-    name="rechnungen-$(days_ago "$i")-0315.tar.age"
-    [ -f "$dir/$name" ] || continue
-    # Still there: only allowed when it is the newest file of its month.
-    month="${name:11:7}"
-    newest="$(find "$dir" -maxdepth 1 -name "rechnungen-$month-*.tar.age" | sort | tail -n 1)"
-    other="$dir/$name"
-    [ "$newest" = "$other" ] || return 1
+retention_oldest_daily_pruned() { # day 16..22 daily files must be gone unless they are the newest backup of an older month
+  local dir=$1 i name ext month other newest
+  for i in 16 17 18 19 20 21 22; do
+    for ext in tar.age tar; do
+      name="rechnungen-$(days_ago "$i")-0315.$ext"
+      [ -f "$dir/$name" ] || continue
+      # Still there: only allowed when it is the newest file of its month (of either kind).
+      month="${name:11:7}"
+      newest="$(all_backup_files "$dir" | grep "/rechnungen-$month-" | tail -n 1)"
+      other="$dir/$name"
+      [ "$newest" = "$other" ] || return 1
+    done
   done
   return 0
 }
@@ -557,7 +769,7 @@ retention_oldest_daily_pruned() { # day 16..22 daily files must be gone unless t
 retention_nothing_ancient() {
   local dir=$1 cutoff
   cutoff="$(days_ago 400)"
-  ! backup_files "$dir" | sed 's|.*/rechnungen-||' | awk -v c="$cutoff" 'substr($0, 1, 10) < c { found = 1 } END { exit !found }'
+  ! all_backup_files "$dir" | sed 's|.*/rechnungen-||' | awk -v c="$cutoff" 'substr($0, 1, 10) < c { found = 1 } END { exit !found }'
 }
 
 # ---- end-to-end test and security lint ----
