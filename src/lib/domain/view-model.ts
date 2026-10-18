@@ -98,21 +98,22 @@ export function buildInvoiceViewModel(input: InvoiceInput, company: Company, the
   const totals = calcTotals(input.items)
   const dueIso = input.paymentDays === null ? null : addDays(input.issueDate, input.paymentDays)
 
-  const placeholders: Record<string, string> = {
-    Nr: input.number,
-    Kunde: input.recipient.name,
-    Datum: formatDateDe(input.issueDate),
-    Faellig: dueIso ? formatDateDe(dueIso) : '',
-    Betrag: formatEuro(totals.grossCents),
-  }
-  const fill = (text: string | null) => fillPlaceholders(text ?? '', placeholders)
-
   const singleServiceDay = !input.serviceDateTo || input.serviceDateTo === input.serviceDateFrom
   const serviceDateIsIssueDate = singleServiceDay && input.serviceDateFrom === input.issueDate
   const serviceDate =
     input.serviceDateTo && input.serviceDateTo !== input.serviceDateFrom
       ? `${formatDateDe(input.serviceDateFrom)} – ${formatDateDe(input.serviceDateTo)}`
       : formatDateDe(input.serviceDateFrom)
+
+  const placeholders: Record<string, string> = {
+    Nr: input.number,
+    Kunde: input.recipient.name,
+    Datum: formatDateDe(input.issueDate),
+    Faellig: dueIso ? formatDateDe(dueIso) : '',
+    Betrag: formatEuro(totals.grossCents),
+    Leistungsdatum: serviceDate,
+  }
+  const fill = (text: string | null) => fillPlaceholders(text ?? '', placeholders)
 
   return {
     title: theme.texts.title,
@@ -150,7 +151,7 @@ export function buildInvoiceViewModel(input: InvoiceInput, company: Company, the
     },
     footerColumns: theme.texts.footerColumns.length > 0 ? theme.texts.footerColumns.map(fill) : autoFooter(company),
     taxIdLine: company.taxNumber ? `St.-Nr.: ${company.taxNumber}` : company.vatId ? `USt-IdNr.: ${company.vatId}` : '',
-    serviceDateNote: serviceDateIsIssueDate ? 'Leistungsdatum entspricht Rechnungsdatum.' : `Leistungsdatum: ${serviceDate}`,
+    serviceDateNote: fill(serviceDateIsIssueDate ? theme.texts.serviceDateNoteSame : theme.texts.serviceDateNoteOther).trim(),
     bankAccounts: bankAccountsOf(company).map((b) => ({
       bank: b.bankName,
       rows: [

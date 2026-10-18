@@ -89,7 +89,14 @@ export function appearanceFormValues(theme: Theme): AppearanceFormInput {
       din5008: theme.page.din5008,
       senderLine: theme.page.senderLine,
     },
-    texts: { title: theme.texts.title, intro: theme.texts.intro, closing: theme.texts.closing, footerColumns: [...theme.texts.footerColumns, '', '', '', ''].slice(0, 4) },
+    texts: {
+      title: theme.texts.title,
+      intro: theme.texts.intro,
+      closing: theme.texts.closing,
+      serviceDateNoteSame: theme.texts.serviceDateNoteSame,
+      serviceDateNoteOther: theme.texts.serviceDateNoteOther,
+      footerColumns: [...theme.texts.footerColumns, '', '', '', ''].slice(0, 4),
+    },
     colors: { ...theme.colors },
     table: {
       showPosition: theme.table.showPosition,

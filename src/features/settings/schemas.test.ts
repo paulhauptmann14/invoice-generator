@@ -54,9 +54,9 @@ describe('paymentFormSchema', () => {
     const result = paymentFormSchema.safeParse({ ...payment, bankAccounts: [{ ...payment.bankAccounts[0], iban: 'DE89370400440532013001' }] })
     expect(errorsOf(result)).toEqual({ 'bankAccounts.0.iban': 'IBAN ist ungültig (Prüfsumme).' })
   })
-  test('requires bank name and IBAN in every row', () => {
+  test('requires the IBAN in every row (bank name is optional)', () => {
     const errors = errorsOf(paymentFormSchema.safeParse({ ...payment, bankAccounts: [{ bankName: '', accountNumber: '', iban: '', bic: '' }] }))
-    expect(Object.keys(errors).sort()).toEqual(['bankAccounts.0.bankName', 'bankAccounts.0.iban'])
+    expect(Object.keys(errors)).toEqual(['bankAccounts.0.iban'])
   })
   test('at most three bank accounts', () => {
     const errors = errorsOf(paymentFormSchema.safeParse({ ...payment, bankAccounts: Array(4).fill(payment.bankAccounts[0]) }))
@@ -88,7 +88,7 @@ describe('appearanceFormSchema', () => {
     logo: { position: 'rechts', widthMm: '45' },
     font: { builtin: 'IBM Plex Sans', baseSizePt: '9,5', headingSizePt: '16' },
     page: { marginTopMm: '15', marginRightMm: '20', marginBottomMm: '20', marginLeftMm: '25', din5008: 'B', senderLine: true },
-    texts: { title: 'Rechnung', intro: '', closing: '', footerColumns: [] },
+    texts: { title: 'Rechnung', intro: '', closing: '', serviceDateNoteSame: 'Leistungsdatum entspricht Rechnungsdatum.', serviceDateNoteOther: 'Leistungsdatum: {Leistungsdatum}', footerColumns: [] },
     colors: { primary: '#17191C', accent: '#1F5F74', text: '#17191C', tableHeaderBg: '#ECEEE9', zebra: false },
     table: {
       showPosition: true,
@@ -113,6 +113,10 @@ describe('appearanceFormSchema', () => {
   test('empty footer columns are dropped (empty list = footer from the company data)', () => {
     const data = appearanceFormSchema.parse({ ...appearance, texts: { ...appearance.texts, footerColumns: ['', ' Spalte 2 ', '', ''] } })
     expect(data.texts.footerColumns).toEqual(['Spalte 2'])
+  })
+  test('service date notes may be emptied (the note is then left out)', () => {
+    const data = appearanceFormSchema.parse({ ...appearance, texts: { ...appearance.texts, serviceDateNoteSame: '  ', serviceDateNoteOther: '' } })
+    expect(data.texts).toMatchObject({ serviceDateNoteSame: '', serviceDateNoteOther: '' })
   })
   test('rejects colors that are not #RRGGBB', () => {
     expect(errorsOf(appearanceFormSchema.safeParse({ ...appearance, colors: { ...appearance.colors, primary: 'rot' } }))).toHaveProperty('colors.primary')

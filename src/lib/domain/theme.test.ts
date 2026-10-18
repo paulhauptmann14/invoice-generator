@@ -36,6 +36,10 @@ describe('theme', () => {
     expect(readableTextOn('#F2C94C')).toBe('#17191C')
     expect(readableTextOn('#FFFFFF')).toBe('#17191C')
   })
+  test('service date notes have editable defaults', () => {
+    expect(defaultTheme.texts.serviceDateNoteSame).toBe('Leistungsdatum entspricht Rechnungsdatum.')
+    expect(defaultTheme.texts.serviceDateNoteOther).toBe('Leistungsdatum: {Leistungsdatum}')
+  })
   test('default texts follow the business template', () => {
     expect(defaultTheme.texts.intro).toBe('')
     expect(defaultTheme.texts.closing).toBe('')

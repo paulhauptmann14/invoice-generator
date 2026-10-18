@@ -78,6 +78,13 @@ one on another device or a USB stick. **Without this private key no backup can b
 
 ### 2. Install the operating system
 
+If your Mac has no SSH key yet (`ls ~/.ssh/*.pub` shows nothing), create one first; Raspberry Pi Imager offers it in
+the SSH settings:
+
+```bash
+ssh-keygen -t ed25519
+```
+
 1. Install Raspberry Pi Imager on your Mac and choose "Raspberry Pi OS Lite (64-bit)".
 2. In the OS customisation dialog set:
    - hostname `rechnungen` (the app is then reachable as `rechnungen.local`; avahi, which answers `.local` names, is
@@ -185,6 +192,15 @@ too.) It is safe to run `scripts/setup` again: an existing `.env` and an existin
 `.env` to "start over": that creates new secrets that do not match the existing data.
 
 At the end it prints the address to open. Continue with the next chapter before you do.
+
+**Raspberry Pi 5 only:** its default kernel uses 16 KB memory pages, which some software built for 4 KB pages does not
+support. If a container keeps restarting and its log (`docker compose logs <service>`) mentions the page size, switch
+to the 4 KB kernel by adding the line `kernel=kernel8.img` to `/boot/firmware/config.txt`, reboot and run the setup
+again:
+
+```bash
+echo 'kernel=kernel8.img' | sudo tee -a /boot/firmware/config.txt
+```
 
 ## Trust the certificate
 

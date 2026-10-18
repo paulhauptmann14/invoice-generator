@@ -10,7 +10,7 @@ import { type AppearanceFormInput, appearanceFormSchema } from './schemas'
 import { useSettingsForm } from './use-settings-form'
 
 const legend = 'font-display text-xl font-semibold'
-const placeholders = 'Platzhalter: {Nr}, {Kunde}, {Datum}, {Faellig}, {Betrag}'
+const placeholders = 'Platzhalter: {Nr}, {Kunde}, {Datum}, {Leistungsdatum}, {Faellig}, {Betrag}'
 
 const LAYOUT_OPTIONS = [
   { value: 'briefpapier', label: 'Briefpapier', description: 'Wie die eigene Word-Rechnung: Kopf nur mit Logo, Positionen als Zeilen, keine Fußzeile.' },
@@ -102,6 +102,24 @@ export function AppearanceForm({ initial, logo }: { initial: AppearanceFormInput
           <TextField form={form} path="texts.title" label="Titel" autoComplete="off" className="max-w-sm" />
           <TextAreaField form={form} path="texts.intro" label="Einleitung" hint="Vorbelegung für neue Rechnungen." />
           <TextAreaField form={form} path="texts.closing" label="Schlusstext" hint={`Vorbelegung für neue Rechnungen. ${placeholders}`} />
+          {layout === 'briefpapier' && (
+            <>
+              <TextField
+                form={form}
+                path="texts.serviceDateNoteSame"
+                label="Satz, wenn Leistungsdatum = Rechnungsdatum"
+                autoComplete="off"
+                hint="Leer lassen, um den Satz wegzulassen. Das Leistungsdatum ist Pflichtangabe – außer bei Kleinbetragsrechnungen bis 250 €."
+              />
+              <TextField
+                form={form}
+                path="texts.serviceDateNoteOther"
+                label="Satz bei abweichendem Leistungsdatum"
+                autoComplete="off"
+                hint="Platzhalter {Leistungsdatum} setzt das Datum oder den Zeitraum ein. Leer lassen, um den Satz wegzulassen."
+              />
+            </>
+          )}
         </fieldset>
 
         {tableLayout && (

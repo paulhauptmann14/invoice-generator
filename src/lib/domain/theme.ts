@@ -86,6 +86,10 @@ export const themeSchema = z.object({
         .string()
         .max(1000)
         .default('Wir bitten höflich um Überweisung auf eines unserer nachfolgend genannten Konten:'),
+      /** "Briefpapier": note when the service date equals the invoice date; empty = no note. */
+      serviceDateNoteSame: z.string().max(300).default('Leistungsdatum entspricht Rechnungsdatum.'),
+      /** "Briefpapier": note for a different service date or period ({Leistungsdatum}); empty = no note. */
+      serviceDateNoteOther: z.string().max(300).default('Leistungsdatum: {Leistungsdatum}'),
       /** Empty = footer is generated from the company data. */
       footerColumns: z.array(z.string().max(500)).max(4).default([]),
     })

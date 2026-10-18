@@ -101,7 +101,7 @@ export function BriefpapierInvoice({ vm, theme, fontFamily, logo }: Props) {
             {vm.taxIdLine !== '' && <Text>{vm.taxIdLine}</Text>}
           </View>
           {vm.recipientVatId && <Text style={s.note}>Ihre USt-IdNr.: {vm.recipientVatId}</Text>}
-          <Text style={s.note}>{vm.serviceDateNote}</Text>
+          {vm.serviceDateNote !== '' && <Text style={s.note}>{vm.serviceDateNote}</Text>}
           {vm.intro !== '' && <Text style={s.paragraph}>{vm.intro}</Text>}
 
           <View style={s.items}>

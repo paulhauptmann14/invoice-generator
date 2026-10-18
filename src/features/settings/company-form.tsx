@@ -46,7 +46,12 @@ export function CompanyForm({ initial }: { initial: CompanyFormInput }) {
 
         <fieldset className="space-y-5">
           <legend className={legend}>Steuer</legend>
-          <p className="text-sm text-muted-foreground">Auf jeder Rechnung muss die Steuernummer oder die USt-IdNr. stehen.</p>
+          <p className="text-sm text-muted-foreground">
+            <span aria-hidden className="text-stamp">
+              *
+            </span>{' '}
+            Pflicht ist eines von beiden: Steuernummer oder USt-IdNr. Es steht auf jeder Rechnung.
+          </p>
           <div className="grid gap-5 @lg:grid-cols-2">
             <TextField form={form} path="taxNumber" label="Steuernummer" autoComplete="off" />
             <TextField form={form} path="vatId" label="USt-IdNr." autoComplete="off" spellCheck={false} />

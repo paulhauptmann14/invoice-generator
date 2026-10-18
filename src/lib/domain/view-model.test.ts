@@ -156,6 +156,19 @@ describe('fields for the "Briefpapier" layout', () => {
     expect(sameDayRange.serviceDateNote).toBe('Leistungsdatum entspricht Rechnungsdatum.')
   })
 
+  test('service date notes come from the theme; empty = no note', () => {
+    const theme = parseTheme({ texts: { serviceDateNoteSame: 'Lieferung am Rechnungstag.', serviceDateNoteOther: 'Geliefert: {Leistungsdatum} ({Nr})' } })
+    expect(buildInvoiceViewModel(input, company, theme).serviceDateNote).toBe('Lieferung am Rechnungstag.')
+    expect(buildInvoiceViewModel({ ...input, serviceDateFrom: '2026-10-01' }, company, theme).serviceDateNote).toBe('Geliefert: 01.10.2026 (2026-0001)')
+    const empty = parseTheme({ texts: { serviceDateNoteSame: '', serviceDateNoteOther: '' } })
+    expect(buildInvoiceViewModel(input, company, empty).serviceDateNote).toBe('')
+    expect(buildInvoiceViewModel({ ...input, serviceDateFrom: '2026-10-01' }, company, empty).serviceDateNote).toBe('')
+  })
+
+  test('{Leistungsdatum} also works in intro and closing texts', () => {
+    expect(buildInvoiceViewModel({ ...input, introText: 'Leistung vom {Leistungsdatum}.' }, company, defaultTheme).intro).toBe('Leistung vom 07.10.2026.')
+  })
+
   test('item line reads like the template', () => {
     expect(vm.items[0].line).toBe(`2 Pers. Buffet pro Person à 24,90${NBSP}€`)
     const noUnit = buildInvoiceViewModel(

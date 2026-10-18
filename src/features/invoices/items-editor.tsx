@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { NativeSelect } from '@/components/ui/native-select'
 import { Textarea } from '@/components/ui/textarea'
+import { RequiredMark } from '@/components/form/required-mark'
 import { VAT_RATES } from '@/lib/domain/input-schemas'
 import { formatEuro, toCents } from '@/lib/domain/money'
 import type { DraftAction, DraftItem, PickerArticle } from './draft'
@@ -36,10 +37,19 @@ export function ItemsEditor({
       {errors.items && <FieldError id="inv-items-error">{errors.items}</FieldError>}
 
       <div aria-hidden className={`hidden border-b border-border pb-2 text-sm font-medium text-muted-foreground ${GRID}`}>
-        <span>Beschreibung</span>
-        <span className="text-right">Menge</span>
+        <span>
+          Beschreibung
+          <RequiredMark />
+        </span>
+        <span className="text-right">
+          Menge
+          <RequiredMark />
+        </span>
         <span>Einheit</span>
-        <span className="text-right">Einzelpreis</span>
+        <span className="text-right">
+          Einzelpreis
+          <RequiredMark />
+        </span>
         <span>MwSt.</span>
         <span className="text-right">Gesamt</span>
         <span className="w-[7.5rem]" />
@@ -58,9 +68,11 @@ export function ItemsEditor({
               <div className="space-y-1">
                 <label htmlFor={field('description')} className="text-sm font-medium @4xl:sr-only">
                   Beschreibung<span className="sr-only"> Position {n}</span>
+                  <RequiredMark />
                 </label>
                 <Textarea
                   id={field('description')}
+                  aria-required
                   rows={1}
                   value={item.description}
                   onChange={(e) => update('description', e.target.value)}
@@ -85,9 +97,11 @@ export function ItemsEditor({
                 <div className="space-y-1">
                   <label htmlFor={field('quantity')} className="text-sm font-medium @4xl:sr-only">
                     Menge<span className="sr-only"> Position {n}</span>
+                    <RequiredMark />
                   </label>
                   <Input
                     id={field('quantity')}
+                    aria-required
                     inputMode="decimal"
                     value={item.quantity}
                     onChange={(e) => update('quantity', e.target.value)}
@@ -105,9 +119,11 @@ export function ItemsEditor({
                 <div className="space-y-1">
                   <label htmlFor={field('unitPriceGross')} className="text-sm font-medium @4xl:sr-only">
                     Einzelpreis brutto<span className="sr-only"> Position {n}</span>
+                    <RequiredMark />
                   </label>
                   <Input
                     id={field('unitPriceGross')}
+                    aria-required
                     inputMode="decimal"
                     value={item.unitPriceGross}
                     onChange={(e) => update('unitPriceGross', e.target.value)}

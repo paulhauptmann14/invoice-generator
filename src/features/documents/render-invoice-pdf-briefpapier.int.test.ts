@@ -1,7 +1,7 @@
 import { extractText, getDocumentProxy } from 'unpdf'
 import { describe, expect, test, vi } from 'vitest'
 import { parseCompany } from '@/lib/domain/company'
-import { defaultTheme } from '@/lib/domain/theme'
+import { defaultTheme, parseTheme } from '@/lib/domain/theme'
 import { buildInvoiceViewModel, type InvoiceInput } from '@/lib/domain/view-model'
 
 vi.mock('server-only', () => ({}))
@@ -107,6 +107,13 @@ describe('renderInvoicePdf – layout "Briefpapier" (default)', () => {
     expect(totalPages).toBeGreaterThan(1)
     expect(text).toContain(`Seite ${totalPages} von ${totalPages}`)
     expect(text).toContain('1 Stk. Position 60')
+  })
+
+  test('an emptied service date note is left out', async () => {
+    const theme = parseTheme({ texts: { serviceDateNoteSame: '' } })
+    const { text } = await pdfText(await renderInvoicePdf(buildInvoiceViewModel(template(voucherAndSale), company, theme), theme))
+    expect(text).not.toContain('Leistungsdatum')
+    expect(text).toContain('Gesamtbetrag')
   })
 
   test('the logo is drawn in the head when present', async () => {

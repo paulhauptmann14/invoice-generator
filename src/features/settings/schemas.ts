@@ -51,7 +51,7 @@ export type CompanyFormInput = z.input<typeof companyFormSchema>
 export type CompanyForm = z.output<typeof companyFormSchema>
 
 const bankAccountRow = z.object({
-  bankName: required(200, 'Bitte den Namen der Bank eingeben.'),
+  bankName: text(200),
   accountNumber: text(30),
   iban: z
     .string()
@@ -122,6 +122,8 @@ export const appearanceFormSchema = z.object({
     title: required(40, 'Bitte einen Titel eingeben.'),
     intro: text(2000),
     closing: text(2000),
+    serviceDateNoteSame: text(300),
+    serviceDateNoteOther: text(300),
     // Empty columns are dropped; an empty list means the footer is generated from the company data.
     footerColumns: z
       .array(text(500))

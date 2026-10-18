@@ -151,7 +151,7 @@ export function buildBriefpapierDocx(vm: InvoiceViewModel, theme: Theme, fontFam
             children: [new TextRun(vm.taxIdLine !== '' ? `${vm.number}\t${vm.taxIdLine}` : vm.number)],
           }),
           ...(vm.recipientVatId ? [new Paragraph({ spacing: { before: twip(1) }, children: [new TextRun(`Ihre USt-IdNr.: ${vm.recipientVatId}`)] })] : []),
-          new Paragraph({ spacing: { before: twip(1) }, children: [new TextRun(vm.serviceDateNote)] }),
+          ...(vm.serviceDateNote !== '' ? [new Paragraph({ spacing: { before: twip(1) }, children: [new TextRun(vm.serviceDateNote)] })] : []),
           ...(vm.intro !== '' ? [new Paragraph({ spacing: { before: twip(6) }, children: lines(vm.intro.split('\n')) })] : []),
           ...vm.items.map((item, i) => amountRow(item.line, item.total, { at: contentWidthMm, before: i === 0 ? 14 : 0 })),
           amountRow('Gesamtbetrag brutto', vm.totals.gross, { at: contentWidthMm, bold: true, before: 8 }),

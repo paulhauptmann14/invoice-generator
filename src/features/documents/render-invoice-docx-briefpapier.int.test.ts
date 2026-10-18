@@ -1,7 +1,7 @@
 import JSZip from 'jszip'
 import { describe, expect, test, vi } from 'vitest'
 import { parseCompany } from '@/lib/domain/company'
-import { defaultTheme } from '@/lib/domain/theme'
+import { defaultTheme, parseTheme } from '@/lib/domain/theme'
 import { buildInvoiceViewModel, type InvoiceInput } from '@/lib/domain/view-model'
 
 vi.mock('server-only', () => ({}))
@@ -93,6 +93,13 @@ describe('renderInvoiceDocx – layout "Briefpapier" (default)', () => {
     for (const absent of ['Pos.', 'Einzelpreis']) expect(docText).not.toContain(absent)
     expect(footerText).toBe('')
     expect(doc).not.toMatch(/NUMPAGES/)
+  })
+
+  test('an emptied service date note is left out', async () => {
+    const theme = parseTheme({ texts: { serviceDateNoteSame: '' } })
+    const { docText } = await parts(await renderInvoiceDocx(buildInvoiceViewModel(input, company, theme), theme))
+    expect(docText).not.toContain('Leistungsdatum')
+    expect(docText).toContain('Gesamtbetrag')
   })
 
   test('the logo sits in the header when present', async () => {

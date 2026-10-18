@@ -5,6 +5,7 @@ import { FieldError } from '@/components/field-error'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/native-select'
+import { RequiredMark } from '@/components/form/required-mark'
 import { COUNTRIES } from '@/lib/countries'
 import type { DraftAction, DraftRecipient, InvoiceDraft, PickerCustomer } from './draft'
 
@@ -82,11 +83,7 @@ export function RecipientSection({
         <div key={field} className="space-y-1.5">
           <Label htmlFor={`inv-recipient.${field}`}>
             {label}
-            {field === 'name' && (
-              <span aria-hidden className="text-stamp">
-                {' '}*
-              </span>
-            )}
+            {field === 'name' && <RequiredMark />}
           </Label>
           {input(field, { autoComplete, 'aria-required': field === 'name' || undefined })}
         </div>
@@ -105,9 +102,13 @@ export function RecipientSection({
 
       <div className="grid gap-5 @lg:grid-cols-2">
         <div className="space-y-1.5">
-          <Label htmlFor="inv-recipient.countryCode">Land</Label>
+          <Label htmlFor="inv-recipient.countryCode">
+            Land
+            <RequiredMark />
+          </Label>
           <NativeSelect
             id="inv-recipient.countryCode"
+            aria-required
             value={r.countryCode}
             onChange={(e) => dispatch({ type: 'setRecipient', field: 'countryCode', value: e.target.value })}
           >

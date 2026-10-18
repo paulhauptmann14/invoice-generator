@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/native-select'
 import { Textarea } from '@/components/ui/textarea'
+import { RequiredMark } from '@/components/form/required-mark'
 import { addDays, formatDateDe } from '@/lib/domain/dates'
 import { type InvoiceFormState, saveInvoice } from './actions'
 import { createDraftReducer, draftTotals, type InvoiceDraft, type NumberContext, type PickerArticle, type PickerCustomer, recipientNotice, toPayload } from './draft'
@@ -121,15 +122,19 @@ export function InvoiceForm({
           )}
           <div className="space-y-1.5">
             <Label htmlFor="inv-number">
-              Rechnungsnummer<span aria-hidden className="text-stamp"> *</span>
+              Rechnungsnummer
+              <RequiredMark />
             </Label>
             <Input id="inv-number" value={draft.number} onChange={(e) => dispatch({ type: 'setField', field: 'number', value: e.target.value })} aria-invalid={Boolean(err.number)} aria-required className="font-mono" />
             {err.number && <FieldError id="inv-number-error">{err.number}</FieldError>}
           </div>
           <div className="grid gap-5 @lg:grid-cols-2">
             <div className="space-y-1.5">
-              <Label htmlFor="inv-issueDate">Rechnungsdatum</Label>
-              <Input id="inv-issueDate" type="date" value={draft.issueDate} onChange={(e) => dispatch({ type: 'setField', field: 'issueDate', value: e.target.value })} aria-invalid={Boolean(err.issueDate)} />
+              <Label htmlFor="inv-issueDate">
+                Rechnungsdatum
+                <RequiredMark />
+              </Label>
+              <Input id="inv-issueDate" type="date" value={draft.issueDate} onChange={(e) => dispatch({ type: 'setField', field: 'issueDate', value: e.target.value })} aria-invalid={Boolean(err.issueDate)} aria-required />
               {err.issueDate && <FieldError id="inv-issueDate-error">{err.issueDate}</FieldError>}
             </div>
             <div className="space-y-1.5">
@@ -143,14 +148,20 @@ export function InvoiceForm({
           </div>
           <div className="grid gap-5 @lg:grid-cols-2">
             <div className="space-y-1.5">
-              <Label htmlFor="inv-serviceDateFrom">{draft.serviceDateTo === null ? 'Leistungsdatum' : 'Leistung von'}</Label>
-              <Input id="inv-serviceDateFrom" type="date" value={draft.serviceDateFrom} onChange={(e) => dispatch({ type: 'setField', field: 'serviceDateFrom', value: e.target.value })} aria-invalid={Boolean(err.serviceDateFrom)} />
+              <Label htmlFor="inv-serviceDateFrom">
+                {draft.serviceDateTo === null ? 'Leistungsdatum' : 'Leistung von'}
+                <RequiredMark />
+              </Label>
+              <Input id="inv-serviceDateFrom" type="date" value={draft.serviceDateFrom} onChange={(e) => dispatch({ type: 'setField', field: 'serviceDateFrom', value: e.target.value })} aria-invalid={Boolean(err.serviceDateFrom)} aria-required />
               {err.serviceDateFrom && <FieldError id="inv-serviceDateFrom-error">{err.serviceDateFrom}</FieldError>}
             </div>
             {draft.serviceDateTo !== null && (
               <div className="space-y-1.5">
-                <Label htmlFor="inv-serviceDateTo">Leistung bis</Label>
-                <Input id="inv-serviceDateTo" type="date" value={draft.serviceDateTo} onChange={(e) => dispatch({ type: 'setServiceDateTo', value: e.target.value })} aria-invalid={Boolean(err.serviceDateTo)} />
+                <Label htmlFor="inv-serviceDateTo">
+                  Leistung bis
+                  <RequiredMark />
+                </Label>
+                <Input id="inv-serviceDateTo" type="date" value={draft.serviceDateTo} onChange={(e) => dispatch({ type: 'setServiceDateTo', value: e.target.value })} aria-invalid={Boolean(err.serviceDateTo)} aria-required />
                 {err.serviceDateTo && <FieldError id="inv-serviceDateTo-error">{err.serviceDateTo}</FieldError>}
               </div>
             )}
@@ -183,7 +194,7 @@ export function InvoiceForm({
           <Textarea id="inv-closingText" rows={2} value={draft.closingText} onChange={(e) => dispatch({ type: 'setField', field: 'closingText', value: e.target.value })} aria-describedby="inv-placeholders" />
         </div>
         <p id="inv-placeholders" className="text-sm text-muted-foreground">
-          Platzhalter: {'{Nr}'}, {'{Kunde}'}, {'{Datum}'}, {'{Faellig}'}, {'{Betrag}'}
+          Platzhalter: {'{Nr}'}, {'{Kunde}'}, {'{Datum}'}, {'{Leistungsdatum}'}, {'{Faellig}'}, {'{Betrag}'}
         </p>
       </fieldset>
 

@@ -55,7 +55,7 @@ export function PaymentForm({ initial }: { initial: PaymentFormInput }) {
                 </Button>
               </div>
               <div className="clear-both grid gap-5 @lg:grid-cols-2">
-                <TextField form={form} path={`bankAccounts.${index}.bankName`} label="Bank" required autoComplete="off" />
+                <TextField form={form} path={`bankAccounts.${index}.bankName`} label="Bank" autoComplete="off" />
                 <TextField form={form} path={`bankAccounts.${index}.accountNumber`} label="Kontonummer" autoComplete="off" hint="Optional, nur wenn sie auf der Rechnung stehen soll." />
               </div>
               <div className="grid gap-5 @lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
@@ -84,7 +84,7 @@ export function PaymentForm({ initial }: { initial: PaymentFormInput }) {
             hint="Vorbelegung für neue Rechnungen. Leer = kein Fälligkeitsdatum."
           />
           <TextAreaField form={form} path="paymentNote" label="Zahlungstext mit Fälligkeitsdatum" />
-          <TextAreaField form={form} path="paymentNoteWithoutDueDate" label="Zahlungstext ohne Fälligkeitsdatum" hint="Platzhalter: {Faellig} (Fälligkeitsdatum), {Betrag}, {Nr}, {Kunde}, {Datum}" />
+          <TextAreaField form={form} path="paymentNoteWithoutDueDate" label="Zahlungstext ohne Fälligkeitsdatum" hint="Platzhalter: {Faellig} (Fälligkeitsdatum), {Betrag}, {Nr}, {Kunde}, {Datum}, {Leistungsdatum}" />
         </fieldset>
 
         <SaveBar form={form} />

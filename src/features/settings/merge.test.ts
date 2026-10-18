@@ -67,7 +67,7 @@ describe('applyAppearanceForm', () => {
       logo: { position: 'links', widthMm: '30' },
       font: { builtin: 'Inter', baseSizePt: '10', headingSizePt: '18' },
       page: { marginTopMm: '10', marginRightMm: '20', marginBottomMm: '20', marginLeftMm: '25', din5008: 'A', senderLine: false },
-      texts: { title: 'Rechnung', intro: 'Hallo', closing: '', footerColumns: ['Spalte 1'] },
+      texts: { title: 'Rechnung', intro: 'Hallo', closing: '', serviceDateNoteSame: '', serviceDateNoteOther: 'Am {Leistungsdatum}', footerColumns: ['Spalte 1'] },
       colors: { primary: '#000000', accent: '#654321', text: '#111111', tableHeaderBg: '#EEEEEE', zebra: true },
       table: {
         showPosition: false,
@@ -80,7 +80,7 @@ describe('applyAppearanceForm', () => {
     expect(next.logo).toEqual({ path: 'c0000000-0000-4000-8000-000000000001/logo.png', position: 'links', widthMm: 30 })
     expect(next.colors).toEqual({ primary: '#000000', accent: '#654321', text: '#111111', tableHeaderBg: '#EEEEEE', zebra: true })
     expect(next).toMatchObject({ layout: 'modern', font: { builtin: 'Inter', baseSizePt: 10 }, page: { din5008: 'A', senderLine: false } })
-    expect(next.texts).toMatchObject({ intro: 'Hallo', footerColumns: ['Spalte 1'], paymentNote: theme.texts.paymentNote })
+    expect(next.texts).toMatchObject({ intro: 'Hallo', serviceDateNoteSame: '', serviceDateNoteOther: 'Am {Leistungsdatum}', footerColumns: ['Spalte 1'], paymentNote: theme.texts.paymentNote })
     expect(next.table.labels.total).toBe('Summe')
   })
 })
