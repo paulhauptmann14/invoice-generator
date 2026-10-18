@@ -3,9 +3,8 @@
 import { CircleAlert, ExternalLink, RefreshCw } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { useTenant } from '@/features/tenants/tenant-context'
 
-type Status = 'loading' | 'ready' | 'error' | 'expired'
+type Status = 'loading' | 'ready' | 'error' | 'expired' | 'invalid'
 const DEBOUNCE_MS = 700
 
 const STATUS_TEXT: Record<Status, string> = {
@@ -13,6 +12,7 @@ const STATUS_TEXT: Record<Status, string> = {
   ready: 'Aktuell',
   error: 'Vorschau konnte nicht erstellt werden.',
   expired: 'Sitzung abgelaufen – bitte neu anmelden.',
+  invalid: 'Eingaben prüfen – die Vorschau zeigt den letzten gültigen Stand.',
 }
 
 /**
@@ -20,18 +20,20 @@ const STATUS_TEXT: Record<Status, string> = {
  * superseded requests are aborted, and the previous PDF stays visible while the next one renders.
  */
 export function LivePreview({
+  url: endpoint,
   payload,
   className,
   frameClassName,
   showLabel = true,
 }: {
+  /** POST endpoint that renders the payload as PDF (422 = form not valid yet). */
+  url: string
   payload: string
   className?: string
   frameClassName?: string
   /** Off inside the preview dialog, whose title already says "Vorschau". */
   showLabel?: boolean
 }) {
-  const previewUrl = useTenant().api('invoices/preview')
   const [status, setStatus] = useState<Status>('loading')
   const [url, setUrl] = useState<string | null>(null)
   // The draft the visible PDF was rendered from; differs from `payload` while an update is pending.
@@ -48,13 +50,15 @@ export function LivePreview({
     const timer = window.setTimeout(async () => {
       setStatus('loading')
       try {
-        const response = await fetch(previewUrl, {
+        const response = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: payload,
           signal: controller.signal,
         })
         if (response.status === 401) return setStatus('expired')
+        // Incomplete form values: keep the last PDF and say why it is not current.
+        if (response.status === 422) return setStatus('invalid')
         if (!response.ok) throw new Error(`Preview request failed with ${response.status}`)
         const next = URL.createObjectURL(await response.blob())
         if (urlRef.current) URL.revokeObjectURL(urlRef.current)
@@ -72,7 +76,7 @@ export function LivePreview({
       window.clearTimeout(timer)
       controller.abort()
     }
-  }, [payload, attempt, previewUrl])
+  }, [payload, attempt, endpoint])
 
   // Release the last PDF when the preview goes away.
   useEffect(
@@ -83,6 +87,7 @@ export function LivePreview({
   )
 
   const failed = status === 'error' || status === 'expired'
+  const attention = failed || status === 'invalid'
   // Edits waiting for the debounce already count as "updating", so a stale PDF is never labelled current.
   const shown: Status = status === 'ready' && renderedPayload !== payload ? 'loading' : status
   return (
@@ -91,7 +96,7 @@ export function LivePreview({
         <p className="flex items-baseline gap-2 text-sm">
           {showLabel && <span className="font-medium">PDF-Vorschau</span>}
           <span role="status" aria-atomic="true" className={failed ? 'text-stamp' : 'text-muted-foreground'}>
-            {failed && <CircleAlert aria-hidden className="mr-1 inline size-4 align-[-0.15em]" />}
+            {attention && <CircleAlert aria-hidden className="mr-1 inline size-4 align-[-0.15em]" />}
             {STATUS_TEXT[shown]}
           </span>
         </p>
@@ -119,7 +124,7 @@ export function LivePreview({
         {url ? (
           <iframe title="PDF-Vorschau der Rechnung" src={`${url}#toolbar=0&navpanes=0&view=FitH`} className="size-full" />
         ) : (
-          <p className="p-6 text-sm text-muted-foreground">{failed ? 'Noch keine Vorschau vorhanden.' : 'Die Vorschau wird erstellt …'}</p>
+          <p className="p-6 text-sm text-muted-foreground">{attention ? 'Noch keine Vorschau vorhanden.' : 'Die Vorschau wird erstellt …'}</p>
         )}
         {/* Keep the last PDF visible while the next one renders; just dim it slightly. */}
         {shown === 'loading' && url && <div aria-hidden className="pointer-events-none absolute inset-0 bg-card/35 transition-opacity duration-150" />}

@@ -75,6 +75,7 @@ export function applyPaymentForm(
 
 const decimal = (n: number) => String(n).replace('.', ',')
 
+/** Form values of the appearance tab; the footer always offers four columns (empty ones are dropped on save). */
 export function appearanceFormValues(theme: Theme): AppearanceFormInput {
   return {
     layout: theme.layout === 'klassisch' ? 'klassisch' : 'briefpapier',
@@ -88,7 +89,7 @@ export function appearanceFormValues(theme: Theme): AppearanceFormInput {
       din5008: theme.page.din5008,
       senderLine: theme.page.senderLine,
     },
-    texts: { title: theme.texts.title, intro: theme.texts.intro, closing: theme.texts.closing, footerColumns: [...theme.texts.footerColumns] },
+    texts: { title: theme.texts.title, intro: theme.texts.intro, closing: theme.texts.closing, footerColumns: [...theme.texts.footerColumns, '', '', '', ''].slice(0, 4) },
     colors: { primary: theme.colors.primary, text: theme.colors.text, tableHeaderBg: theme.colors.tableHeaderBg, zebra: theme.colors.zebra },
     table: {
       showPosition: theme.table.showPosition,

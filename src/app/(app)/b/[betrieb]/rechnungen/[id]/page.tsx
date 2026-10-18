@@ -72,6 +72,7 @@ export default async function EditInvoicePage({ params, searchParams }: { params
           invoiceId={invoice.id}
           defaultFilenames={defaultFilenames}
           missing={documentSettings.missing}
+          hasLogo={documentSettings.logo !== null}
           leading={<InvoiceNumber number={invoice.number} size="lg" />}
         />
         {query.gespeichert && <StatusBanner>Rechnung gespeichert.</StatusBanner>}

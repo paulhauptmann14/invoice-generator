@@ -123,7 +123,11 @@ export const appearanceFormSchema = z.object({
     title: required(40, 'Bitte einen Titel eingeben.'),
     intro: text(2000),
     closing: text(2000),
-    footerColumns: z.array(text(500)).max(4, 'Höchstens 4 Spalten.'),
+    // Empty columns are dropped; an empty list means the footer is generated from the company data.
+    footerColumns: z
+      .array(text(500))
+      .max(4, 'Höchstens 4 Spalten.')
+      .transform((columns) => columns.filter((c) => c !== '')),
   }),
   colors: z.object({ primary: hex, text: hex, tableHeaderBg: hex, zebra: z.boolean() }),
   table: z.object({

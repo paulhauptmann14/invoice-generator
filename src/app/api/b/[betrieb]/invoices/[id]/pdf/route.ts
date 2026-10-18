@@ -22,7 +22,8 @@ export async function GET(_request: Request, { params }: Params) {
   return pdfResponse(await renderInvoicePdf(doc.vm, doc.theme, { logo: doc.logo }), { type: 'inline', filename: doc.filenames.pdf })
 }
 
-const exportBody = z.object({ filename: z.string().max(200) })
+// withoutLogo: for printing on letterhead paper that already carries the logo.
+const exportBody = z.object({ filename: z.string().max(200), withoutLogo: z.boolean().optional() })
 
 /** Export: render, archive in storage + invoice_exports, then download. No download without archive. */
 export async function POST(request: Request, { params }: Params) {
@@ -41,7 +42,7 @@ export async function POST(request: Request, { params }: Params) {
   }
 
   const filename = parsedBody.data.filename.trim() ? normalizeUserFilename(parsedBody.data.filename, 'pdf') : doc.filenames.pdf
-  const pdf = await renderInvoicePdf(doc.vm, doc.theme, { logo: doc.logo })
+  const pdf = await renderInvoicePdf(doc.vm, doc.theme, { logo: parsedBody.data.withoutLogo ? null : doc.logo })
   const storagePath = `${auth.tenant.id}/${id}/${new Date().toISOString().replace(/[:.]/g, '-')}_${filename}`
   const bucket = auth.supabase.storage.from('invoice-pdfs')
 

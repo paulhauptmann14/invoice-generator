@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { parseCompany } from '@/lib/domain/company'
 import { defaultTheme, themeSchema } from '@/lib/domain/theme'
-import { applyAppearanceForm, applyCompanyForm, applyPaymentForm, companyFormValues } from './merge'
+import { applyAppearanceForm, applyCompanyForm, applyPaymentForm, appearanceFormValues, companyFormValues } from './merge'
 import { appearanceFormSchema, companyFormSchema, paymentFormSchema } from './schemas'
 
 const stored = parseCompany({
@@ -44,6 +44,12 @@ describe('applyPaymentForm', () => {
     expect(result.theme.texts).toMatchObject({ title: 'Beleg', paymentNote: 'Mit Datum {Faellig}', paymentNoteWithoutDueDate: 'Ohne Datum' })
     expect(result.theme.layout).toBe('klassisch')
     expect(result.defaultPaymentDays).toBe(14)
+  })
+})
+
+describe('appearanceFormValues', () => {
+  test('always offers four footer columns', () => {
+    expect(appearanceFormValues(themeSchema.parse({ texts: { footerColumns: ['A'] } })).texts.footerColumns).toEqual(['A', '', '', ''])
   })
 })
 

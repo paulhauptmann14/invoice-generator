@@ -7,7 +7,8 @@ import { normalizeUserFilename } from '@/lib/domain/filename'
 
 type Params = { params: Promise<{ betrieb: string; id: string }> }
 
-const body = z.object({ filename: z.string().max(200) })
+// withoutLogo: for printing on letterhead paper that already carries the logo.
+const body = z.object({ filename: z.string().max(200), withoutLogo: z.boolean().optional() })
 
 /** Editable Word version of a saved invoice. Not archived: the archived PDF is the record (spec 8). */
 export async function POST(request: Request, { params }: Params) {
@@ -27,7 +28,7 @@ export async function POST(request: Request, { params }: Params) {
 
   const filename = parsed.data.filename.trim() ? normalizeUserFilename(parsed.data.filename, 'docx') : doc.filenames.docx
   try {
-    return docxResponse(await renderInvoiceDocx(doc.vm, doc.theme, { logo: doc.logo }), filename)
+    return docxResponse(await renderInvoiceDocx(doc.vm, doc.theme, { logo: parsed.data.withoutLogo ? null : doc.logo }), filename)
   } catch (error) {
     console.error('DOCX rendering failed', error)
     return Response.json({ error: 'render failed' }, { status: 500 })

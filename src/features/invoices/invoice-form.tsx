@@ -1,25 +1,22 @@
 'use client'
 
-import { CircleAlert, Eye, EyeOff, Info, X } from 'lucide-react'
+import { CircleAlert, Info } from 'lucide-react'
 import Link from 'next/link'
 import { useActionState, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { FieldError } from '@/components/field-error'
 import { FormAlert } from '@/components/form-alert'
 import { useTenant } from '@/features/tenants/tenant-context'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogClose, DialogContent, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect } from '@/components/ui/native-select'
 import { Textarea } from '@/components/ui/textarea'
 import { addDays, formatDateDe } from '@/lib/domain/dates'
-import { useMediaQuery } from '@/lib/use-media-query'
-import { useStoredFlag } from '@/lib/use-stored-flag'
 import { type InvoiceFormState, saveInvoice } from './actions'
 import { createDraftReducer, draftTotals, type InvoiceDraft, type NumberContext, type PickerArticle, type PickerCustomer, recipientNotice, toPayload } from './draft'
 import { useReportDirty } from './editor-context'
 import { ItemsEditor } from './items-editor'
-import { LivePreview } from './live-preview'
+import { PreviewToggle, usePreviewMode, WithPreview } from './with-preview'
 import { RecipientSection } from './recipient-section'
 import { TotalsPanel } from './totals-panel'
 
@@ -38,7 +35,7 @@ export function InvoiceForm({
   customers: PickerCustomer[]
   articles: PickerArticle[]
 }) {
-  const { tenant, path } = useTenant()
+  const { tenant, path, api } = useTenant()
   const reducer = useMemo(() => createDraftReducer(numberContext), [numberContext])
   const [draft, dispatch] = useReducer(reducer, initialDraft)
   // Archived ranges stay selectable only for an invoice that already uses them.
@@ -53,10 +50,8 @@ export function InvoiceForm({
   const dirty = draft !== pristine
   useReportDirty(dirty)
   const payloadJson = useMemo(() => JSON.stringify(toPayload(draft)), [draft])
-  // Side-by-side preview from 80rem (Tailwind xl, 1280px); below that it opens in a full-screen dialog.
-  const wide = useMediaQuery('(min-width: 80rem)')
-  const [previewOn, setPreviewOn] = useStoredFlag('rechnung-vorschau', true)
-  const sidePreview = wide && previewOn
+  // Side-by-side preview from 80rem; below that it opens in a full-screen dialog.
+  const preview = usePreviewMode('rechnung-vorschau')
 
   // Focus the first invalid control after a failed save.
   useEffect(() => {
@@ -76,37 +71,8 @@ export function InvoiceForm({
   const days = draft.paymentDays.trim()
   const dueDate = /^\d{1,3}$/.test(days) && /^\d{4}-\d{2}-\d{2}$/.test(draft.issueDate) ? formatDateDe(addDays(draft.issueDate, Number(days))) : null
 
-  const previewToggle = wide ? (
-    <Button type="button" variant="outline" className="gap-2" onClick={() => setPreviewOn(!previewOn)}>
-      {previewOn ? <EyeOff aria-hidden className="size-4" /> : <Eye aria-hidden className="size-4" />}
-      {previewOn ? 'Vorschau ausblenden' : 'Vorschau einblenden'}
-    </Button>
-  ) : (
-    <Dialog>
-      <DialogTrigger asChild>
-        <Button type="button" variant="outline" className="gap-2">
-          <Eye aria-hidden className="size-4" />
-          Vorschau
-        </Button>
-      </DialogTrigger>
-      <DialogContent
-        showCloseButton={false}
-        aria-describedby={undefined}
-        className="inset-0 top-0 left-0 flex h-dvh w-full max-w-none translate-x-0 translate-y-0 flex-col gap-3 overflow-y-auto rounded-none border-0 bg-background p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:max-w-none sm:p-6"
-      >
-        <div className="flex items-center justify-between gap-3">
-          <DialogTitle className="font-display text-xl font-semibold">Vorschau</DialogTitle>
-          <DialogClose asChild>
-            <Button type="button" variant="outline" className="min-h-11 gap-2 md:min-h-9">
-              <X aria-hidden className="size-4" />
-              Schließen
-            </Button>
-          </DialogClose>
-        </div>
-        <LivePreview payload={payloadJson} showLabel={false} className="mx-auto w-full max-w-2xl" />
-      </DialogContent>
-    </Dialog>
-  )
+  const previewUrl = api('invoices/preview')
+  const previewToggle = <PreviewToggle mode={preview} url={previewUrl} payload={payloadJson} />
 
   const form = (
     <form ref={formRef} action={action} noValidate className="space-y-10">
@@ -232,12 +198,9 @@ export function InvoiceForm({
     </form>
   )
 
-  // data-wide lets the app shell widen the content area for the editor (see (app)/layout.tsx).
   return (
-    <div data-wide className={sidePreview ? 'mt-8 grid grid-cols-[minmax(0,1fr)_minmax(22rem,40%)] items-start gap-10' : 'mt-8'}>
-      {/* Container queries: the form adapts to its own width, which shrinks next to the preview. */}
-      <div className="@container min-w-0">{form}</div>
-      {sidePreview && <LivePreview payload={payloadJson} className="sticky top-6" frameClassName="aspect-[210/297] max-h-[calc(100dvh-6rem)]" />}
-    </div>
+    <WithPreview mode={preview} url={previewUrl} payload={payloadJson}>
+      {form}
+    </WithPreview>
   )
 }

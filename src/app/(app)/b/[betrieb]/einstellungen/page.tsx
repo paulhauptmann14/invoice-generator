@@ -1,16 +1,8 @@
-import type { Metadata } from 'next'
-import { EmptyState } from '@/components/empty-state'
-import { PageHeader } from '@/components/page-header'
+import { redirect } from 'next/navigation'
 import { requireTenant } from '@/lib/auth/require-tenant'
-
-export const metadata: Metadata = { title: 'Einstellungen' }
+import { tenantPath } from '@/lib/tenant-paths'
 
 export default async function SettingsPage({ params }: { params: Promise<{ betrieb: string }> }) {
-  await requireTenant((await params).betrieb)
-  return (
-    <>
-      <PageHeader title="Einstellungen" description="Firmendaten, Rechnungsdesign, Nummern und Dateinamen." />
-      <EmptyState title="Noch nichts einzustellen">Die Einstellungen werden in einem späteren Schritt eingebaut.</EmptyState>
-    </>
-  )
+  const { tenant } = await requireTenant((await params).betrieb)
+  redirect(tenantPath(tenant.id, 'einstellungen/firma'))
 }

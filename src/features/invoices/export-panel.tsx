@@ -61,11 +61,14 @@ export function ExportPanel({
   invoiceId,
   defaultFilenames,
   missing,
+  hasLogo = false,
   leading,
 }: {
   invoiceId: string
   defaultFilenames: Record<Format, string>
   missing: string[]
+  /** Offers "Ohne Logo (für Briefpapier)" when a logo is configured. */
+  hasLogo?: boolean
   /** Shown left of the PDF actions (the invoice number). */
   leading?: React.ReactNode
 }) {
@@ -75,6 +78,7 @@ export function ExportPanel({
   const [open, setOpen] = useState(false)
   const [format, setFormat] = useState<Format>('pdf')
   const [name, setName] = useState(withoutExtension(defaultFilenames.pdf))
+  const [withoutLogo, setWithoutLogo] = useState(false)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<ExportError | null>(null)
   const [done, setDone] = useState<string | null>(null)
@@ -89,6 +93,7 @@ export function ExportPanel({
   function openDialog(next: Format) {
     setFormat(next)
     setName(withoutExtension(defaultFilenames[next]))
+    setWithoutLogo(false)
     setError(null)
     setDone(null)
     setOpen(true)
@@ -102,7 +107,7 @@ export function ExportPanel({
       const response = await fetch(api(`invoices/${invoiceId}/${format}`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: name }),
+        body: JSON.stringify({ filename: name, withoutLogo }),
       })
       if (response.status === 401) return setError({ kind: 'expired' })
       if (response.status === 409) {
@@ -170,7 +175,7 @@ export function ExportPanel({
           {missing.length > 0 ? (
             <span>
               Export gesperrt – Firmendaten unvollständig: {fieldList(missing)}{' '}
-              <Link href={path('einstellungen')} className="font-medium text-foreground underline underline-offset-4">
+              <Link href={path('einstellungen/firma')} className="font-medium text-foreground underline underline-offset-4">
                 Firmendaten ergänzen
               </Link>
             </span>
@@ -198,7 +203,7 @@ export function ExportPanel({
                 {error.kind === 'missing' ? (
                   <>
                     Firmendaten unvollständig: {fieldList(error.fields)}{' '}
-                    <Link href={path('einstellungen')} className="font-medium underline underline-offset-4">
+                    <Link href={path('einstellungen/firma')} className="font-medium underline underline-offset-4">
                       Zu den Einstellungen
                     </Link>
                   </>
@@ -216,6 +221,13 @@ export function ExportPanel({
                 Gespeichert als <span className="font-mono text-foreground">{finalName}</span>
               </p>
             </div>
+            {hasLogo && (
+              // The whole row is the click target (44px on mobile).
+              <label className="flex min-h-11 items-center gap-3 text-sm md:min-h-9">
+                <input type="checkbox" checked={withoutLogo} onChange={(e) => setWithoutLogo(e.target.checked)} className="size-4 accent-[var(--color-tinte)]" />
+                Ohne Logo (für Briefpapier)
+              </label>
+            )}
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <DialogClose asChild>
                 <Button type="button" variant="ghost" disabled={pending}>

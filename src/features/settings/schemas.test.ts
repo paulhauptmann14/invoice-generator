@@ -107,6 +107,10 @@ describe('appearanceFormSchema', () => {
     expect(errors).toHaveProperty('layout')
     expect(errors['logo.widthMm']).toBe('Bitte einen Wert von 10 bis 120 eingeben.')
   })
+  test('empty footer columns are dropped (empty list = footer from the company data)', () => {
+    const data = appearanceFormSchema.parse({ ...appearance, texts: { ...appearance.texts, footerColumns: ['', ' Spalte 2 ', '', ''] } })
+    expect(data.texts.footerColumns).toEqual(['Spalte 2'])
+  })
   test('rejects colors that are not #RRGGBB', () => {
     expect(errorsOf(appearanceFormSchema.safeParse({ ...appearance, colors: { ...appearance.colors, primary: 'rot' } }))).toHaveProperty('colors.primary')
   })
