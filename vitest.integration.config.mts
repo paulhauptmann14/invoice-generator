@@ -12,6 +12,7 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.int.test.ts'],
+    exclude: ['node_modules/**', 'e2e/**'],
     fileParallelism: false,
   },
 })

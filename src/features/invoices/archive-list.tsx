@@ -4,7 +4,7 @@ import type { InvoiceExport } from './exports-queries'
 
 const dateTime = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Europe/Berlin' })
 
-/** Archived PDF exports of an invoice, newest first; each entry downloads via a short-lived signed URL. */
+/** Archived PDF exports of an invoice, newest first; each entry downloads through the app's export route. */
 export function ArchiveList({ tenantId, invoiceId, exports }: { tenantId: string; invoiceId: string; exports: InvoiceExport[] }) {
   return (
     <section aria-labelledby="archive-heading" className="mt-12 max-w-3xl">

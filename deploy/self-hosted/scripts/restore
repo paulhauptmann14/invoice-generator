@@ -1,0 +1,197 @@
+#!/usr/bin/env bash
+# Replaces ALL data on this machine with the content of a backup made by scripts/backup. Also the way to move the app to a new
+# machine: install Docker, age and this repository there, then run restore (no setup needed first).
+#
+#   restore [--yes] [--no-safety-backup] <backup file>
+#
+# Asks for the path of your private age key (or reads AGE_IDENTITY). --yes skips the confirmation question (tests).
+# Before it deletes anything it makes a safety copy of the current data (rechnungen-safety-*.tar.age in the backup directory,
+# never pruned; skipped when the database has no accounts yet, or with --no-safety-backup, e.g. when the old installation is
+# too broken to back up). If the restore fails half way, run it again with the same file.
+#
+# The data is loaded into the schema the backup was made with: the migrations up to the backup's newest one are applied first,
+# then the data is loaded, then the remaining migrations of this checkout run on top (so backfills see the restored rows).
+# A backup that is newer than this checkout (it knows migrations this checkout lacks) is refused before anything is changed.
+set -euo pipefail
+
+# shellcheck source=lib/common.sh
+. "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+
+USAGE="usage: restore [--yes] [--no-safety-backup] <backup file>"
+ASSUME_YES=0
+SAFETY_BACKUP=1
+FILE=""
+for arg in "$@"; do
+  case "$arg" in
+    --yes) ASSUME_YES=1 ;;
+    --no-safety-backup) SAFETY_BACKUP=0 ;;
+    -*) die "$USAGE" ;;
+    *)
+      [ -z "$FILE" ] || die "$USAGE"
+      FILE="$arg"
+      ;;
+  esac
+done
+[ -n "$FILE" ] || die "$USAGE"
+[ -f "$FILE" ] || die "backup file not found: $FILE"
+
+for tool in docker age tar; do
+  command -v "$tool" >/dev/null 2>&1 || die "'$tool' is required but not installed"
+done
+docker info >/dev/null 2>&1 || die "cannot talk to the Docker daemon (is it running, are you in the docker group?)"
+
+identity="${AGE_IDENTITY:-}"
+if [ -z "$identity" ]; then
+  [ -t 0 ] || die "no terminal to ask for the private age key; set AGE_IDENTITY to its path"
+  read -r -p "Path to your private age key file: " identity
+fi
+[ -f "$identity" ] || die "age key file not found: $identity"
+
+work="$(mktemp -d)"
+DESTROYED=0 # set once the old data is gone
+FINISHED=0
+SAFETY_FILE=""
+on_exit() {
+  rm -rf "${work:?}"
+  if [ "$DESTROYED" = 1 ] && [ "$FINISHED" = 0 ]; then
+    {
+      echo
+      echo "RESTORE INCOMPLETE. The old data on this machine has been deleted and the backup was not fully restored."
+      echo "The app is not running. Fix the cause named above, then run restore again with the same backup file:"
+      echo "  $0 $FILE"
+      if [ -n "$SAFETY_FILE" ]; then
+        echo "The data this machine had before the restore is saved in: $SAFETY_FILE"
+      fi
+      if [ -n "${SAVED_ENV:-}" ]; then
+        echo "The previous .env is saved as: $SAVED_ENV"
+      fi
+    } >&2
+  fi
+}
+trap on_exit EXIT
+
+# Everything is decrypted and checked before anything on this machine is touched. Only the expected members are unpacked.
+# Archives from before the migration list existed have no migrations.txt/commit.txt: list first, then unpack what is there.
+info "Decrypting the backup ..."
+members="$(age -d -i "$identity" "$FILE" | tar -tf -)" || die "could not decrypt or unpack the backup (wrong key or damaged file); nothing was changed"
+unpack=(data.sql storage.tar caddy.tar .env)
+for part in migrations.txt commit.txt; do
+  if grep -qx "$part" <<<"$members"; then
+    unpack+=("$part")
+  fi
+done
+age -d -i "$identity" "$FILE" | tar -x -C "$work" "${unpack[@]}" || die "could not decrypt or unpack the backup (wrong key or damaged file); nothing was changed"
+for part in data.sql storage.tar caddy.tar .env; do
+  [ -s "$work/$part" ] || die "the backup is incomplete ($part is missing); nothing was changed"
+done
+
+# The schema version of the backup: its newest migration. Refuse a backup made by newer code than this checkout.
+BACKUP_UNTIL=""
+if [ -s "$work/migrations.txt" ]; then
+  unknown=""
+  while IFS= read -r version; do
+    [[ "$version" =~ ^[0-9]+$ ]] || die "the migration list in the backup is damaged; nothing was changed"
+    compgen -G "$MIGRATIONS_DIR/${version}_*.sql" >/dev/null || unknown="$unknown $version"
+  done <"$work/migrations.txt"
+  if [ -n "$unknown" ]; then
+    die "this backup was made by a newer version of the app (commit $(head -n 1 "$work/commit.txt" 2>/dev/null || echo unknown)): it contains database changes that this copy of the repository does not have:$unknown. Check out a newer version of the repository (git pull), then run restore again. Nothing was changed."
+  fi
+  BACKUP_UNTIL="$(sort "$work/migrations.txt" | tail -n 1)"
+else
+  echo "warning: this backup has no migration list (made by an older version of the scripts). The data is loaded into the schema of" >&2
+  echo "this copy of the repository; that only works if the schema has not changed since the backup was made." >&2
+fi
+
+if [ "$ASSUME_YES" = 0 ]; then
+  [ -t 0 ] || die "no terminal to ask for confirmation; use --yes to confirm"
+  echo "All data on this device will be replaced by the content of $(basename "$FILE")."
+  read -r -p "Type 'yes' to continue: " answer
+  [ "$answer" = yes ] || die "cancelled; nothing was changed"
+fi
+
+# True when the database of this machine holds at least one account (a fresh or emptied database has nothing worth saving).
+# A failing query is not "no accounts": it stops the restore, so a broken database never skips the safety copy silently.
+database_has_accounts() {
+  local has_table count
+  has_table="$(psql_admin -qtA -c "select to_regclass('auth.users') is not null")" || die "could not query the current database; nothing was changed (use --no-safety-backup to restore without a safety backup)"
+  [ "$has_table" = t ] || return 1
+  count="$(psql_admin -qtA -c 'select count(*) from auth.users')" || die "could not query the current database; nothing was changed (use --no-safety-backup to restore without a safety backup)"
+  [ "$count" != 0 ]
+}
+
+# Safety net: save what is on this machine now. Starts the database if the old stack is stopped but its data exists.
+SAVED_ENV=""
+if [ -f "$ENV_FILE" ] && [ "$SAFETY_BACKUP" = 1 ] && (volume_name db-data) >/dev/null 2>&1; then
+  compose up -d db
+  wait_healthy db
+  if database_has_accounts; then
+    info "Making a safety backup of the current data first ..."
+    safety_output="$("$(dirname "${BASH_SOURCE[0]}")/backup" --safety)" || die "the safety backup failed; nothing was changed (use --no-safety-backup to restore without it)"
+    echo "$safety_output"
+    SAFETY_FILE="$(sed -n 's/^Backup written: \(.*\) ([0-9]* bytes)$/\1/p' <<<"$safety_output" | tail -n 1)"
+  else
+    info "The current database has no accounts; skipping the safety backup."
+  fi
+elif [ -f "$ENV_FILE" ] && [ "$SAFETY_BACKUP" = 1 ]; then
+  info "No existing data found on this machine; skipping the safety backup."
+fi
+
+# The old stack goes first (with its own .env, if there is one), then the saved .env takes its place.
+if [ -f "$ENV_FILE" ]; then
+  info "Stopping the current stack and deleting its data ..."
+  DESTROYED=1
+  compose down -v --remove-orphans
+  SAVED_ENV="$ENV_FILE.bak-$(date +%Y%m%d-%H%M%S)"
+  mv "$ENV_FILE" "$SAVED_ENV"
+  info "The previous .env was kept as $SAVED_ENV"
+fi
+DESTROYED=1
+(umask 077 && cp "$work/.env" "$ENV_FILE")
+# A stack of the restored project name may still exist from an earlier attempt.
+compose down -v --remove-orphans
+
+info "Starting a fresh stack (this builds the app) ..."
+if [ -n "$BACKUP_UNTIL" ]; then
+  "$(dirname "${BASH_SOURCE[0]}")/setup" --restore --until "$BACKUP_UNTIL"
+else
+  "$(dirname "${BASH_SOURCE[0]}")/setup" --restore
+fi
+
+# Nothing may write while the data is replaced; only the database keeps running.
+compose stop app caddy storage auth rest
+
+info "Loading the database ..."
+# The migrations already created the schema (and a few rows, like the storage buckets): empty the tables, then load the dump
+# in one transaction with triggers and foreign keys switched off, so the order of tables does not matter.
+{
+  cat <<SQL
+set session_replication_role = replica;
+do \$\$
+declare tables text;
+begin
+  select string_agg(t, ', ') into tables from ($WRITABLE_TABLES_SQL) as w(t);
+  execute 'truncate table ' || tables || ' cascade';
+end
+\$\$;
+SQL
+  cat "$work/data.sql"
+} | psql_admin -q --single-transaction -f - >/dev/null
+
+if [ -n "$BACKUP_UNTIL" ]; then
+  info "Applying the database changes made since the backup ..."
+  "$(dirname "${BASH_SOURCE[0]}")/migrate"
+fi
+
+info "Restoring storage files and certificate authority ..."
+tar_to_volume storage-data <"$work/storage.tar"
+tar_to_volume caddy-data <"$work/caddy.tar"
+
+compose up -d
+wait_healthy db auth rest storage caddy app
+FINISHED=1
+url="https://$(env_get APP_HOST)"
+if [ "$(env_get HTTPS_PORT 443)" != 443 ]; then
+  url="$url:$(env_get HTTPS_PORT)"
+fi
+echo
+echo "Restore finished. Open $url in a browser; the old accounts and the old certificate work again."

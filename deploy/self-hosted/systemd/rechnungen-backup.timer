@@ -1,0 +1,11 @@
+# Template: copy next to rechnungen-backup.service and enable it with "systemctl enable --now rechnungen-backup.timer".
+[Unit]
+Description=Nightly backup of the invoice app
+
+[Timer]
+OnCalendar=*-*-* 03:15
+# Runs at the next boot if the machine was off at 03:15
+Persistent=true
+
+[Install]
+WantedBy=timers.target

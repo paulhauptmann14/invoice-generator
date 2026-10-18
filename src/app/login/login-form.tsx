@@ -12,7 +12,7 @@ import { signIn, type SignInState } from './actions'
 
 const initialState: SignInState = { error: null, fieldErrors: {}, email: '' }
 
-export function LoginForm() {
+export function LoginForm({ showPasswordReset }: { showPasswordReset: boolean }) {
   const [state, action, pending] = useActionState(signIn, initialState)
   const [showPassword, setShowPassword] = useState(false)
   const alertRef = useRef<HTMLDivElement>(null)
@@ -61,11 +61,13 @@ export function LoginForm() {
           aria-describedby={state.fieldErrors.password ? 'password-error' : undefined}
         />
         {state.fieldErrors.password && <FieldError id="password-error">{state.fieldErrors.password}</FieldError>}
-        <div className="flex justify-end">
-          <Link href="/passwort-vergessen" className="inline-flex min-h-11 items-center text-sm underline underline-offset-4 md:min-h-9">
-            Passwort vergessen?
-          </Link>
-        </div>
+        {showPasswordReset && (
+          <div className="flex justify-end">
+            <Link href="/passwort-vergessen" className="inline-flex min-h-11 items-center text-sm underline underline-offset-4 md:min-h-9">
+              Passwort vergessen?
+            </Link>
+          </div>
+        )}
       </div>
 
       <Button type="submit" className="w-full" size="lg" disabled={pending} aria-busy={pending}>

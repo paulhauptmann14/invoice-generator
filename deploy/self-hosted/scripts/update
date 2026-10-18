@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# Updates the app: backup first, then new code, a new app image, database migrations and a restart of the app.
+#
+#   update            git pull (fast-forward only), then as above
+#   update --no-pull  skip git pull (tests, or code you updated yourself)
+#
+# The running app keeps serving until the new image is built. The build comes before the migrations, so a failed backup, pull
+# or build changes neither the running app nor the database. A failed migration is rolled back (one transaction per file) and
+# the old app keeps running: do not restore the backup, fix the cause and run update again. At the end, old images and
+# build cache are removed.
+set -euo pipefail
+
+main() {
+  # shellcheck source=lib/common.sh
+  . "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+  local scripts pull=1
+  scripts="$(dirname "${BASH_SOURCE[0]}")"
+  case "${1:-}" in
+    --no-pull) pull=0 ;;
+    "") ;;
+    *) die "usage: update [--no-pull]" ;;
+  esac
+
+  info "Backing up before the update ..."
+  "$scripts/backup" || die "the backup failed; nothing was changed"
+
+  if [ "$pull" = 1 ]; then
+    info "Fetching the new version ..."
+    git -C "$REPO_DIR" pull --ff-only
+  fi
+
+  info "Building the new app image (the old app keeps running meanwhile) ..."
+  compose build app
+
+  info "Applying database migrations ..."
+  "$scripts/migrate"
+
+  compose up -d app
+  wait_healthy app
+
+  # Every build leaves the previous app image behind (dangling) and adds build cache; on an SD card that adds up. Only
+  # images no container uses and cache older than a week are removed, never volumes. A failure here must not fail the update.
+  info "Removing old images and build cache ..."
+  docker image prune -f >/dev/null || info "(could not remove old images; ignored)"
+  docker builder prune -f --filter until=168h >/dev/null || info "(could not remove old build cache; ignored)"
+  info "Update finished."
+}
+
+# git pull may replace this very file; bash reads scripts while running them, so everything is inside main and we exit here.
+main "$@"
+exit

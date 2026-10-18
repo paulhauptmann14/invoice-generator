@@ -15,7 +15,8 @@
     "db:reset": "supabase db reset",
     "db:test": "supabase test db",
     "db:types": "supabase gen types typescript --local > src/lib/supabase/database.types.ts",
-    "test:integration": "vitest run --config vitest.integration.config.mts"
+    "test:integration": "vitest run --config vitest.integration.config.mts",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@fontsource/ibm-plex-sans": "5.3.0",
@@ -42,6 +43,7 @@
     "zod": "4.6.5"
   },
   "devDependencies": {
+    "@playwright/test": "1.64.1",
     "@tailwindcss/turbopack": "4.3.3",
     "@types/node": "24.19.1",
     "@types/react": "19.3.0",

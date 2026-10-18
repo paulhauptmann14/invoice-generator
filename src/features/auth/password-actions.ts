@@ -1,7 +1,8 @@
 'use server'
 
-import { redirect } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { z } from 'zod'
+import { isPasswordResetEnabled } from '@/lib/feature-flags'
 import { createClient } from '@/lib/supabase/server'
 import { isFreshRecovery, parseRecoveryLink, requestReset } from './recovery'
 import { newPasswordSchema, resetRequestSchema } from './schemas'
@@ -13,6 +14,7 @@ export type ResetRequestState = { status: 'idle' | 'sent' | 'error'; fieldError:
 /** Requests the reset e-mail. The answer is always the same (no account enumeration, also on rate limits). */
 export async function requestPasswordReset(_prev: ResetRequestState, formData: FormData): Promise<ResetRequestState> {
   const email = String(formData.get('email') ?? '')
+  if (!isPasswordResetEnabled()) return { status: 'error', fieldError: 'Das Zurücksetzen per E-Mail ist hier nicht verfügbar.', email }
   const parsed = resetRequestSchema.safeParse({ email })
   if (!parsed.success) return { status: 'error', fieldError: parsed.error.issues[0].message, email }
 
@@ -25,6 +27,7 @@ export async function requestPasswordReset(_prev: ResetRequestState, formData: F
  * mail scanners that prefetch links would otherwise use up the one-time token.
  */
 export async function confirmRecovery(formData: FormData): Promise<void> {
+  if (!isPasswordResetEnabled()) notFound()
   const tokenHash = parseRecoveryLink('recovery', formData.get('token_hash'))
   if (!tokenHash) redirect(LINK_INVALID)
 
@@ -41,6 +44,7 @@ export type NewPasswordState = { message: string | null; errors: { password?: st
 
 /** Sets the new password; only a fresh session from the e-mail link may do this (not a normal sign-in). */
 export async function setNewPassword(_prev: NewPasswordState, formData: FormData): Promise<NewPasswordState> {
+  if (!isPasswordResetEnabled()) notFound()
   const parsed = newPasswordSchema.safeParse({ password: String(formData.get('password') ?? ''), confirm: String(formData.get('confirm') ?? '') })
   if (!parsed.success) {
     const fields = z.flattenError(parsed.error).fieldErrors

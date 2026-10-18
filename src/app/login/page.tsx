@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { AuthShell } from '@/components/auth-shell'
 import { FormAlert } from '@/components/form-alert'
 import { loginNotice } from '@/features/auth/schemas'
+import { isPasswordResetEnabled } from '@/lib/feature-flags'
 import { LoginForm } from './login-form'
 
 export const metadata: Metadata = { title: 'Anmelden' }
@@ -15,7 +16,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <FormAlert>{notice.text}</FormAlert>
         </div>
       )}
-      <LoginForm />
+      <LoginForm showPasswordReset={isPasswordResetEnabled()} />
     </AuthShell>
   )
 }

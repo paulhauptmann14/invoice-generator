@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Copies Caddy's root certificate to ./rechnungen-root.crt (current directory) so it can be installed on phones and computers.
+set -euo pipefail
+
+# shellcheck source=lib/common.sh
+. "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+
+compose cp caddy:/data/caddy/pki/authorities/local/root.crt ./rechnungen-root.crt
+info "Wrote $PWD/rechnungen-root.crt. Install it as a trusted root certificate on every device that opens the app."

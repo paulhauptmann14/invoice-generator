@@ -1,9 +1,10 @@
 import type { Metadata } from 'next'
-import { redirect } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { AuthShell } from '@/components/auth-shell'
 import { Button } from '@/components/ui/button'
 import { confirmRecovery } from '@/features/auth/password-actions'
 import { parseRecoveryLink } from '@/features/auth/recovery'
+import { isPasswordResetEnabled } from '@/lib/feature-flags'
 
 export const metadata: Metadata = { title: 'Neues Passwort festlegen' }
 
@@ -12,6 +13,7 @@ export const metadata: Metadata = { title: 'Neues Passwort festlegen' }
  * the one-time token is redeemed only by the button (POST via server action).
  */
 export default async function ConfirmRecoveryPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  if (!isPasswordResetEnabled()) notFound()
   const query = await searchParams
   const tokenHash = parseRecoveryLink(query.type, query.token_hash)
   if (!tokenHash) redirect('/login?hinweis=link-ungueltig')

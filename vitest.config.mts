@@ -9,6 +9,6 @@ export default defineConfig({
     environment: 'node',
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
     // Integration tests need the local Supabase stack: npm run test:integration
-    exclude: ['src/**/*.int.test.ts', 'node_modules/**'],
+    exclude: ['src/**/*.int.test.ts', 'node_modules/**', 'e2e/**'],
   },
 })

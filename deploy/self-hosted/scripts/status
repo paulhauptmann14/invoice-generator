@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Shows container state, free disk space and the newest backup.
+set -euo pipefail
+
+# shellcheck source=lib/common.sh
+. "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
+
+echo "== containers"
+compose ps
+
+echo
+echo "== disk (docker data)"
+docker_root="$(docker info -f '{{.DockerRootDir}}' 2>/dev/null || true)"
+if [ -n "$docker_root" ] && [ -d "$docker_root" ]; then
+  df -h "$docker_root"
+else
+  # Docker Desktop keeps its data inside a VM; show the disk of the deploy directory instead.
+  df -h "$DEPLOY_DIR"
+fi
+
+echo
+echo "== newest backup (last successful one)"
+dir="$(backup_dir)"
+latest=""
+if [ -d "$dir" ]; then
+  # Only finished archives count: the lock file is touched by every run (also a failed one) and .partial.* files are unfinished.
+  # rechnungen-<digit>... excludes the safety copies that restore makes (rechnungen-safety-...).
+  latest="$(find "$dir" -maxdepth 1 -type f -name 'rechnungen-[0-9]*.tar.age' -exec ls -t {} + 2>/dev/null | head -n 1 || true)"
+fi
+if [ -n "$latest" ]; then
+  echo "$latest ($(date -r "$latest" '+%Y-%m-%d %H:%M'))"
+else
+  echo "none in $dir"
+fi
+
+# Safety copies made by restore: they are never pruned, so list them for the user to delete when no longer needed.
+safety=""
+if [ -d "$dir" ]; then
+  safety="$(find "$dir" -maxdepth 1 -type f -name 'rechnungen-safety-*.tar.age' | LC_ALL=C sort)"
+fi
+if [ -n "$safety" ]; then
+  echo
+  echo "== safety copies made before a restore (not counted above, never deleted automatically)"
+  echo "$safety"
+fi

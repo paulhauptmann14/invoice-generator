@@ -1,0 +1,11 @@
+node_modules
+.next
+.git
+.claude
+supabase/.temp
+deploy/self-hosted/.env*
+deploy/self-hosted/backups
+e2e
+.playwright-mcp
+*.log
+.env*

@@ -1,9 +1,13 @@
 import { z } from 'zod'
+import { pdfResponse } from '@/features/documents/document-response'
 import { requireTenantForRoute } from '@/lib/auth/require-tenant'
 
 type Params = { params: Promise<{ betrieb: string; id: string; exportId: string }> }
 
-/** Download an archived PDF via a short-lived signed URL (60 s). */
+/**
+ * Download an archived PDF. The app streams the file itself: a signed-URL redirect would send the browser to the Supabase URL the server uses,
+ * which is an internal address (http://caddy:8000) on a self-hosted install.
+ */
 export async function GET(_request: Request, { params }: Params) {
   const { betrieb, id, exportId } = await params
   const auth = await requireTenantForRoute(betrieb)
@@ -25,10 +29,10 @@ export async function GET(_request: Request, { params }: Params) {
   }
   if (!row) return Response.json({ error: 'not found' }, { status: 404 })
 
-  const { data, error } = await auth.supabase.storage.from('invoice-pdfs').createSignedUrl(row.storage_path, 60, { download: row.filename })
+  const { data, error } = await auth.supabase.storage.from('invoice-pdfs').download(row.storage_path)
   if (error || !data) {
-    console.error('Signed URL failed', error)
+    console.error('Downloading archived PDF failed', error)
     return Response.json({ error: 'unavailable' }, { status: 502 })
   }
-  return Response.redirect(data.signedUrl, 303)
+  return pdfResponse(Buffer.from(await data.arrayBuffer()), { type: 'attachment', filename: row.filename })
 }

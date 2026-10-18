@@ -51,3 +51,11 @@ supabase/.branches/
 
 # Backups
 backups/
+
+# Self-hosted stack: secrets and backups never go into git
+deploy/self-hosted/.env
+deploy/self-hosted/backups/
+
+# Playwright
+/test-results/
+/playwright-report/
