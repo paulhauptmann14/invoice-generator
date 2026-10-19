@@ -1,0 +1,38 @@
+# Dependency updates: one grouped pull request per month, tested by CI, merged by hand when green.
+# Major versions are not proposed here; they are updated by hand after reading the release notes.
+# Security fixes are separate (repository setting "Dependabot security updates") and arrive right away,
+# also when the fix needs a major version: the ignore rule below only applies to the monthly updates.
+# Not covered: the Supabase images in deploy/self-hosted/compose.yml (updated together, by hand, after the stack test).
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    # Releases younger than a week are left out: compromised packages are usually pulled within days.
+    cooldown:
+      default-days: 7
+    # Keeps the exact versions of package.json (.npmrc save-exact).
+    versioning-strategy: increase
+    commit-message:
+      prefix: chore
+      include: scope
+    groups:
+      npm:
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: '*'
+        update-types: [version-update:semver-major]
+
+  # Workflows reference major tags (@v7), so only a new major version is a change here.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns: ['*']
