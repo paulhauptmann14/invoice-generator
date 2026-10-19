@@ -8,8 +8,8 @@ import { CheckboxField, ColorField, ErrorSummary, RadioField, SaveBar, SelectFie
 import { LogoField } from './logo-field'
 import { type AppearanceFormInput, appearanceFormSchema } from './schemas'
 import { useSettingsForm } from './use-settings-form'
+import { FormSection } from '@/components/form/form-section'
 
-const legend = 'font-display text-xl font-semibold'
 const placeholders = 'Platzhalter: {Nr}, {Kunde}, {Datum}, {Leistungsdatum}, {Faellig}, {Betrag}'
 
 const LAYOUT_OPTIONS = [
@@ -60,13 +60,11 @@ export function AppearanceForm({ initial, logo }: { initial: AppearanceFormInput
           <PreviewToggle mode={preview} url={previewUrl} payload={previewPayload} />
         </div>
 
-        <fieldset className="space-y-4">
-          <legend className={legend}>Layout</legend>
+        <FormSection title="Layout">
           <RadioField form={form} path="layout" label="Aufbau der Rechnung" options={LAYOUT_OPTIONS} />
-        </fieldset>
+        </FormSection>
 
-        <fieldset className="space-y-5">
-          <legend className={legend}>Logo</legend>
+        <FormSection title="Logo">
           {!hasLogo && <p className="text-sm text-muted-foreground">Das Layout {layout === 'kompakt' ? 'Kompakt' : 'Klassisch'} druckt kein Logo.</p>}
           <LogoField hasLogo={logo.present} version={logo.version} />
           <div className="grid gap-5 @lg:grid-cols-2">
@@ -74,19 +72,17 @@ export function AppearanceForm({ initial, logo }: { initial: AppearanceFormInput
             {layout === 'briefpapier' && <SelectField form={form} path="logo.position" label="Position" options={POSITIONS} />}
             <TextField form={form} path="logo.widthMm" label="Breite (mm)" inputMode="decimal" autoComplete="off" hint="10 bis 120 mm" />
           </div>
-        </fieldset>
+        </FormSection>
 
-        <fieldset className="space-y-5">
-          <legend className={legend}>Schrift</legend>
+        <FormSection title="Schrift">
           <SelectField form={form} path="font.builtin" label="Schriftart" options={BUILTIN_FONTS.map((f) => ({ value: f, label: f }))} />
           <div className="grid gap-5 @lg:grid-cols-2">
             <TextField form={form} path="font.baseSizePt" label="Größe Fließtext (pt)" inputMode="decimal" autoComplete="off" hint="7 bis 14 pt" />
             {tableLayout && <TextField form={form} path="font.headingSizePt" label="Größe Überschrift (pt)" inputMode="decimal" autoComplete="off" hint="10 bis 28 pt" />}
           </div>
-        </fieldset>
+        </FormSection>
 
-        <fieldset className="space-y-5">
-          <legend className={legend}>Seite</legend>
+        <FormSection title="Seite">
           <div className="grid gap-5 @md:grid-cols-2 @3xl:grid-cols-4">
             <TextField form={form} path="page.marginTopMm" label="Rand oben (mm)" inputMode="decimal" autoComplete="off" />
             <TextField form={form} path="page.marginRightMm" label="Rand rechts (mm)" inputMode="decimal" autoComplete="off" />
@@ -95,10 +91,9 @@ export function AppearanceForm({ initial, logo }: { initial: AppearanceFormInput
           </div>
           <SelectField form={form} path="page.din5008" label="Anschriftfeld (DIN 5008)" options={DIN_FORMS} hint="Muss zum Fensterkuvert passen." />
           <CheckboxField form={form} path="page.senderLine" label="Absenderzeile über der Anschrift" hint="Firmenname und Anschrift klein über dem Empfänger, sichtbar im Fenster." />
-        </fieldset>
+        </FormSection>
 
-        <fieldset className="space-y-5">
-          <legend className={legend}>Texte</legend>
+        <FormSection title="Texte">
           <TextField form={form} path="texts.title" label="Titel" autoComplete="off" className="max-w-sm" />
           <TextAreaField form={form} path="texts.intro" label="Einleitung" hint="Vorbelegung für neue Rechnungen." />
           <TextAreaField form={form} path="texts.closing" label="Schlusstext" hint={`Vorbelegung für neue Rechnungen. ${placeholders}`} />
@@ -120,12 +115,11 @@ export function AppearanceForm({ initial, logo }: { initial: AppearanceFormInput
               />
             </>
           )}
-        </fieldset>
+        </FormSection>
 
         {tableLayout && (
           <>
-            <fieldset className="space-y-5">
-              <legend className={legend}>Farben</legend>
+            <FormSection title="Farben">
               <div className="grid gap-5 @lg:grid-cols-3">
                 <ColorField form={form} path="colors.primary" label={layout === 'modern' ? 'Firmenname und Überschriften' : 'Überschriften und Linien'} />
                 <ColorField form={form} path="colors.text" label="Text" />
@@ -137,10 +131,9 @@ export function AppearanceForm({ initial, logo }: { initial: AppearanceFormInput
               ) : (
                 <CheckboxField form={form} path="colors.zebra" label="Positionen abwechselnd hinterlegen" />
               )}
-            </fieldset>
+            </FormSection>
 
-            <fieldset className="space-y-5">
-              <legend className={legend}>Tabelle</legend>
+            <FormSection title="Tabelle">
               <div>
                 <CheckboxField form={form} path="table.showPosition" label="Spalte Positionsnummer" />
                 <CheckboxField form={form} path="table.showUnit" label="Spalte Einheit" />
@@ -151,17 +144,16 @@ export function AppearanceForm({ initial, logo }: { initial: AppearanceFormInput
                   <TextField key={key} form={form} path={`table.labels.${key}`} label={`Spaltenkopf ${label}`} autoComplete="off" />
                 ))}
               </div>
-            </fieldset>
+            </FormSection>
 
-            <fieldset className="space-y-5">
-              <legend className={legend}>Fußzeile</legend>
+            <FormSection title="Fußzeile">
               <p className="text-sm text-muted-foreground">Bis zu vier Spalten. Alle leer = Fußzeile automatisch aus den Firmendaten.</p>
               <div className="grid gap-5 @lg:grid-cols-2">
                 {[0, 1, 2, 3].map((i) => (
                   <TextAreaField key={i} form={form} path={`texts.footerColumns.${i}`} label={`Spalte ${i + 1}`} rows={3} />
                 ))}
               </div>
-            </fieldset>
+            </FormSection>
           </>
         )}
 

@@ -14,6 +14,7 @@ import { COUNTRIES } from '@/lib/countries'
 import { emptyFormState, type FormState } from '@/lib/form'
 import { saveCustomer } from './actions'
 import { CUSTOMER_FIELDS, type CustomerField, customerSchema } from './schema'
+import { FormSection } from '@/components/form/form-section'
 
 export function CustomerForm({ id, initial }: { id: string | null; initial: Partial<Record<CustomerField, string>> }) {
   const { tenant, path } = useTenant()
@@ -29,8 +30,7 @@ export function CustomerForm({ id, initial }: { id: string | null; initial: Part
       {state.message && <FormAlert>{state.message}</FormAlert>}
       <RequiredNote />
 
-      <fieldset className="space-y-5">
-        <legend className="font-display text-xl font-semibold">Kunde</legend>
+      <FormSection title="Kunde">
         <Field name="name" label="Name oder Firma" required error={errors.name}>
           {(p) => <Input {...p} defaultValue={v.name} autoComplete="organization" />}
         </Field>
@@ -40,10 +40,9 @@ export function CustomerForm({ id, initial }: { id: string | null; initial: Part
         <Field name="email" label="E-Mail" error={errors.email}>
           {(p) => <Input {...p} type="email" inputMode="email" defaultValue={v.email} autoComplete="email" />}
         </Field>
-      </fieldset>
+      </FormSection>
 
-      <fieldset className="space-y-5">
-        <legend className="font-display text-xl font-semibold">Adresse</legend>
+      <FormSection title="Adresse">
         <Field name="street" label="Straße und Hausnummer" error={errors.street}>
           {(p) => <Input {...p} defaultValue={v.street} autoComplete="street-address" />}
         </Field>
@@ -66,17 +65,16 @@ export function CustomerForm({ id, initial }: { id: string | null; initial: Part
             </NativeSelect>
           )}
         </Field>
-      </fieldset>
+      </FormSection>
 
-      <fieldset className="space-y-5">
-        <legend className="font-display text-xl font-semibold">Steuer und Notizen</legend>
+      <FormSection title="Steuer und Notizen">
         <Field name="vatId" label="USt-IdNr." hint="Nur bei Firmenkunden, z. B. DE123456789." error={errors.vatId}>
           {(p) => <Input {...p} defaultValue={v.vatId} autoCapitalize="characters" />}
         </Field>
         <Field name="notes" label="Notizen" hint="Nur intern, erscheint nicht auf Rechnungen." error={errors.notes}>
           {(p) => <Textarea {...p} defaultValue={v.notes} rows={3} />}
         </Field>
-      </fieldset>
+      </FormSection>
 
       <div className="flex flex-wrap items-center gap-3 border-t border-border pt-6">
         <Button type="submit" disabled={pending} aria-busy={pending}>

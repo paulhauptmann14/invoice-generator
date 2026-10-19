@@ -9,8 +9,8 @@ import { savePaymentSettings } from './actions'
 import { ErrorSummary, SaveBar, TextAreaField, TextField } from './fields'
 import { type PaymentFormInput, paymentFormSchema } from './schemas'
 import { useSettingsForm } from './use-settings-form'
+import { FormSection } from '@/components/form/form-section'
 
-const legend = 'font-display text-xl font-semibold'
 const MAX_ACCOUNTS = 3
 const emptyAccount = { bankName: '', accountNumber: '', iban: '', bic: '' }
 
@@ -37,18 +37,18 @@ export function PaymentForm({ initial }: { initial: PaymentFormInput }) {
           <PreviewToggle mode={preview} url={previewUrl} payload={previewPayload} />
         </div>
 
-        <section aria-labelledby="bank-heading" className="space-y-6">
-          <div>
-            <h2 id="bank-heading" className={legend}>
+        <section aria-labelledby="bank-heading" className="space-y-3">
+          <div className="px-1">
+            <h2 id="bank-heading" className="type-title">
               Bankverbindungen
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">Bis zu drei, in dieser Reihenfolge unter dem Zahlungstext.</p>
           </div>
-          {accounts.length === 0 && <p className="text-sm text-muted-foreground">Noch keine Bankverbindung hinterlegt.</p>}
+          {accounts.length === 0 && <p className="surface px-4 py-4 text-sm text-muted-foreground sm:px-6">Noch keine Bankverbindung hinterlegt.</p>}
           {accounts.map((_, index) => (
-            <fieldset key={index} className="space-y-5 rounded-md border border-border bg-card p-4 sm:p-5">
+            <fieldset key={index} className="surface space-y-5 p-4 sm:p-6">
               <div className="flex items-center justify-between gap-3">
-                <legend className="float-left text-base font-medium">Bankverbindung {index + 1}</legend>
+                <legend className="type-headline float-left">Bankverbindung {index + 1}</legend>
                 <Button type="button" variant="ghost" className="gap-2 text-muted-foreground" onClick={() => removeAccount(index)} aria-label={`Bankverbindung ${index + 1} entfernen`}>
                   <Trash2 aria-hidden className="size-4" />
                   Entfernen
@@ -72,8 +72,7 @@ export function PaymentForm({ initial }: { initial: PaymentFormInput }) {
           )}
         </section>
 
-        <fieldset className="space-y-5">
-          <legend className={legend}>Zahlungsziel und Texte</legend>
+        <FormSection title="Zahlungsziel und Texte">
           <TextField
             form={form}
             path="defaultPaymentDays"
@@ -85,7 +84,7 @@ export function PaymentForm({ initial }: { initial: PaymentFormInput }) {
           />
           <TextAreaField form={form} path="paymentNote" label="Zahlungstext mit Fälligkeitsdatum" />
           <TextAreaField form={form} path="paymentNoteWithoutDueDate" label="Zahlungstext ohne Fälligkeitsdatum" hint="Platzhalter: {Faellig} (Fälligkeitsdatum), {Betrag}, {Nr}, {Kunde}, {Datum}, {Leistungsdatum}" />
-        </fieldset>
+        </FormSection>
 
         <SaveBar form={form} />
       </form>

@@ -15,11 +15,12 @@ export function FilenameForm({ initial, example }: { initial: string; example: {
   return (
     <form action={form.formAction} noValidate className="@container space-y-5">
       <input type="hidden" name="payload" value={form.payload} />
-      <div>
-        <h2 className="font-display text-xl font-semibold">Dateinamen</h2>
+      <div className="px-1">
+        <h2 className="type-title">Dateinamen</h2>
         <p className="mt-1 text-sm text-muted-foreground">Vorschlag beim Export, im Export-Dialog weiterhin änderbar.</p>
       </div>
       <ErrorSummary form={form} />
+      <div className="surface p-4 sm:p-6">
       <TextField
         form={form}
         path="filenameTemplate"
@@ -34,6 +35,7 @@ export function FilenameForm({ initial, example }: { initial: string; example: {
           </>
         }
       />
+      </div>
       <SaveBar form={form} />
     </form>
   )

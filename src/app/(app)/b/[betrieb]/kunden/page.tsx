@@ -1,3 +1,4 @@
+import { Archive, SearchX, Users } from 'lucide-react'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { EmptyState } from '@/components/empty-state'
@@ -59,18 +60,18 @@ export default async function CustomersPage(props: Props) {
 
       {customers.length === 0 ? (
         normalizeSearch(q) ? (
-          <EmptyState title="Keine Treffer">Für „{q}“ wurde kein Kunde gefunden.</EmptyState>
+          <EmptyState title="Keine Treffer" icon={SearchX}>Für „{q}“ wurde kein Kunde gefunden.</EmptyState>
         ) : archived ? (
-          <EmptyState title="Keine archivierten Kunden" />
+          <EmptyState title="Keine archivierten Kunden" icon={Archive} />
         ) : onlyArchived ? (
-          <EmptyState title="Keine aktiven Kunden">
+          <EmptyState title="Keine aktiven Kunden" icon={Users}>
             Alle Kunden sind archiviert.{' '}
             <Link href={tenantPath(tenant.id, 'kunden?ansicht=archiv')} className="font-medium text-foreground underline underline-offset-4">
               Archivierte anzeigen
             </Link>
           </EmptyState>
         ) : (
-          <EmptyState title="Noch keine Kunden">
+          <EmptyState title="Noch keine Kunden" icon={Users}>
             Kunden einmal anlegen und beim Schreiben einer Rechnung auswählen.{' '}
             <Link href={tenantPath(tenant.id, 'kunden/neu')} className="font-medium text-foreground underline underline-offset-4">
               Neuer Kunde
@@ -79,7 +80,7 @@ export default async function CustomersPage(props: Props) {
         )
       ) : (
         <>
-          <div className="mt-6 hidden overflow-hidden rounded-md border border-border bg-card md:block">
+          <div className="surface mt-6 hidden overflow-hidden md:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -105,7 +106,7 @@ export default async function CustomersPage(props: Props) {
             </Table>
           </div>
 
-          <ul className="mt-6 divide-y divide-border overflow-hidden rounded-md border border-border bg-card md:hidden">
+          <ul className="surface mt-6 divide-y divide-border overflow-hidden md:hidden">
             {customers.map((c) => (
               <li key={c.id}>
                 <Link href={tenantPath(tenant.id, `kunden/${c.id}`)} className={`block min-h-11 px-4 py-3 ${listLinkClass}`}>

@@ -1,3 +1,4 @@
+import { Archive, Package, SearchX } from 'lucide-react'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { EmptyState } from '@/components/empty-state'
@@ -60,18 +61,18 @@ export default async function ArticlesPage(props: Props) {
 
       {articles.length === 0 ? (
         normalizeSearch(q) ? (
-          <EmptyState title="Keine Treffer">Für „{q}“ wurde kein Artikel gefunden.</EmptyState>
+          <EmptyState title="Keine Treffer" icon={SearchX}>Für „{q}“ wurde kein Artikel gefunden.</EmptyState>
         ) : archived ? (
-          <EmptyState title="Keine archivierten Artikel" />
+          <EmptyState title="Keine archivierten Artikel" icon={Archive} />
         ) : onlyArchived ? (
-          <EmptyState title="Keine aktiven Artikel">
+          <EmptyState title="Keine aktiven Artikel" icon={Package}>
             Alle Artikel sind archiviert.{' '}
             <Link href={tenantPath(tenant.id, 'artikel?ansicht=archiv')} className="font-medium text-foreground underline underline-offset-4">
               Archivierte anzeigen
             </Link>
           </EmptyState>
         ) : (
-          <EmptyState title="Noch keine Artikel">
+          <EmptyState title="Noch keine Artikel" icon={Package}>
             Häufige Positionen einmal anlegen und beim Rechnungschreiben mit einem Klick einfügen.{' '}
             <Link href={tenantPath(tenant.id, 'artikel/neu')} className="font-medium text-foreground underline underline-offset-4">
               Neuer Artikel
@@ -80,7 +81,7 @@ export default async function ArticlesPage(props: Props) {
         )
       ) : (
         <>
-          <div className="mt-6 hidden overflow-hidden rounded-md border border-border bg-card md:block">
+          <div className="surface mt-6 hidden overflow-hidden md:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -108,7 +109,7 @@ export default async function ArticlesPage(props: Props) {
             </Table>
           </div>
 
-          <ul className="mt-6 divide-y divide-border overflow-hidden rounded-md border border-border bg-card md:hidden">
+          <ul className="surface mt-6 divide-y divide-border overflow-hidden md:hidden">
             {articles.map((a) => (
               <li key={a.id}>
                 <Link href={tenantPath(tenant.id, `artikel/${a.id}`)} className={`flex min-h-11 items-baseline justify-between gap-4 px-4 py-3 ${listLinkClass}`}>

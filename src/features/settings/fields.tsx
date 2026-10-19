@@ -212,7 +212,7 @@ export function ErrorSummary({ form }: { form: AnyForm }) {
 /** Save button plus a note while there are unsaved changes. */
 export function SaveBar({ form }: { form: AnyForm }) {
   return (
-    <div className="flex flex-wrap items-center gap-3 border-t border-border pt-6">
+    <div className="flex flex-wrap items-center gap-3 pt-2">
       <Button type="submit" disabled={form.pending} aria-busy={form.pending}>
         {form.pending ? 'Wird gespeichert …' : 'Speichern'}
       </Button>

@@ -1,9 +1,8 @@
 import { Search } from 'lucide-react'
-import Link from 'next/link'
-import { Button } from '@/components/ui/button'
+import { SegmentedNav } from '@/components/segmented-nav'
 import { Input } from '@/components/ui/input'
 
-/** Search (GET form, works without JS) and the active/archived view switch. */
+/** Search (GET form, Enter submits, works without JS) and the active/archived view switch. */
 export function ListToolbar({
   basePath,
   q,
@@ -17,35 +16,24 @@ export function ListToolbar({
   searchLabel: string
   showViews?: boolean
 }) {
-  const tab = (active: boolean) =>
-    [
-      'inline-flex min-h-11 items-center rounded-t-md px-3 text-sm transition-colors duration-(--duration-fast) active:bg-pressed active:duration-0 md:min-h-9',
-      active
-        ? 'font-medium text-foreground shadow-[inset_0_-2px_0_var(--nav-indicator)]'
-        : 'text-muted-foreground hover:text-foreground',
-    ].join(' ')
   return (
     <div className="mt-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-      <form role="search" action={basePath} className="flex w-full gap-2 md:max-w-md">
+      <form role="search" action={basePath} className="relative w-full md:max-w-sm">
         {archived && <input type="hidden" name="ansicht" value="archiv" />}
         <label htmlFor="q" className="sr-only">
           {searchLabel}
         </label>
-        <Input id="q" name="q" type="search" defaultValue={q} placeholder="Suchen" className="bg-card" />
-        <Button type="submit" variant="outline" className="gap-2">
-          <Search aria-hidden className="size-4" />
-          Suchen
-        </Button>
+        <Search aria-hidden className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+        <Input id="q" name="q" type="search" defaultValue={q} placeholder="Suchen" enterKeyHint="search" className="pl-9" />
       </form>
       {showViews && (
-        <nav aria-label="Ansicht" className="flex">
-          <Link href={basePath} aria-current={!archived ? 'page' : undefined} className={tab(!archived)}>
-            Aktiv
-          </Link>
-          <Link href={`${basePath}?ansicht=archiv`} aria-current={archived ? 'page' : undefined} className={tab(archived)}>
-            Archiviert
-          </Link>
-        </nav>
+        <SegmentedNav
+          label="Ansicht"
+          segments={[
+            { href: basePath, label: 'Aktiv', active: !archived },
+            { href: `${basePath}?ansicht=archiv`, label: 'Archiviert', active: archived },
+          ]}
+        />
       )}
     </div>
   )

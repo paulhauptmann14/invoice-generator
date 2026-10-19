@@ -73,7 +73,7 @@ export function NewTenantDialog({ open, onOpenChange, returnFocusRef }: Props) {
         }}
       >
         <div className="space-y-1.5">
-          <DialogTitle className="font-display text-xl font-semibold">Neuer Betrieb</DialogTitle>
+          <DialogTitle className="type-title">Neuer Betrieb</DialogTitle>
           <DialogDescription className="text-sm text-muted-foreground">
             Eigene Kunden, Artikel, Rechnungen und Nummern. Firmendaten und Logo folgen in den Einstellungen.
           </DialogDescription>

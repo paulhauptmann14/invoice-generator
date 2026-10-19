@@ -8,18 +8,18 @@ const dateTime = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeSty
 export function ArchiveList({ tenantId, invoiceId, exports }: { tenantId: string; invoiceId: string; exports: InvoiceExport[] }) {
   return (
     <section aria-labelledby="archive-heading" className="mt-12 max-w-3xl">
-      <h2 id="archive-heading" className="font-display text-xl font-semibold">
+      <h2 id="archive-heading" className="type-title px-1">
         Archivierte PDFs
       </h2>
       {exports.length === 0 ? (
-        <p className="mt-3 text-sm text-muted-foreground">Noch nicht exportiert.</p>
+        <p className="mt-3 px-1 text-sm text-muted-foreground">Noch nicht exportiert.</p>
       ) : (
-        <ul className="mt-3 divide-y divide-border rounded-md border border-border bg-card">
+        <ul className="surface mt-3 divide-y divide-border overflow-hidden">
           {exports.map((e) => (
             <li key={e.id}>
               <a
                 href={apiPath(tenantId, `invoices/${invoiceId}/exports/${e.id}`)}
-                className="flex min-h-11 flex-wrap items-center gap-x-4 gap-y-0.5 px-4 py-2.5 text-sm transition-colors duration-(--duration-fast) hover:bg-muted active:bg-pressed active:duration-0"
+                className="flex min-h-11 flex-wrap items-center gap-x-4 gap-y-0.5 px-4 py-3 text-sm focus-visible:-outline-offset-2 transition-colors duration-(--duration-fast) hover:bg-muted active:bg-pressed active:duration-0"
               >
                 <FileDown aria-hidden className="size-4 shrink-0 text-muted-foreground" />
                 <span className="min-w-0 flex-1 font-medium break-all">{e.filename}</span>

@@ -119,7 +119,7 @@ export function LivePreview({
       </div>
       <div
         aria-busy={shown === 'loading'}
-        className={['relative w-full overflow-hidden rounded-md border border-border bg-card', frameClassName ?? 'aspect-[210/297]'].join(' ')}
+        className={['surface relative w-full overflow-hidden', frameClassName ?? 'aspect-[210/297]'].join(' ')}
       >
         {url ? (
           <iframe title="PDF-Vorschau der Rechnung" src={`${url}#toolbar=0&navpanes=0&view=FitH`} className="size-full" />

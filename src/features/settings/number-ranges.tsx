@@ -112,15 +112,15 @@ export function NumberRanges({ ranges, year }: { ranges: NumberRangeChoice[]; ye
   const archived = ranges.filter((r) => r.archived)
   return (
     <section aria-labelledby="ranges-heading" className="@container space-y-4">
-      <div>
-        <h2 id="ranges-heading" className="font-display text-xl font-semibold">
+      <div className="px-1">
+        <h2 id="ranges-heading" className="type-title">
           Nummernkreise
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">
           Der Standardkreis ist bei neuen Rechnungen vorausgewählt. Gibt es mehrere Kreise, wird der Kreis im Rechnungsformular gewählt.
         </p>
       </div>
-      <ul className="divide-y divide-border rounded-md border border-border bg-card">
+      <ul className="surface divide-y divide-border">
         {active.map((r) => (
           <RangeRow key={`${r.id}-${r.name}-${r.format}-${r.isDefault}`} range={r} year={year} />
         ))}
@@ -138,8 +138,8 @@ export function NumberRanges({ ranges, year }: { ranges: NumberRangeChoice[]; ye
       )}
       {archived.length > 0 && (
         <div className="space-y-2 pt-2">
-          <h3 className="text-sm font-medium">Archiviert</h3>
-          <ul className="divide-y divide-border rounded-md border border-border bg-card">
+          <h3 className="type-headline px-1">Archiviert</h3>
+          <ul className="surface divide-y divide-border">
             {archived.map((r) => (
               <RangeRow key={`${r.id}-archived`} range={r} year={year} />
             ))}

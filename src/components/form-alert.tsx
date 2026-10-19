@@ -7,7 +7,7 @@ export function FormAlert({ ref, children }: { ref?: React.Ref<HTMLDivElement>; 
       ref={ref}
       role="alert"
       tabIndex={-1}
-      className="flex items-start gap-2 rounded-md border border-stamp/40 bg-stamp/5 px-3 py-2.5 text-sm text-stamp"
+      className="flex items-start gap-2 rounded-lg border border-stamp/40 bg-stamp/5 px-3.5 py-3 text-sm text-stamp"
     >
       <CircleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
       <span>{children}</span>

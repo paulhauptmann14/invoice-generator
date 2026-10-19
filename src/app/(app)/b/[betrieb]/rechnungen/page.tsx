@@ -1,3 +1,4 @@
+import { FileText, SearchX } from 'lucide-react'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { EmptyState } from '@/components/empty-state'
@@ -44,9 +45,9 @@ export default async function InvoicesPage(props: Props) {
 
       {invoices.length === 0 ? (
         normalizeSearch(q) ? (
-          <EmptyState title="Keine Treffer">Für „{q}“ wurde keine Rechnung gefunden.</EmptyState>
+          <EmptyState title="Keine Treffer" icon={SearchX}>Für „{q}“ wurde keine Rechnung gefunden.</EmptyState>
         ) : (
-          <EmptyState title="Noch keine Rechnungen">
+          <EmptyState title="Noch keine Rechnungen" icon={FileText}>
             Die erste Rechnung schreiben – Kunden und Artikel lassen sich direkt im Formular auswählen.{' '}
             <Link href={tenantPath(tenant.id, 'rechnungen/neu')} className="font-medium text-foreground underline underline-offset-4">
               Neue Rechnung
@@ -55,7 +56,7 @@ export default async function InvoicesPage(props: Props) {
         )
       ) : (
         <>
-          <div className="mt-6 hidden overflow-hidden rounded-md border border-border bg-card md:block">
+          <div className="surface mt-6 hidden overflow-hidden md:block">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -93,7 +94,7 @@ export default async function InvoicesPage(props: Props) {
             </Table>
           </div>
 
-          <ul className="mt-6 divide-y divide-border overflow-hidden rounded-md border border-border bg-card md:hidden">
+          <ul className="surface mt-6 divide-y divide-border overflow-hidden md:hidden">
             {invoices.map((i) => (
               <li key={i.id}>
                 <Link href={tenantPath(tenant.id, `rechnungen/${i.id}`)} className={`flex min-h-11 items-center justify-between gap-4 px-4 py-3 ${listLinkClass}`}>

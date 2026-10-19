@@ -194,7 +194,7 @@ export function ExportPanel({
       <Dialog open={open} onOpenChange={(next) => !pending && setOpen(next)}>
         <DialogContent showCloseButton={false} className="gap-5 p-5 sm:max-w-md">
           <div className="space-y-1.5">
-            <DialogTitle className="font-display text-xl font-semibold">{copy.title}</DialogTitle>
+            <DialogTitle className="type-title">{copy.title}</DialogTitle>
             <DialogDescription className="text-sm text-muted-foreground">{copy.description}</DialogDescription>
           </div>
           <form onSubmit={runExport} noValidate className="space-y-5">

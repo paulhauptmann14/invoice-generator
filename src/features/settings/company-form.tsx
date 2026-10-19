@@ -7,8 +7,8 @@ import { saveCompanySettings } from './actions'
 import { ErrorSummary, SaveBar, TextField } from './fields'
 import { type CompanyFormInput, companyFormSchema } from './schemas'
 import { useSettingsForm } from './use-settings-form'
+import { FormSection } from '@/components/form/form-section'
 
-const legend = 'font-display text-xl font-semibold'
 
 export function CompanyForm({ initial }: { initial: CompanyFormInput }) {
   const { tenant, api } = useTenant()
@@ -27,13 +27,11 @@ export function CompanyForm({ initial }: { initial: CompanyFormInput }) {
           <PreviewToggle mode={preview} url={previewUrl} payload={previewPayload} />
         </div>
 
-        <fieldset className="space-y-5">
-          <legend className={legend}>Betrieb</legend>
+        <FormSection title="Betrieb">
           <TextField form={form} path="tenantName" label="Name des Betriebs" required autoComplete="off" hint="Erscheint im Betriebs-Umschalter, nicht auf der Rechnung." />
-        </fieldset>
+        </FormSection>
 
-        <fieldset className="space-y-5">
-          <legend className={legend}>Firma auf der Rechnung</legend>
+        <FormSection title="Firma auf der Rechnung">
           <TextField form={form} path="name" label="Firmenname" required autoComplete="organization" />
           <TextField form={form} path="owner" label="Inhaber" autoComplete="name" />
           <TextField form={form} path="street" label="Straße und Hausnummer" required autoComplete="street-address" />
@@ -42,10 +40,9 @@ export function CompanyForm({ initial }: { initial: CompanyFormInput }) {
             <TextField form={form} path="city" label="Ort" required autoComplete="address-level2" />
           </div>
           <TextField form={form} path="country" label="Land" autoComplete="country-name" />
-        </fieldset>
+        </FormSection>
 
-        <fieldset className="space-y-5">
-          <legend className={legend}>Steuer</legend>
+        <FormSection title="Steuer">
           <p className="text-sm text-muted-foreground">
             <span aria-hidden className="text-stamp">
               *
@@ -57,16 +54,15 @@ export function CompanyForm({ initial }: { initial: CompanyFormInput }) {
             <TextField form={form} path="vatId" label="USt-IdNr." autoComplete="off" spellCheck={false} />
           </div>
           <TextField form={form} path="commercialRegister" label="Handelsregister" autoComplete="off" hint="Optional, z. B. „Amtsgericht Musterstadt HRB 1234“." />
-        </fieldset>
+        </FormSection>
 
-        <fieldset className="space-y-5">
-          <legend className={legend}>Kontakt</legend>
+        <FormSection title="Kontakt">
           <div className="grid gap-5 @lg:grid-cols-2">
             <TextField form={form} path="phone" label="Telefon" type="tel" autoComplete="tel" />
             <TextField form={form} path="email" label="E-Mail" type="email" autoComplete="email" spellCheck={false} />
           </div>
           <TextField form={form} path="web" label="Website" autoComplete="url" spellCheck={false} />
-        </fieldset>
+        </FormSection>
 
         <SaveBar form={form} />
       </form>

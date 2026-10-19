@@ -1,12 +1,10 @@
 import type { Metadata } from 'next'
-import { Barlow_Condensed, IBM_Plex_Mono, IBM_Plex_Sans } from 'next/font/google'
+import { IBM_Plex_Mono } from 'next/font/google'
 import { headers } from 'next/headers'
 import { connection } from 'next/server'
 import { CspNonce } from '@/components/csp-nonce'
 import './globals.css'
 
-const sans = IBM_Plex_Sans({ subsets: ['latin'], weight: ['400', '500'], variable: '--font-plex-sans', display: 'swap' })
-const display = Barlow_Condensed({ subsets: ['latin'], weight: ['600'], variable: '--font-barlow', display: 'swap' })
 // Only used for invoice numbers (list, editor, number field).
 const mono = IBM_Plex_Mono({
   subsets: ['latin'],
@@ -26,7 +24,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   await connection()
   const nonce = (await headers()).get('x-nonce') ?? ''
   return (
-    <html lang="de" className={`${sans.variable} ${display.variable} ${mono.variable}`}>
+    <html lang="de" className={mono.variable}>
       <body className="min-h-dvh antialiased">
         <CspNonce nonce={nonce} />
         {children}

@@ -20,6 +20,7 @@ import { ItemsEditor } from './items-editor'
 import { PreviewToggle, usePreviewMode, WithPreview } from './with-preview'
 import { RecipientSection } from './recipient-section'
 import { TotalsPanel } from './totals-panel'
+import { FormSection } from '@/components/form/form-section'
 
 const initialState: InvoiceFormState = { message: null, errors: {}, suggestedNumber: null }
 
@@ -101,8 +102,7 @@ export function InvoiceForm({
       <div className="grid gap-10 @3xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <RecipientSection draft={draft} dispatch={dispatch} customers={customers} errors={err} />
 
-        <fieldset className="space-y-5">
-          <legend className="font-display text-xl font-semibold">Rechnung</legend>
+        <FormSection title="Rechnung">
           {rangeChoices.length > 1 && (
             <div className="space-y-1.5">
               <Label htmlFor="inv-numberRange">Nummernkreis</Label>
@@ -170,7 +170,7 @@ export function InvoiceForm({
             <input type="checkbox" checked={draft.serviceDateTo !== null} onChange={(e) => dispatch({ type: 'setServiceDateTo', value: e.target.checked ? draft.serviceDateFrom : null })} className="size-4 accent-[var(--color-tinte)]" />
             Leistungszeitraum statt einzelnem Datum
           </label>
-        </fieldset>
+        </FormSection>
       </div>
 
       {notice && (
@@ -183,8 +183,7 @@ export function InvoiceForm({
       <ItemsEditor items={draft.items} lineTotals={lineTotals} invalidKeys={invalidKeys} articles={articles} dispatch={dispatch} errors={err} />
       <TotalsPanel totals={totals} />
 
-      <fieldset className="space-y-5">
-        <legend className="font-display text-xl font-semibold">Texte</legend>
+      <FormSection title="Texte">
         <div className="space-y-1.5">
           <Label htmlFor="inv-introText">Einleitung</Label>
           <Textarea id="inv-introText" rows={2} value={draft.introText} onChange={(e) => dispatch({ type: 'setField', field: 'introText', value: e.target.value })} aria-describedby="inv-placeholders" />
@@ -196,9 +195,9 @@ export function InvoiceForm({
         <p id="inv-placeholders" className="text-sm text-muted-foreground">
           Platzhalter: {'{Nr}'}, {'{Kunde}'}, {'{Datum}'}, {'{Leistungsdatum}'}, {'{Faellig}'}, {'{Betrag}'}
         </p>
-      </fieldset>
+      </FormSection>
 
-      <div className="flex flex-wrap items-center gap-3 border-t border-border pt-6">
+      <div className="flex flex-wrap items-center gap-3 pt-2">
         <Button type="submit" disabled={pending} aria-busy={pending}>
           {pending ? 'Speichern …' : id ? 'Änderungen speichern' : 'Rechnung speichern'}
         </Button>

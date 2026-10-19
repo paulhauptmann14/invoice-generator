@@ -50,7 +50,7 @@ export function LogoField({ hasLogo, version }: { hasLogo: boolean; version: str
     <div className="space-y-3">
       <p className="text-sm font-medium">Logo</p>
       {hasLogo ? (
-        <div className="flex min-h-24 items-center justify-center rounded-md border border-border bg-card p-4">
+        <div className="flex min-h-24 items-center justify-center rounded-lg border border-border bg-card p-4">
           {/* Private image from this origin (no-store); next/image would add nothing here. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={`${api('settings/logo')}?v=${encodeURIComponent(version)}`} alt="Aktuelles Logo" className="max-h-20 max-w-full object-contain" />

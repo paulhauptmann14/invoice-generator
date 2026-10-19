@@ -28,7 +28,7 @@ export function SideNav() {
   const items = useItems()
   return (
     <nav aria-label="Hauptnavigation" className="hidden md:block">
-      <ul className="flex flex-col gap-1 px-3">
+      <ul className="flex flex-col gap-0.5 px-3">
         {items.map(({ href, label, icon: Icon }) => {
           const active = isActive(href)
           return (
@@ -37,13 +37,11 @@ export function SideNav() {
                 href={href}
                 aria-current={active ? 'page' : undefined}
                 className={[
-                  'flex min-h-10 items-center gap-2.5 rounded-md px-3 text-sm transition-colors duration-(--duration-fast) active:bg-pressed active:duration-0',
-                  active
-                    ? 'bg-card font-medium text-foreground shadow-[inset_3px_0_0_var(--nav-indicator)]'
-                    : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                  'flex min-h-9 items-center gap-2.5 rounded-md px-2.5 text-sm text-foreground transition-colors duration-(--duration-fast) active:bg-(--sidebar-selection) active:duration-0',
+                  active ? 'bg-(--sidebar-selection) font-semibold' : 'hover:bg-(--sidebar-hover)',
                 ].join(' ')}
               >
-                <Icon aria-hidden className="size-4 shrink-0" />
+                <Icon aria-hidden strokeWidth={active ? 2.25 : 1.75} className={active ? 'size-4 shrink-0' : 'size-4 shrink-0 text-muted-foreground'} />
                 {label}
               </Link>
             </li>
@@ -76,10 +74,11 @@ export function TabBar() {
                 aria-current={active ? 'page' : undefined}
                 className={[
                   'flex min-h-14 flex-col items-center justify-center gap-1 text-xs transition-colors duration-(--duration-fast) active:bg-pressed/70 active:duration-0',
-                  active ? 'font-medium text-foreground shadow-[inset_0_3px_0_var(--nav-indicator)]' : 'text-muted-foreground',
+                  active ? 'font-semibold text-foreground' : 'font-medium text-muted-foreground',
                 ].join(' ')}
               >
-                <Icon aria-hidden className="size-5" />
+                {/* Selected tab: ink and a heavier stroke (not color alone); no indicator bar. */}
+                <Icon aria-hidden strokeWidth={active ? 2.25 : 1.75} className="size-6" />
                 {label}
               </Link>
             </li>

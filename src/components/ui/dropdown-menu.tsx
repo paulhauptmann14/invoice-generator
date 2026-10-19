@@ -37,7 +37,7 @@ function DropdownMenuContent({
         sideOffset={sideOffset}
         align={align}
         className={cn(
-          "z-50 max-h-(--radix-dropdown-menu-content-available-height) min-w-(--radix-dropdown-menu-trigger-width) origin-(--radix-dropdown-menu-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2 data-[side=bottom]:slide-out-to-top-2 data-[side=top]:slide-out-to-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-[0.97] data-open:duration-(--duration-fast) data-open:ease-(--ease-settle) data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-[0.97] data-closed:duration-(--duration-exit) data-closed:ease-(--ease-leave)",
+          "z-50 max-h-(--radix-dropdown-menu-content-available-height) min-w-(--radix-dropdown-menu-trigger-width) origin-(--radix-dropdown-menu-content-transform-origin) overflow-x-hidden overflow-y-auto rounded-xl border border-border/70 bg-(--material-menu) p-1 text-popover-foreground shadow-(--elev-float) backdrop-blur-(--material-blur) backdrop-saturate-150 data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2 data-[side=bottom]:slide-out-to-top-2 data-[side=top]:slide-out-to-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-[0.97] data-open:duration-(--duration-fast) data-open:ease-(--ease-settle) data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-[0.97] data-closed:duration-(--duration-exit) data-closed:ease-(--ease-leave)",
           className
         )}
         {...props}
@@ -62,7 +62,7 @@ function DropdownMenuItem({
     <DropdownMenuPrimitive.Item
       data-slot="dropdown-menu-item"
       className={cn(
-        "relative flex min-h-11 cursor-default items-center gap-2 rounded-md px-2 text-base select-none transition-colors duration-(--duration-fast) focus-visible:outline-offset-[-2px] data-highlighted:bg-muted active:bg-pressed active:duration-0 data-disabled:pointer-events-none data-disabled:opacity-50 md:min-h-9 md:text-sm [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
+        "relative flex min-h-11 cursor-default items-center gap-2 rounded-md px-2.5 text-base select-none transition-colors duration-(--duration-fast) focus-visible:outline-offset-[-2px] data-highlighted:bg-muted active:bg-pressed active:duration-0 data-disabled:pointer-events-none data-disabled:opacity-50 md:min-h-9 md:text-sm [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className
       )}
       {...props}

@@ -16,13 +16,13 @@ export default async function TenantLayout({ children, params }: Props) {
     <TenantProvider tenant={tenant} tenants={tenants}>
       <div className="min-h-dvh md:grid md:grid-cols-[14rem_minmax(0,1fr)]">
         <SkipLink />
-        <aside className="flex items-center justify-between gap-4 border-b border-border px-4 py-2 md:sticky md:top-0 md:h-dvh md:flex-col md:items-stretch md:justify-start md:border-r md:border-b-0 md:px-0 md:py-0">
-          <div className="min-w-0 flex-1 md:flex-none md:px-3 md:pt-6 md:pb-4">
+        <aside className="flex items-center justify-between gap-4 border-b border-border px-4 py-2 md:sticky md:top-0 md:h-dvh md:flex-col md:items-stretch md:justify-start md:border-r md:border-b-0 md:bg-(--sidebar) md:px-0 md:py-0">
+          <div className="min-w-0 flex-1 md:flex-none md:px-3 md:pt-5 md:pb-3">
             <TenantSwitcher />
           </div>
           <SideNav />
-          <div className="shrink-0 md:mt-auto md:px-4 md:py-6">
-            <p className="hidden truncate px-2 text-xs text-muted-foreground md:block" title={email ?? undefined}>
+          <div className="shrink-0 md:mt-auto md:px-3 md:py-4">
+            <p className="hidden truncate px-2.5 pb-1 text-xs text-muted-foreground md:block" title={email ?? undefined}>
               {email}
             </p>
             <SignOutButton />

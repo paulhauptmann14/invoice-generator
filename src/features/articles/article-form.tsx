@@ -13,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { emptyFormState, type FormState } from '@/lib/form'
 import { saveArticle } from './actions'
 import { ARTICLE_FIELDS, type ArticleField, articleSchema, VAT_RATES } from './schema'
+import { FormSection } from '@/components/form/form-section'
 
 const UNIT_SUGGESTIONS = ['Stk.', 'kg', 'g', 'Pers.', 'Portion', 'Std.', 'Pauschale', 'l', 'Fl.']
 
@@ -30,8 +31,7 @@ export function ArticleForm({ id, initial }: { id: string | null; initial: Parti
       {state.message && <FormAlert>{state.message}</FormAlert>}
       <RequiredNote />
 
-      <fieldset className="space-y-5">
-        <legend className="font-display text-xl font-semibold">Artikel</legend>
+      <FormSection title="Artikel">
         <Field name="name" label="Bezeichnung" required error={errors.name}>
           {(p) => <Input {...p} defaultValue={v.name} />}
         </Field>
@@ -43,10 +43,9 @@ export function ArticleForm({ id, initial }: { id: string | null; initial: Parti
         >
           {(p) => <Textarea {...p} defaultValue={v.description} rows={2} />}
         </Field>
-      </fieldset>
+      </FormSection>
 
-      <fieldset className="space-y-5">
-        <legend className="font-display text-xl font-semibold">Preis</legend>
+      <FormSection title="Preis">
         <div className="grid gap-5 sm:grid-cols-3">
           <Field
             name="unitPriceGross"
@@ -77,7 +76,7 @@ export function ArticleForm({ id, initial }: { id: string | null; initial: Parti
             <option key={u} value={u} />
           ))}
         </datalist>
-      </fieldset>
+      </FormSection>
 
       <div className="flex flex-wrap items-center gap-3 border-t border-border pt-6">
         <Button type="submit" disabled={pending} aria-busy={pending}>

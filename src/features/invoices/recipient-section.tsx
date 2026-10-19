@@ -8,6 +8,7 @@ import { NativeSelect } from '@/components/ui/native-select'
 import { RequiredMark } from '@/components/form/required-mark'
 import { COUNTRIES } from '@/lib/countries'
 import type { DraftAction, DraftRecipient, InvoiceDraft, PickerCustomer } from './draft'
+import { FormSection } from '@/components/form/form-section'
 
 const FIELDS: { field: keyof DraftRecipient; label: string; autoComplete?: string; span?: string }[] = [
   { field: 'name', label: 'Name oder Firma', autoComplete: 'organization' },
@@ -46,8 +47,7 @@ export function RecipientSection({
   }
 
   return (
-    <fieldset className="space-y-5">
-      <legend className="font-display text-xl font-semibold">Empfänger</legend>
+    <FormSection title="Empfänger">
 
       <div className="space-y-1.5">
         <Label htmlFor="inv-customer">Kunde aus dem Kundenstamm</Label>
@@ -136,6 +136,6 @@ export function RecipientSection({
           Als neuen Kunden speichern
         </label>
       )}
-    </fieldset>
+    </FormSection>
   )
 }

@@ -12,6 +12,7 @@ import { RequiredMark } from '@/components/form/required-mark'
 import { VAT_RATES } from '@/lib/domain/input-schemas'
 import { formatEuro, toCents } from '@/lib/domain/money'
 import type { DraftAction, DraftItem, PickerArticle } from './draft'
+import { FormSection } from '@/components/form/form-section'
 
 // Row layout needs ~830px: rows from @4xl (56rem) of the *form* width (container query), cards below.
 const GRID = '@4xl:grid @4xl:grid-cols-[minmax(0,1fr)_5.5rem_5.5rem_7.5rem_6rem_7rem_auto] @4xl:items-start @4xl:gap-3'
@@ -62,11 +63,10 @@ export function ItemsEditor({
 
   const removedLabel = removed?.item.description.split('\n')[0].trim()
   return (
-    <fieldset className="space-y-4">
-      <legend className="font-display text-xl font-semibold">Positionen</legend>
+    <FormSection title="Positionen">
       {errors.items && <FieldError id="inv-items-error">{errors.items}</FieldError>}
 
-      <div aria-hidden className={`hidden border-b border-border pb-2 text-sm font-medium text-muted-foreground ${GRID}`}>
+      <div aria-hidden className={`hidden border-b border-border pb-2 text-xs font-medium text-muted-foreground ${GRID}`}>
         <span>
           Beschreibung
           <RequiredMark />
@@ -94,7 +94,7 @@ export function ItemsEditor({
             dispatch({ type: 'updateItem', key: item.key, field: f, value })
           const total = lineTotals.get(item.key)
           return (
-            <li key={item.key} className={`rounded-md border border-border bg-card p-4 @4xl:border-0 @4xl:bg-transparent @4xl:p-0 ${GRID}`}>
+            <li key={item.key} className={`rounded-lg border border-border p-4 @4xl:rounded-none @4xl:border-0 @4xl:p-0 ${GRID}`}>
               <div className="space-y-1">
                 <label htmlFor={field('description')} className="text-sm font-medium @4xl:sr-only">
                   Beschreibung<span className="sr-only"> Position {n}</span>
@@ -202,7 +202,7 @@ export function ItemsEditor({
       {/* Always rendered, so screen readers announce the removal when the text appears. */}
       <div role="status">
         {removed && (
-          <p className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-md border border-border bg-card py-1 pr-1 pl-4 text-sm">
+          <p className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-lg bg-muted py-1 pr-1 pl-4 text-sm">
             <span className="min-w-0 truncate">
               {removedLabel ? `„${removedLabel}“ entfernt.` : `Position ${removed.index + 1} entfernt.`}
             </span>
@@ -249,6 +249,6 @@ export function ItemsEditor({
           Freie Position
         </Button>
       </div>
-    </fieldset>
+    </FormSection>
   )
 }

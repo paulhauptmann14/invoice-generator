@@ -51,7 +51,6 @@
 /* === COMPONENT === */
 :root {
   --field-border: var(--input);
-  --nav-indicator: var(--color-tinte);
   --pressed: var(--color-wash-tief);
   /* Floating bar material (mobile tab bar): translucent white, content scrolls underneath. */
   --material-bar: color-mix(in oklch, var(--color-weiss) 80%, transparent);
@@ -59,12 +58,25 @@
   /* Modal scrim: dims the page so the dialog is the only focus. */
   --scrim: color-mix(in oklch, var(--color-tinte) 22%, transparent);
   --scrim-blur: 2px;
+  /* Grouped surfaces (form sections, lists) sit on the paper without a frame; the edge returns with more contrast. */
+  --surface-border: transparent;
+  /* Sidebar: a slightly heavier material than the content; selection is a filled pill. */
+  --sidebar: var(--color-wash);
+  --sidebar-hover: color-mix(in oklch, var(--color-tinte) 5%, transparent);
+  --sidebar-selection: color-mix(in oklch, var(--color-tinte) 9%, transparent);
+  /* Segmented control track. */
+  --segment-track: color-mix(in oklch, var(--color-tinte) 7%, transparent);
+  /* Floating layers: menus are translucent, dialogs solid; both float on a soft shadow instead of a frame. */
+  --material-menu: color-mix(in oklch, var(--color-weiss) 88%, transparent);
+  --elev-raised: 0 1px 2px color-mix(in oklch, var(--color-tinte) 14%, transparent), 0 0 0 0.5px color-mix(in oklch, var(--color-tinte) 6%, transparent);
+  --elev-float: 0 12px 32px color-mix(in oklch, var(--color-tinte) 16%, transparent), 0 2px 6px color-mix(in oklch, var(--color-tinte) 8%, transparent), 0 0 0 0.5px color-mix(in oklch, var(--color-tinte) 10%, transparent);
 }
 
 /* Reduced transparency: solid surfaces, no blur. */
 @media (prefers-reduced-transparency: reduce) {
   :root {
     --material-bar: var(--color-weiss);
+    --material-menu: var(--color-weiss);
     --material-blur: 0px;
     --scrim: color-mix(in oklch, var(--color-tinte) 40%, transparent);
     --scrim-blur: 0px;
@@ -75,7 +87,9 @@
 @media (prefers-contrast: more) {
   :root {
     --border: var(--color-feld);
+    --surface-border: var(--color-feld);
     --material-bar: var(--color-weiss);
+    --material-menu: var(--color-weiss);
     --material-blur: 0px;
     --scrim: color-mix(in oklch, var(--color-tinte) 50%, transparent);
     --scrim-blur: 0px;
@@ -102,18 +116,52 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
   --color-stamp: var(--stamp);
-  --color-nav-indicator: var(--nav-indicator);
   --color-pressed: var(--pressed);
   /* Small text reads better with slightly positive tracking. */
   --text-xs--letter-spacing: 0.01em;
-  --font-sans: var(--font-plex-sans);
-  --font-display: var(--font-barlow);
+  /* The platform's own UI font (SF Pro on Apple devices): optical sizes, tracking tables, Dynamic Type. */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono: var(--font-plex-mono);
-  /* Explicit radius scale: derived values would round the 2px and 4px radii unpredictably. */
-  --radius-sm: 2px;
-  --radius-md: 4px;
-  --radius-lg: 4px;
-  --radius-xl: 6px;
+  /* Radius grows with the surface: controls 8px, grouped surfaces 12px, floating sheets 16px. */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+}
+
+/*
+ * Type scale. Tracking and leading are set per size: large text gets tighter, small text slightly looser.
+ * Hierarchy comes from size, weight and leading together.
+ */
+@utility type-large-title {
+  font-size: 1.75rem;
+  line-height: 1.15;
+  font-weight: 700;
+  letter-spacing: -0.021em;
+  @media (width >= 48rem) {
+    font-size: 2.125rem;
+    letter-spacing: -0.024em;
+  }
+}
+@utility type-title {
+  font-size: 1.25rem;
+  line-height: 1.25;
+  font-weight: 600;
+  letter-spacing: -0.016em;
+}
+@utility type-headline {
+  font-size: 1.0625rem;
+  line-height: 1.3;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* Grouped surface: white, rounded, frameless (framed with prefers-contrast: more). */
+@utility surface {
+  background-color: var(--card);
+  border: 1px solid var(--surface-border);
+  border-radius: var(--radius-xl);
 }
 
 @layer base {
