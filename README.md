@@ -1,13 +1,49 @@
-# Invoice app
+# Rechnungen (_invoice-generator_)
 
-A German invoicing web app (customers, articles, invoices, PDF and Word export, several businesses per account): a Next.js 16
-app on Supabase components, run with Docker on a Raspberry Pi or any small Linux machine. It is meant for the home network
-only and is not reachable from the internet.
+[![CI](https://github.com/paulhauptmann14/invoice-generator/actions/workflows/ci.yml/badge.svg)](https://github.com/paulhauptmann14/invoice-generator/actions/workflows/ci.yml)
 
-## Quickstart
+Self-hosted invoicing for small German businesses, run with Docker on a Raspberry Pi in your home network.
 
-Needs 64-bit Linux (for example Raspberry Pi OS 64-bit on a Pi 5), Docker with the Compose plugin usable without `sudo`, `git`
-and `openssl`, and ports 80 and 443 free.
+"Rechnungen" is a web app with a German interface for writing invoices, keeping customers and articles, and exporting
+invoices as PDF and Word files. It runs on a Raspberry Pi or another small Linux machine (Next.js app, self-hosted Supabase
+for database, accounts and files, Caddy for HTTPS) and is meant to stay in the home network: nothing is reachable from the
+internet. The repository is called `invoice-generator`; inside the app it is "Rechnungen".
+
+## Table of Contents
+
+- [Features](#features)
+- [Requirements](#requirements)
+- [Install](#install)
+- [Usage](#usage)
+- [Operations](#operations)
+- [Security](#security)
+- [Development](#development)
+- [Contributing](#contributing)
+- [License](#license)
+
+## Features
+
+- **Invoices** with a live PDF preview while writing, positions from the article list or free text, VAT of 19, 7 or 0 %,
+  a service date or period and an optional due date.
+- **Export** as PDF (archived with the invoice) or as an editable Word file. Browsers that support it (Chrome, Edge) ask
+  where to save the file.
+- **Layouts:** "Briefpapier" (like your own letterhead, default), "Klassisch", "Kompakt" and "Modern", with logo, fonts,
+  colors, margins and a DIN 5008 address field for window envelopes.
+- **Numbering** with several number ranges per business (for example `G1/26` for invoices, `GU1/26` for vouchers).
+- **Customers and articles** to pick from while writing; archived instead of deleted.
+- **Several businesses per account**, each with its own customers, articles, invoices, numbers, settings and files.
+- **Runs at home:** HTTPS with its own certificate authority, scripts for update, backup (optionally encrypted) and restore,
+  and a move to another machine by backup and restore.
+
+## Requirements
+
+- 64-bit Linux, for example Raspberry Pi OS (64-bit) on a Raspberry Pi 5 with 8 GB
+- Docker with the Compose plugin, usable without `sudo`
+- `git` and `openssl`
+- Ports 80 and 443 free
+- A name for the machine that your devices can resolve, for example `raspberrypi.local`
+
+## Install
 
 ```bash
 git clone https://github.com/paulhauptmann14/invoice-generator.git ~/docker/invoice-generator
@@ -17,161 +53,67 @@ git clone https://github.com/paulhauptmann14/invoice-generator.git ~/docker/invo
 cd ~/docker/invoice-generator/deploy/self-hosted && scripts/setup
 ```
 
-The setup asks only for the name the app is reached at (for example `raspberrypi.local`; it must resolve to this machine). It
-creates no account: open the app and choose "Konto anlegen" to create yours (password of at least 12 characters), then name your
-first business. The first build takes several minutes on a Pi; if it stops with "did not become healthy", run it again or allow more time with
-`HEALTH_TIMEOUT=900 scripts/setup`. Do not delete `.env` to start over (that creates secrets that do not match the data).
+The setup asks for the name the app is reached at and creates all secrets in `deploy/self-hosted/.env`. The first build takes
+several minutes on a Pi. If it stops with "did not become healthy", see
+[Troubleshooting](deploy/self-hosted/README.md#troubleshooting).
 
-Then open `https://<name>` in a browser, continue past the certificate warning and choose "Konto anlegen". Done. Everyone who
-can reach the app in your network can create an account, and every account only sees its own businesses. To switch registration
-off once your accounts exist, set `REGISTRATION=off` in `deploy/self-hosted/.env` and run `docker compose up -d` there. Backups are **off** until you turn
-them on ([Backups](#backups)).
+## Usage
 
-## Contents
+1. Open `https://<name>` (for example `https://raspberrypi.local`) and continue past the certificate warning. To get rid of
+   the warning, [trust the certificate](deploy/self-hosted/README.md#trust-the-certificate) once per device.
+2. Choose **"Konto anlegen"** and create your account (password of at least 12 characters), then name your first business.
+3. Fill in **Einstellungen → Firma**: export stays locked until the company details required on an invoice are complete.
+4. Optionally upload a logo and choose a layout under **Einstellungen → Erscheinungsbild**.
+5. Write the first invoice under **Rechnungen → Neue Rechnung** and export it as PDF.
 
-1. [Trust the certificate (optional)](#trust-the-certificate-optional)
-2. [Operations](#operations)
-3. [Backups](#backups)
-4. [Security](#security)
-5. [Troubleshooting](#troubleshooting)
-6. [Development](#development)
-
-## Trust the certificate (optional)
-
-The browser warns because Caddy signs the HTTPS certificate with its own certificate authority for a home-network name; the
-connection is still encrypted. You can simply continue past the warning ("Advanced", "Continue"). To remove the warning, trust the
-authority once per device. Export the file on the server (run it in your home directory so it does not end up in the
-repository), then copy it to the device:
-
-```bash
-cd ~ && ~/docker/invoice-generator/deploy/self-hosted/scripts/cert
-```
-
-This writes `~/rechnungen-root.crt`, for example to the Mac with `scp <user>@<host>:rechnungen-root.crt ~/Downloads/`.
-
-- **macOS:** double-click the file, then in Keychain Access open "Caddy Local Authority ...", expand "Trust" and set "When using
-  this certificate" to "Always Trust".
-- **iPhone / iPad:** open the file (AirDrop), install the profile in Settings, then switch on full trust under Settings,
-  General, About, Certificate Trust Settings.
-- **Windows:** double-click the `.crt`, "Install Certificate", store "Trusted Root Certification Authorities".
-
-If a device cannot resolve `<name>.local` (some Windows PCs), add a DNS entry for the Pi in your router instead.
+Further businesses are added from the business switcher at the top left ("Neuer Betrieb …").
 
 ## Operations
 
-Run these in `~/docker/invoice-generator/deploy/self-hosted`:
+Everyday commands run in `~/docker/invoice-generator/deploy/self-hosted`:
 
-- `scripts/status`: containers, disk space, whether backups are on, the newest backup.
-- `scripts/update`: backup (only if backups are on), `git pull`, new app image, migrations, restart. With backups off, run
-  `scripts/backup` by hand first.
-- `scripts/set-password <email>`: new password for an account (there is no reset e-mail on the server).
+| Command | What it does |
+|---|---|
+| `scripts/status` | Containers, disk space, backups |
+| `scripts/update` | Pull the new version, rebuild, migrate, restart |
+| `scripts/backup` | Backup now |
+| `scripts/set-password <email>` | New password for an account |
 
-## Backups
-
-Backups are **off by default** (`BACKUPS=off` in `.env`). Off means: the nightly timer does nothing, and `update` and `restore`
-skip their automatic backup/safety backup. `scripts/backup` can always be run by hand, also when backups are off.
-
-A backup is one file `rechnungen-YYYY-MM-DD-HHMM.tar` (database data, stored files, the certificate authority and `.env`). The
-newest 14 are kept, plus the newest of each of the last 12 months.
-
-**Turn on backups** (once you have an external disk):
-
-1. Mount the disk, ext4 recommended (exFAT, NTFS and FAT ignore file permissions), create a directory on it that belongs to
-   your user, and set it in `.env`:
-
-```bash
-sudo mkdir -p /mnt/backup/rechnungen && sudo chown "$USER": /mnt/backup/rechnungen
-```
-
-   ```text
-   BACKUP_DIR=/mnt/backup/rechnungen
-   ```
-2. Recommended, because the disk can be carried away: encrypt the backups. Without a key a backup is a plain file that anyone
-   who plugs the disk in can read. Create a key pair on your **Mac** (not on the server), keep the file in your password
-   manager and put the public `age1...` value into `.env`. **Without the private key an encrypted backup cannot be restored.**
-
-```bash
-age-keygen -o ~/rechnungen-backup.key
-```
-
-   ```text
-   AGE_RECIPIENT=age1...
-   ```
-
-   Backups are then named `rechnungen-....tar.age`. (Install `age` on the server first if needed.) Older `.tar` backups stay
-   unencrypted: delete them if the disk leaves the house.
-3. Set `BACKUPS=on` in `.env`.
-4. Install the nightly timer (03:15) and check it:
-
-```bash
-cd ~/docker/invoice-generator/deploy/self-hosted && sed -e "s|@USER@|$USER|" -e "s|@REPO_DIR@|$HOME/docker/invoice-generator|" systemd/rechnungen-backup.service | sudo tee /etc/systemd/system/rechnungen-backup.service && sudo cp systemd/rechnungen-backup.timer /etc/systemd/system/
-```
-
-```bash
-sudo systemctl daemon-reload && sudo systemctl enable --now rechnungen-backup.timer
-```
-
-```bash
-cd ~/docker/invoice-generator/deploy/self-hosted && scripts/backup && scripts/status
-```
-
-`scripts/status` should show "Backups: on" and the new file as "encrypted" or "NOT encrypted". There is no alert when a backup
-fails: look at `scripts/status` now and then (and `journalctl -u rechnungen-backup`).
-
-**Restore** replaces all data on the machine with a backup (it makes a safety copy first if backups are on; with backups off
-there is none, so run `scripts/backup` by hand first if the current data matters). It says so before it asks for confirmation.
-A `.tar.age` file needs the private key (it asks for the path, or set `AGE_IDENTITY`) and `age` on the machine; a `.tar` file
-needs neither:
-
-```bash
-cd ~/docker/invoice-generator/deploy/self-hosted && scripts/restore /mnt/backup/rechnungen/<file>
-```
-
-**Moving to another machine:** run `scripts/backup` by hand on the old machine (works with backups off) and copy the file. On the
-new machine meet the requirements and clone the repository as in the [Quickstart](#quickstart), then run `scripts/restore`
-instead of `scripts/setup`. The restored `.env` is the old one, so set what differs on the new machine in the environment; each
-variable you set (`APP_HOST`, `HTTP_PORT`, `HTTPS_PORT`, `BACKUPS`, `BACKUP_DIR`, `AGE_RECIPIENT`) replaces that line, and
-invalid values are refused before anything is changed. For example, from a Mac test installation to the Pi, without backups and
-without a key (the key is only needed for a `.tar.age` file, and then `age` must be installed on the new machine):
-
-```bash
-cd ~/docker/invoice-generator/deploy/self-hosted && APP_HOST=raspberrypi.local BACKUPS=off AGE_RECIPIENT= scripts/restore <file>
-```
-
-Accounts, invoices and the certificate authority come along, so devices that already trust it keep trusting it; only the name in
-the browser changes if you chose a new one.
+Backups are **off** until you turn them on. Certificates, registration, backups, restore, moving to another machine and
+troubleshooting are described in the [operations guide](deploy/self-hosted/README.md).
 
 ## Security
 
-- Home network only. Do not forward ports on your router and do not put the app behind a tunnel (for example a Cloudflare
-  Tunnel).
-- Only ports 80 and 443 (Caddy) are published. Docker-published ports bypass the `ufw` firewall, so never add `ports:` entries to
-  `compose.yml`.
-- `.env` holds all secrets (mode 600) and is part of every backup. Unencrypted backups on removable disks are readable by
-  anyone who plugs the disk in; exFAT, NTFS and FAT ignore file permissions.
-- The app container only gets the "anon" key; the `service_role` key goes to the storage service only.
+- Home network only: do not forward ports on your router and do not put the app behind a tunnel.
+- Everyone who can reach the app can create an account while registration is on; each account only sees its own businesses.
+  [Switch registration off](deploy/self-hosted/README.md#registration) once your accounts exist.
+- Every business is separated in the database itself (row-level security), not only in the app.
+- `.env` holds all secrets and is part of every backup: [encrypt backups](deploy/self-hosted/README.md#turn-on-backups) that
+  leave the house.
 
-## Troubleshooting
-
-- **Raspberry Pi 5, a container keeps restarting and its log mentions the page size:** use the 4 KB kernel, then reboot and run
-  `scripts/setup` again:
-
-```bash
-echo 'kernel=kernel8.img' | sudo tee -a /boot/firmware/config.txt
-```
-
-- **`docker info` says "No memory limit support":** append `cgroup_enable=memory` to the single line in
-  `/boot/firmware/cmdline.txt`, then reboot:
-
-```bash
-sudo sed -i '1 s/$/ cgroup_enable=memory/' /boot/firmware/cmdline.txt
-```
+Found a security problem? Please report it privately through
+[GitHub security advisories](https://github.com/paulhauptmann14/invoice-generator/security/advisories/new) instead of a
+public issue.
 
 ## Development
 
-### Local setup (Supabase CLI)
+### Tech stack
 
-Needs Node.js (the Docker image uses Node 24), Docker, and the Supabase CLI (a dev dependency, started through the `npm run db:*` scripts).
+Next.js 16 (App Router, React 19, TypeScript), Tailwind CSS 4 with shadcn/ui components, Supabase (Postgres with row-level
+security, Auth, Storage), react-pdf and docx for the documents, Vitest, Playwright and pgTAP for tests.
+
+| Path | Contents |
+|---|---|
+| `src/app` | Routes: pages, API routes, layouts |
+| `src/features` | Feature modules (invoices, customers, articles, settings, documents, tenants, auth) |
+| `src/components` | Shared UI components |
+| `src/lib` | Domain logic, auth, Supabase clients, security headers |
+| `supabase` | Migrations, database tests, local seed data |
+| `deploy/self-hosted` | Docker Compose stack, Caddy, operation scripts, stack test |
+
+### Local setup
+
+Needs Node.js 24 (as in the Docker image) and Docker. The Supabase CLI is a dev dependency.
 
 ```bash
 npm install
@@ -185,41 +127,54 @@ npm run db:start
 npm run dev
 ```
 
-Open http://localhost:3000. Local Supabase Studio is at http://127.0.0.1:54323; test e-mails (for example "forgot password")
-arrive in Mailpit at http://127.0.0.1:54324. The seed data (`supabase/seed.sql`, local only) contains the user
-`dev@invoice.localhost` with the password `lokales-dev-passwort-123`, owner of two example businesses, and
-`stranger@invoice.localhost` without a business.
+Open http://localhost:3000 and sign in as `dev@invoice.localhost` with the password `lokales-dev-passwort-123` (local seed
+data from `supabase/seed.sql`, owner of two example businesses; `stranger@invoice.localhost` has no business). Supabase
+Studio runs at http://127.0.0.1:54323, test e-mails such as "Passwort vergessen" arrive in Mailpit at http://127.0.0.1:54324.
 
-`npm run db:reset` wipes the local data and re-applies migrations and seed; to apply only new migrations and keep the data use
-`npx supabase migration up`.
+`npm run db:reset` wipes the local data and applies migrations and seed again; `npx supabase migration up` applies only new
+migrations and keeps the data.
 
 ### Checks
 
 | Command | What it runs |
 |---|---|
 | `npm test` | Unit tests (Vitest) |
-| `npm run test:integration` | Integration tests (needs `npm run db:start`) |
+| `npm run test:integration` | Integration tests against the local Supabase |
 | `npm run db:test` | Database tests (pgTAP) |
 | `npm run lint` | ESLint |
 | `npm run typecheck` | TypeScript |
 | `npm run build` | Production build |
 
-Packages are pinned to exact versions (`.npmrc`), and `npm audit --omit=dev` should report 0 vulnerabilities.
+GitHub Actions runs all of them, plus `npm audit --omit=dev` and ShellCheck for the deployment scripts, on every push to
+`main` and every pull request ([`ci.yml`](.github/workflows/ci.yml)).
 
-### Tests for the self-hosted stack
+Packages are pinned to exact versions (`.npmrc`). Dependabot opens one grouped pull request per month for minor and patch
+updates of npm packages and GitHub Actions ([`dependabot.yml`](.github/dependabot.yml)); major versions are updated by hand.
+The Supabase images of the self-hosted stack are updated by hand too, followed by the stack test.
+
+### Stack test
 
 `deploy/self-hosted/tests/stack-test.sh` runs the real Compose stack under its own project name (`rechnungen-test`, ports
-8080/8443) and tears it down afterwards, without touching your local Supabase. It needs Docker, `age` (for the encrypted-backup checks) and, for the security lint, internet access.
+8080/8443) and tears it down afterwards, without touching your local Supabase. It needs Docker, `age` and internet access
+for the Supabase security lint.
 
 ```bash
 deploy/self-hosted/tests/stack-test.sh all
 ```
 
-`all` runs three fresh stacks one after another and takes about 10 minutes. You can also run a single part: `setup`,
-`backup`, `e2e` (Playwright main flow; add `lint` as a second argument to run the security lint on the same stack) or `lint`.
-`KEEP=1` leaves the stack running afterwards.
+`all` runs setup, backup and restore, update, the Playwright main flow and the security lint on fresh stacks (about 10
+minutes). Single parts: `setup`, `backup`, `e2e` (add `lint` as a second argument to lint the same stack) or `lint`.
+`KEEP=1` leaves the stack running. The Playwright test (`npm run test:e2e`) also runs against any instance with
+`E2E_BASE_URL`, `E2E_EMAIL` and `E2E_PASSWORD` (plus `E2E_REGISTRATION=on` when registration is open).
 
-The Playwright test (`npm run test:e2e`) can also be pointed at any running instance with the environment variables
-`E2E_BASE_URL`, `E2E_EMAIL` and `E2E_PASSWORD` (add `E2E_REGISTRATION=on` for an instance with open registration: the flow then starts by creating the account).
+Note: the update part removes unused Docker images and build cache on the machine it runs on.
 
-Shell scripts must pass `shellcheck`.
+## Contributing
+
+This is a personal project for one household and its businesses. Questions and bug reports are welcome as
+[issues](https://github.com/paulhauptmann14/invoice-generator/issues). Code in the repository is English, everything users
+see is German; shell scripts must pass ShellCheck.
+
+## License
+
+No license has been chosen yet. Without one, the default copyright applies: all rights reserved by the author.
