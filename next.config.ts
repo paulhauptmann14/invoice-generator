@@ -1,5 +1,5 @@
 import type { NextConfig } from 'next'
-import { securityHeaders } from './src/lib/security-headers'
+import { securityHeaders, staticFileCsp, staticFileSources } from './src/lib/security-headers'
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
@@ -18,7 +18,11 @@ const nextConfig: NextConfig = {
     },
   },
   async headers() {
-    return [{ source: '/:path*', headers: securityHeaders }]
+    return [
+      { source: '/:path*', headers: securityHeaders },
+      // Pages get their nonce policy from the proxy; the files it skips get a fixed one.
+      ...staticFileSources.map((source) => ({ source, headers: [{ key: 'Content-Security-Policy', value: staticFileCsp }] })),
+    ]
   },
 }
 
