@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- App icon: the document symbol of the "Rechnungen" navigation (lucide file-text, ISC) on an ink tile.
+       Ink and paper colors from globals.css; inverted when the browser chrome is dark. -->
+  <style>
+    .tile { fill: #17191c; }
+    .glyph { fill: none; stroke: #ffffff; stroke-width: 2.25; stroke-linecap: round; stroke-linejoin: round; }
+    @media (prefers-color-scheme: dark) {
+      .tile { fill: #f4f5f2; }
+      .glyph { stroke: #17191c; }
+    }
+  </style>
+  <rect class="tile" width="32" height="32" rx="7.5" />
+  <g class="glyph" transform="translate(4 4)">
+    <path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" />
+    <path d="M14 2v5a1 1 0 0 0 1 1h5" />
+    <path d="M10 9H8" />
+    <path d="M16 13H8" />
+    <path d="M16 17H8" />
+  </g>
+</svg>
