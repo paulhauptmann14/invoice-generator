@@ -12,22 +12,27 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { normalizeUserFilename } from '@/lib/domain/filename'
 import { useEditorDirty } from './editor-context'
+import { chooseLocation, savePicker, writeFile } from './save-file'
 
-type ExportError = { kind: 'missing'; fields: string[] } | { kind: 'failed' } | { kind: 'expired' }
+type ExportError = { kind: 'missing'; fields: string[] } | { kind: 'failed' } | { kind: 'expired' } | { kind: 'write' }
 type Format = 'pdf' | 'docx'
 
 // One dialog for both formats; only the PDF is archived (the archived PDF is the record of the invoice).
-const COPY: Record<Format, { title: string; description: string; failed: string; done: (name: string) => string }> = {
+// `picks`: the browser asks where to save (Chrome, Edge); otherwise the file goes to the downloads folder.
+const COPY: Record<Format, { title: string; description: (picks: boolean) => string; failed: string; writeFailed: string; done: (name: string) => string }> = {
   pdf: {
     title: 'PDF exportieren',
-    description: 'Das PDF wird archiviert und anschließend heruntergeladen.',
+    description: (picks) => `Das PDF wird archiviert und anschließend ${picks ? 'am gewählten Ort gespeichert' : 'heruntergeladen'}.`,
     failed: 'Archivierung fehlgeschlagen, bitte erneut versuchen.',
+    writeFailed: 'Das PDF ist archiviert, konnte aber nicht gespeichert werden. Es lässt sich unter „Archivierte PDFs“ erneut herunterladen.',
     done: (name) => `${name} exportiert und archiviert.`,
   },
   docx: {
     title: 'Word-Datei exportieren',
-    description: 'Die Word-Datei wird heruntergeladen. Sie wird nicht archiviert – maßgeblich bleibt das archivierte PDF.',
+    description: (picks) =>
+      `Die Word-Datei wird ${picks ? 'am gewählten Ort gespeichert' : 'heruntergeladen'}. Sie wird nicht archiviert – maßgeblich bleibt das archivierte PDF.`,
     failed: 'Word-Datei konnte nicht erstellt werden, bitte erneut versuchen.',
+    writeFailed: 'Die Word-Datei konnte nicht gespeichert werden, bitte erneut versuchen.',
     done: (name) => `${name} exportiert.`,
   },
 }
@@ -82,6 +87,8 @@ export function ExportPanel({
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<ExportError | null>(null)
   const [done, setDone] = useState<string | null>(null)
+  // Whether this browser can ask for the location; read when the dialog opens (never during server render).
+  const [picks, setPicks] = useState(false)
   const alertRef = useRef<HTMLDivElement>(null)
   const inputId = useId()
   const hintId = useId()
@@ -96,13 +103,19 @@ export function ExportPanel({
     setWithoutLogo(false)
     setError(null)
     setDone(null)
+    setPicks(savePicker() !== null)
     setOpen(true)
   }
 
   async function runExport(e: React.FormEvent) {
     e.preventDefault()
-    setPending(true)
     setError(null)
+    // The save dialog has to come first, while the click still counts as user activation. Cancelling it
+    // exports nothing (and archives nothing); where it is unavailable, the file is downloaded as before.
+    const picker = savePicker()
+    const choice = picker ? await chooseLocation(picker, finalName, format) : ({ kind: 'unavailable' } as const)
+    if (choice.kind === 'cancelled') return
+    setPending(true)
     try {
       const response = await fetch(api(`invoices/${invoiceId}/${format}`), {
         method: 'POST',
@@ -116,10 +129,26 @@ export function ExportPanel({
       }
       if (!response.ok) throw new Error(`Export failed with ${response.status}`)
       const filename = filenameFrom(response.headers.get('Content-Disposition'), finalName)
-      download(await response.blob(), filename)
-      setDone(copy.done(filename))
-      setOpen(false)
-      // Reload server data so the archive list shows the new PDF (Word files are not archived).
+      const blob = await response.blob()
+      let written = true
+      if (choice.kind === 'chosen') {
+        written = await writeFile(choice.handle, blob).then(
+          () => true,
+          (err: unknown) => {
+            console.error(err)
+            return false
+          },
+        )
+      } else {
+        download(blob, filename)
+      }
+      if (written) {
+        setDone(copy.done(choice.kind === 'chosen' ? choice.handle.name : filename))
+        setOpen(false)
+      } else {
+        setError({ kind: 'write' })
+      }
+      // Reload server data so the archive list shows the new PDF (archived even if writing the file failed).
       if (format === 'pdf') router.refresh()
     } catch (err) {
       console.error(err)
@@ -195,7 +224,7 @@ export function ExportPanel({
         <DialogContent showCloseButton={false} className="gap-5 p-5 sm:max-w-md">
           <div className="space-y-1.5">
             <DialogTitle className="type-title">{copy.title}</DialogTitle>
-            <DialogDescription className="text-sm text-muted-foreground">{copy.description}</DialogDescription>
+            <DialogDescription className="text-sm text-muted-foreground">{copy.description(picks)}</DialogDescription>
           </div>
           <form onSubmit={runExport} noValidate className="space-y-5">
             {error && (
@@ -209,6 +238,8 @@ export function ExportPanel({
                   </>
                 ) : error.kind === 'expired' ? (
                   'Sitzung abgelaufen – bitte neu anmelden.'
+                ) : error.kind === 'write' ? (
+                  copy.writeFailed
                 ) : (
                   copy.failed
                 )}
@@ -218,7 +249,7 @@ export function ExportPanel({
               <Label htmlFor={inputId}>Dateiname</Label>
               <Input id={inputId} value={name} onChange={(e) => setName(e.target.value)} aria-describedby={hintId} autoComplete="off" spellCheck={false} />
               <p id={hintId} className="text-sm break-all text-muted-foreground">
-                Gespeichert als <span className="font-mono text-foreground">{finalName}</span>
+                {picks ? 'Vorschlag im Speichern-Dialog:' : 'Gespeichert als'} <span className="font-mono text-foreground">{finalName}</span>
               </p>
             </div>
             {hasLogo && (
@@ -236,7 +267,7 @@ export function ExportPanel({
               </DialogClose>
               <Button type="submit" className="gap-2" disabled={pending} aria-busy={pending}>
                 <Download aria-hidden className="size-4" />
-                {pending ? 'Wird exportiert …' : 'Exportieren'}
+                {pending ? 'Wird exportiert …' : picks ? 'Speichern unter …' : 'Exportieren'}
               </Button>
             </div>
           </form>
