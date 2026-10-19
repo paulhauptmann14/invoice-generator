@@ -28,7 +28,7 @@ export function TenantSwitcher() {
     <>
       {/* Non-modal: the "new business" dialog opens right after the menu closes. */}
       <DropdownMenu modal={false}>
-        <DropdownMenuTrigger ref={triggerRef} className="-ml-2 flex min-h-11 max-w-full min-w-0 items-center justify-between gap-2 rounded-md px-2 py-2 text-left transition-colors duration-150 hover:bg-muted md:ml-0 md:w-full md:px-3">
+        <DropdownMenuTrigger ref={triggerRef} className="-ml-2 flex min-h-11 max-w-full min-w-0 items-center justify-between gap-2 rounded-md px-2 py-2 text-left transition-colors duration-(--duration-fast) hover:bg-muted active:bg-pressed active:duration-0 data-[state=open]:bg-muted md:ml-0 md:w-full md:px-3">
           <span className="min-w-0 truncate font-display text-base leading-tight font-semibold tracking-[0.12em] uppercase md:line-clamp-2 md:whitespace-normal">
             <span className="sr-only">Betrieb: </span>
             {tenant.name}

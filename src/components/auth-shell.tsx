@@ -6,7 +6,7 @@ export function AuthShell({ title, children, note }: { title: string; children: 
   return (
     <main className="mx-auto grid min-h-dvh max-w-5xl content-center gap-10 px-4 py-12 sm:px-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:items-center lg:gap-16">
       <div className="max-w-md">
-        <p className="font-display text-[3.25rem] leading-[0.9] font-semibold lg:text-[5rem]">Rechnungen</p>
+        <p className="font-display text-[3.25rem] leading-[0.9] font-semibold tracking-[-0.01em] lg:text-[5rem] lg:tracking-[-0.015em]">Rechnungen</p>
         <p className="mt-4 text-base text-muted-foreground">
           Rechnungen schreiben, als PDF oder Word-Datei exportieren und archivieren – für jeden Betrieb getrennt.
         </p>

@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { EmptyState } from '@/components/empty-state'
 import { ListToolbar } from '@/components/list-toolbar'
 import { PageHeader } from '@/components/page-header'
+import { listLinkClass, pressableRowClass, rowLinkClass } from '@/components/pressable'
 import { StatusBanner } from '@/components/status-banner'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -91,9 +92,9 @@ export default async function ArticlesPage(props: Props) {
               </TableHeader>
               <TableBody>
                 {articles.map((a) => (
-                  <TableRow key={a.id}>
+                  <TableRow key={a.id} className={pressableRowClass}>
                     <TableCell>
-                      <Link href={tenantPath(tenant.id, `artikel/${a.id}`)} className="font-medium underline-offset-4 hover:underline">
+                      <Link href={tenantPath(tenant.id, `artikel/${a.id}`)} className={`font-medium underline-offset-4 hover:underline ${rowLinkClass}`}>
                         {a.name}
                       </Link>
                       {a.description && <span className="block text-muted-foreground">{a.description}</span>}
@@ -107,10 +108,10 @@ export default async function ArticlesPage(props: Props) {
             </Table>
           </div>
 
-          <ul className="mt-6 divide-y divide-border rounded-md border border-border bg-card md:hidden">
+          <ul className="mt-6 divide-y divide-border overflow-hidden rounded-md border border-border bg-card md:hidden">
             {articles.map((a) => (
               <li key={a.id}>
-                <Link href={tenantPath(tenant.id, `artikel/${a.id}`)} className="flex min-h-11 items-baseline justify-between gap-4 px-4 py-3">
+                <Link href={tenantPath(tenant.id, `artikel/${a.id}`)} className={`flex min-h-11 items-baseline justify-between gap-4 px-4 py-3 ${listLinkClass}`}>
                   <span>
                     <span className="block font-medium">{a.name}</span>
                     <span className="block text-sm text-muted-foreground">

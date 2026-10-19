@@ -89,6 +89,23 @@ describe('draftReducer', () => {
     d = reduce(d, { type: 'removeItem', key: 'k2' })
     expect(d.items.map((i) => i.key)).toEqual([first.key])
   })
+  test('a removed item can be restored at its old position', () => {
+    let d = reduce(base(), { type: 'addFreeItem', key: 'k2' })
+    d = reduce(d, { type: 'addFreeItem', key: 'k3' })
+    d = reduce(d, { type: 'updateItem', key: 'k2', field: 'description', value: 'Mitte' })
+    const removed = d.items[1]
+    d = reduce(d, { type: 'removeItem', key: 'k2' })
+    d = reduce(d, { type: 'restoreItem', item: removed, index: 1 })
+    expect(d.items.map((i) => i.key)).toEqual([d.items[0].key, 'k2', 'k3'])
+    expect(d.items[1].description).toBe('Mitte')
+  })
+  test('restoring clamps the position and never duplicates an item', () => {
+    const d = reduce(base(), { type: 'addFreeItem', key: 'k2' })
+    const item = d.items[1]
+    const removed = reduce(d, { type: 'removeItem', key: 'k2' })
+    expect(reduce(removed, { type: 'restoreItem', item, index: 9 }).items.map((i) => i.key)).toEqual([d.items[0].key, 'k2'])
+    expect(reduce(d, { type: 'restoreItem', item, index: 0 })).toBe(d)
+  })
 })
 
 describe('number ranges', () => {

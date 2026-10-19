@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { EmptyState } from '@/components/empty-state'
 import { ListToolbar } from '@/components/list-toolbar'
 import { PageHeader } from '@/components/page-header'
+import { listLinkClass, pressableRowClass, rowLinkClass } from '@/components/pressable'
 import { StatusBanner } from '@/components/status-banner'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -89,9 +90,9 @@ export default async function CustomersPage(props: Props) {
               </TableHeader>
               <TableBody>
                 {customers.map((c) => (
-                  <TableRow key={c.id}>
+                  <TableRow key={c.id} className={pressableRowClass}>
                     <TableCell>
-                      <Link href={tenantPath(tenant.id, `kunden/${c.id}`)} className="font-medium underline-offset-4 hover:underline">
+                      <Link href={tenantPath(tenant.id, `kunden/${c.id}`)} className={`font-medium underline-offset-4 hover:underline ${rowLinkClass}`}>
                         {c.name}
                       </Link>
                       {c.contact_person && <span className="block text-muted-foreground">{c.contact_person}</span>}
@@ -104,10 +105,10 @@ export default async function CustomersPage(props: Props) {
             </Table>
           </div>
 
-          <ul className="mt-6 divide-y divide-border rounded-md border border-border bg-card md:hidden">
+          <ul className="mt-6 divide-y divide-border overflow-hidden rounded-md border border-border bg-card md:hidden">
             {customers.map((c) => (
               <li key={c.id}>
-                <Link href={tenantPath(tenant.id, `kunden/${c.id}`)} className="block min-h-11 px-4 py-3">
+                <Link href={tenantPath(tenant.id, `kunden/${c.id}`)} className={`block min-h-11 px-4 py-3 ${listLinkClass}`}>
                   <span className="block font-medium">{c.name}</span>
                   <span className="block text-sm text-muted-foreground">
                     {[c.contact_person, [c.postal_code, c.city].filter(Boolean).join(' ')].filter(Boolean).join(' · ')}

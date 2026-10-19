@@ -1,6 +1,7 @@
 'use client'
 
-import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, Plus, Trash2, Undo2 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
 import { Combobox } from '@/components/combobox'
 import { FieldError } from '@/components/field-error'
 import { Button } from '@/components/ui/button'
@@ -31,6 +32,35 @@ export function ItemsEditor({
   errors: Record<string, string>
 }) {
   const newKey = () => crypto.randomUUID()
+  // Last removed position, kept for "Rückgängig" (forgiving instead of asking before every removal).
+  const [removed, setRemoved] = useState<{ item: DraftItem; index: number } | null>(null)
+  const undoRef = useRef<HTMLButtonElement>(null)
+  // 'undo' or a control id; applied after the next render.
+  const focusNext = useRef<string | null>(null)
+
+  // The pressed button disappears with its row: keep keyboard focus on the next sensible control.
+  useEffect(() => {
+    const target = focusNext.current
+    if (target === null) return
+    focusNext.current = null
+    if (target === 'undo') undoRef.current?.focus()
+    else document.getElementById(target)?.focus()
+  })
+
+  function remove(item: DraftItem, index: number) {
+    setRemoved({ item, index })
+    dispatch({ type: 'removeItem', key: item.key })
+    focusNext.current = 'undo'
+  }
+
+  function undo() {
+    if (!removed) return
+    dispatch({ type: 'restoreItem', item: removed.item, index: removed.index })
+    focusNext.current = `inv-items.${Math.min(removed.index, items.length)}.description`
+    setRemoved(null)
+  }
+
+  const removedLabel = removed?.item.description.split('\n')[0].trim()
   return (
     <fieldset className="space-y-4">
       <legend className="font-display text-xl font-semibold">Positionen</legend>
@@ -160,7 +190,7 @@ export function ItemsEditor({
                 <Button type="button" variant="ghost" size="icon" className="size-11 @4xl:size-8" aria-label={`Position ${n} nach unten`} disabled={index === items.length - 1} onClick={() => dispatch({ type: 'moveItem', key: item.key, direction: 1 })}>
                   <ArrowDown aria-hidden />
                 </Button>
-                <Button type="button" variant="ghost" size="icon" className="size-11 @4xl:size-8" aria-label={`Position ${n} entfernen`} onClick={() => dispatch({ type: 'removeItem', key: item.key })}>
+                <Button type="button" variant="ghost" size="icon" className="size-11 @4xl:size-8" aria-label={`Position ${n} entfernen`} onClick={() => remove(item, index)}>
                   <Trash2 aria-hidden />
                 </Button>
               </div>
@@ -168,6 +198,21 @@ export function ItemsEditor({
           )
         })}
       </ol>
+
+      {/* Always rendered, so screen readers announce the removal when the text appears. */}
+      <div role="status">
+        {removed && (
+          <p className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-md border border-border bg-card py-1 pr-1 pl-4 text-sm">
+            <span className="min-w-0 truncate">
+              {removedLabel ? `„${removedLabel}“ entfernt.` : `Position ${removed.index + 1} entfernt.`}
+            </span>
+            <Button ref={undoRef} type="button" variant="ghost" className="gap-2" onClick={undo}>
+              <Undo2 aria-hidden className="size-4" />
+              Rückgängig
+            </Button>
+          </p>
+        )}
+      </div>
 
       <datalist id="unit-suggestions">
         {['Stk.', 'kg', 'g', 'Pers.', 'Portion', 'Std.', 'Pauschale', 'l', 'Fl.'].map((u) => (
@@ -183,6 +228,7 @@ export function ItemsEditor({
             onSelect={(id) => {
               const article = articles.find((a) => a.id === id)
               if (article) dispatch({ type: 'addArticle', key: newKey(), article })
+              setRemoved(null)
             }}
             placeholder="Artikel hinzufügen"
             searchPlaceholder="Artikel suchen"
@@ -195,7 +241,10 @@ export function ItemsEditor({
             }
           />
         </div>
-        <Button type="button" variant="outline" className="gap-2" onClick={() => dispatch({ type: 'addFreeItem', key: newKey() })}>
+        <Button type="button" variant="outline" className="gap-2" onClick={() => {
+            dispatch({ type: 'addFreeItem', key: newKey() })
+            setRemoved(null)
+          }}>
           <Plus aria-hidden className="size-4" />
           Freie Position
         </Button>

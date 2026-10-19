@@ -19,7 +19,7 @@ export function ArchiveList({ tenantId, invoiceId, exports }: { tenantId: string
             <li key={e.id}>
               <a
                 href={apiPath(tenantId, `invoices/${invoiceId}/exports/${e.id}`)}
-                className="flex min-h-11 flex-wrap items-center gap-x-4 gap-y-0.5 px-4 py-2.5 text-sm transition-colors duration-150 hover:bg-muted"
+                className="flex min-h-11 flex-wrap items-center gap-x-4 gap-y-0.5 px-4 py-2.5 text-sm transition-colors duration-(--duration-fast) hover:bg-muted active:bg-pressed active:duration-0"
               >
                 <FileDown aria-hidden className="size-4 shrink-0 text-muted-foreground" />
                 <span className="min-w-0 flex-1 font-medium break-all">{e.filename}</span>

@@ -4,6 +4,7 @@ import { EmptyState } from '@/components/empty-state'
 import { InvoiceNumber } from '@/components/invoice-number'
 import { ListToolbar } from '@/components/list-toolbar'
 import { PageHeader } from '@/components/page-header'
+import { listLinkClass, pressableRowClass, rowLinkClass } from '@/components/pressable'
 import { StatusBanner } from '@/components/status-banner'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -67,9 +68,9 @@ export default async function InvoicesPage(props: Props) {
               </TableHeader>
               <TableBody>
                 {invoices.map((i) => (
-                  <TableRow key={i.id}>
+                  <TableRow key={i.id} className={pressableRowClass}>
                     <TableCell>
-                      <Link href={tenantPath(tenant.id, `rechnungen/${i.id}`)} aria-label={`Rechnung ${i.number} öffnen`}>
+                      <Link href={tenantPath(tenant.id, `rechnungen/${i.id}`)} aria-label={`Rechnung ${i.number} öffnen`} className={rowLinkClass}>
                         <InvoiceNumber number={i.number} />
                       </Link>
                     </TableCell>
@@ -92,10 +93,10 @@ export default async function InvoicesPage(props: Props) {
             </Table>
           </div>
 
-          <ul className="mt-6 divide-y divide-border rounded-md border border-border bg-card md:hidden">
+          <ul className="mt-6 divide-y divide-border overflow-hidden rounded-md border border-border bg-card md:hidden">
             {invoices.map((i) => (
               <li key={i.id}>
-                <Link href={tenantPath(tenant.id, `rechnungen/${i.id}`)} className="flex min-h-11 items-center justify-between gap-4 px-4 py-3">
+                <Link href={tenantPath(tenant.id, `rechnungen/${i.id}`)} className={`flex min-h-11 items-center justify-between gap-4 px-4 py-3 ${listLinkClass}`}>
                   <span className="min-w-0">
                     <InvoiceNumber number={i.number} />
                     <span className="mt-1 block truncate">{i.recipientName}</span>

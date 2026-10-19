@@ -27,7 +27,7 @@ export function SettingsNav() {
                 href={href}
                 aria-current={active ? 'page' : undefined}
                 className={[
-                  'inline-flex min-h-11 items-center px-3 text-sm whitespace-nowrap transition-colors duration-150',
+                  'inline-flex min-h-11 items-center rounded-t-md px-3 text-sm whitespace-nowrap transition-colors duration-(--duration-fast) active:bg-pressed active:duration-0',
                   active ? 'font-medium text-foreground shadow-[inset_0_-2px_0_var(--nav-indicator)]' : 'text-muted-foreground hover:text-foreground',
                 ].join(' ')}
               >

@@ -37,7 +37,7 @@ export function SideNav() {
                 href={href}
                 aria-current={active ? 'page' : undefined}
                 className={[
-                  'flex min-h-10 items-center gap-2.5 rounded-md px-3 text-sm transition-colors duration-150',
+                  'flex min-h-10 items-center gap-2.5 rounded-md px-3 text-sm transition-colors duration-(--duration-fast) active:bg-pressed active:duration-0',
                   active
                     ? 'bg-card font-medium text-foreground shadow-[inset_3px_0_0_var(--nav-indicator)]'
                     : 'text-muted-foreground hover:bg-muted hover:text-foreground',
@@ -54,14 +54,17 @@ export function SideNav() {
   )
 }
 
-/** Mobile bottom tab bar (4 items, icon above label, >= 56px tall, respects the home-indicator safe area). */
+/**
+ * Mobile bottom tab bar (4 items, icon above label, >= 56px tall, respects the home-indicator safe area).
+ * Translucent material: the page scrolls underneath and stays faintly visible (solid with reduced transparency).
+ */
 export function TabBar() {
   const isActive = useIsActive()
   const items = useItems()
   return (
     <nav
       aria-label="Hauptnavigation"
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card pb-[env(safe-area-inset-bottom)] md:hidden"
+      className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-(--material-bar) pb-[env(safe-area-inset-bottom)] backdrop-blur-(--material-blur) backdrop-saturate-150 md:hidden"
     >
       <ul className="grid grid-cols-4">
         {items.map(({ href, label, icon: Icon }) => {
@@ -72,7 +75,7 @@ export function TabBar() {
                 href={href}
                 aria-current={active ? 'page' : undefined}
                 className={[
-                  'flex min-h-14 flex-col items-center justify-center gap-1 text-xs transition-colors duration-150',
+                  'flex min-h-14 flex-col items-center justify-center gap-1 text-xs transition-colors duration-(--duration-fast) active:bg-pressed/70 active:duration-0',
                   active ? 'font-medium text-foreground shadow-[inset_0_3px_0_var(--nav-indicator)]' : 'text-muted-foreground',
                 ].join(' ')}
               >

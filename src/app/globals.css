@@ -16,7 +16,12 @@
   --color-stempel: #b3261e;    /* red: errors, required markers, destructive actions */
   --color-kuli: #2f4fc9;       /* ballpoint blue: focus only */
   --color-wash: #eceee9;       /* hover/muted surface */
-  --duration-fast: 150ms;
+  --color-wash-tief: #e0e3dd;  /* pressed surface: one step darker than the hover wash */
+  --duration-fast: 150ms;      /* color changes, entering layers */
+  --duration-exit: 100ms;      /* leaving layers: exits are shorter than entrances */
+  /* Arrives fast and settles without overshoot (close to a critically damped spring). */
+  --ease-settle: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-leave: cubic-bezier(0.4, 0, 1, 1);
 }
 
 /* === SEMANTIC: shadcn/ui variables === */
@@ -47,6 +52,34 @@
 :root {
   --field-border: var(--input);
   --nav-indicator: var(--color-tinte);
+  --pressed: var(--color-wash-tief);
+  /* Floating bar material (mobile tab bar): translucent white, content scrolls underneath. */
+  --material-bar: color-mix(in oklch, var(--color-weiss) 80%, transparent);
+  --material-blur: 16px;
+  /* Modal scrim: dims the page so the dialog is the only focus. */
+  --scrim: color-mix(in oklch, var(--color-tinte) 22%, transparent);
+  --scrim-blur: 2px;
+}
+
+/* Reduced transparency: solid surfaces, no blur. */
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --material-bar: var(--color-weiss);
+    --material-blur: 0px;
+    --scrim: color-mix(in oklch, var(--color-tinte) 40%, transparent);
+    --scrim-blur: 0px;
+  }
+}
+
+/* More contrast: decorative lines become real borders, surfaces turn solid. */
+@media (prefers-contrast: more) {
+  :root {
+    --border: var(--color-feld);
+    --material-bar: var(--color-weiss);
+    --material-blur: 0px;
+    --scrim: color-mix(in oklch, var(--color-tinte) 50%, transparent);
+    --scrim-blur: 0px;
+  }
 }
 
 @theme inline {
@@ -70,6 +103,9 @@
   --color-ring: var(--ring);
   --color-stamp: var(--stamp);
   --color-nav-indicator: var(--nav-indicator);
+  --color-pressed: var(--pressed);
+  /* Small text reads better with slightly positive tracking. */
+  --text-xs--letter-spacing: 0.01em;
   --font-sans: var(--font-plex-sans);
   --font-display: var(--font-barlow);
   --font-mono: var(--font-plex-mono);
@@ -87,6 +123,37 @@
   html {
     @apply font-sans;
     color-scheme: light;
+    /* Every control has its own pressed state; the grey iOS tap flash would double it. */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+  /* Mobile: focused fields must not end up hidden behind the fixed tab bar. */
+  @media (width < 48rem) {
+    html {
+      scroll-padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+    }
+  }
+  /* No double-tap-to-zoom wait on controls: taps answer immediately. */
+  a,
+  button,
+  input,
+  select,
+  textarea,
+  label,
+  summary,
+  [role="button"] {
+    touch-action: manipulation;
+  }
+  /* Inline text links (always underlined) fade while pressed; release eases back. */
+  :where(a, button).underline {
+    transition:
+      color var(--duration-fast) var(--ease-settle),
+      opacity var(--duration-fast) var(--ease-settle);
+  }
+  :where(a, button).underline:active {
+    opacity: 0.6;
+    transition-duration: 0s;
   }
   body {
     @apply bg-background text-foreground;
@@ -103,11 +170,20 @@
   }
 }
 
+/*
+ * Reduced motion keeps feedback but drops movement: layers cross-fade instead of zooming or sliding,
+ * color and opacity changes stay (they help to see what changed). Pressed scaling uses motion-safe:.
+ */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
-    transition-duration: 0.01ms !important;
-    animation-duration: 0.01ms !important;
+    --tw-enter-scale: 1 !important;
+    --tw-exit-scale: 1 !important;
+    --tw-enter-translate-x: 0 !important;
+    --tw-enter-translate-y: 0 !important;
+    --tw-exit-translate-x: 0 !important;
+    --tw-exit-translate-y: 0 !important;
+    scroll-behavior: auto !important;
   }
 }

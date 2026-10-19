@@ -127,7 +127,16 @@ export function LivePreview({
           <p className="p-6 text-sm text-muted-foreground">{attention ? 'Noch keine Vorschau vorhanden.' : 'Die Vorschau wird erstellt …'}</p>
         )}
         {/* Keep the last PDF visible while the next one renders; just dim it slightly. */}
-        {shown === 'loading' && url && <div aria-hidden className="pointer-events-none absolute inset-0 bg-card/35 transition-opacity duration-150" />}
+        {/* Always mounted so the dim cross-fades in and out instead of popping. */}
+        {url && (
+          <div
+            aria-hidden
+            className={[
+              'pointer-events-none absolute inset-0 bg-card/35 transition-opacity duration-(--duration-fast) ease-(--ease-settle)',
+              shown === 'loading' ? 'opacity-100' : 'opacity-0',
+            ].join(' ')}
+          />
+        )}
       </div>
     </section>
   )

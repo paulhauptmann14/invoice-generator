@@ -37,7 +37,8 @@ export function PreviewToggle({ mode, url, payload }: { mode: PreviewMode; url: 
       <DialogContent
         showCloseButton={false}
         aria-describedby={undefined}
-        className="inset-0 top-0 left-0 flex h-dvh w-full max-w-none translate-x-0 translate-y-0 flex-col gap-3 overflow-y-auto rounded-none border-0 bg-background p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:max-w-none sm:p-6"
+        // Full-screen sheet: rises from the bottom edge and leaves the same way (no zoom).
+        className="inset-0 top-0 left-0 flex h-dvh w-full max-w-none translate-x-0 translate-y-0 flex-col gap-3 overflow-y-auto rounded-none border-0 bg-background p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] data-open:zoom-in-100! data-open:slide-in-from-bottom-8 data-closed:zoom-out-100! data-closed:slide-out-to-bottom-8 sm:max-w-none sm:p-6"
       >
         <div className="flex items-center justify-between gap-3">
           <DialogTitle className="font-display text-xl font-semibold">Vorschau</DialogTitle>

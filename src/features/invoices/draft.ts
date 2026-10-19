@@ -94,6 +94,8 @@ export type DraftAction =
   | { type: 'updateItem'; key: string; field: ItemField; value: string }
   | { type: 'setSaveAsArticle'; key: string; value: boolean }
   | { type: 'removeItem'; key: string }
+  /** Undo of a removal: puts the item back at its old index (clamped to the list). */
+  | { type: 'restoreItem'; item: DraftItem; index: number }
   | { type: 'moveItem'; key: string; direction: -1 | 1 }
 
 const emptyRecipient = (): DraftRecipient => ({ name: '', contactPerson: '', street: '', postalCode: '', city: '', countryCode: 'DE', vatId: '' })
@@ -282,6 +284,12 @@ export function createDraftReducer(ctx: NumberContext) {
         }
       case 'removeItem':
         return { ...state, items: state.items.filter((i) => i.key !== action.key) }
+      case 'restoreItem': {
+        if (state.items.some((i) => i.key === action.item.key)) return state
+        const items = [...state.items]
+        items.splice(Math.min(Math.max(action.index, 0), items.length), 0, action.item)
+        return { ...state, items }
+      }
       case 'moveItem': {
         const index = state.items.findIndex((i) => i.key === action.key)
         const target = index + action.direction
