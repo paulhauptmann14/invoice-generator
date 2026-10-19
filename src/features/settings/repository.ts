@@ -35,6 +35,17 @@ export async function loadSettings(supabase: Client, tenantId: string): Promise<
   }
 }
 
+/**
+ * Version of the current logo for the app shell (the file name, which changes with every upload), or null
+ * without a logo. Reads only the logo path, not the whole settings row.
+ */
+export async function loadLogoVersion(supabase: Client, tenantId: string): Promise<string | null> {
+  const { data, error } = await supabase.from('settings').select('logo:theme->logo->>path').eq('tenant_id', tenantId).maybeSingle()
+  if (error) throw new Error(`Loading logo path failed: ${error.message}`)
+  const path = typeof data?.logo === 'string' ? data.logo : null
+  return path?.split('/').pop() || null
+}
+
 async function updateSettings(
   supabase: Client,
   tenantId: string,

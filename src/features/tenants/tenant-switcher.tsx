@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { switchTenantPath } from '@/lib/tenant-paths'
 import { NewTenantDialog } from './new-tenant-dialog'
+import { TenantLogo } from './tenant-logo'
 import { useTenant } from './tenant-context'
 
 /** The business name is the app's wordmark; it opens the list of businesses. */
@@ -28,8 +29,11 @@ export function TenantSwitcher() {
     <>
       {/* Non-modal: the "new business" dialog opens right after the menu closes. */}
       <DropdownMenu modal={false}>
-        <DropdownMenuTrigger ref={triggerRef} className="-ml-2 flex min-h-11 max-w-full min-w-0 items-center justify-between gap-2 rounded-md px-2 py-2 text-left transition-colors duration-(--duration-fast) hover:bg-(--sidebar-hover) active:bg-(--sidebar-selection) active:duration-0 data-[state=open]:bg-(--sidebar-hover) md:ml-0 md:w-full md:px-2.5">
-          <span className="type-headline min-w-0 truncate md:line-clamp-2 md:whitespace-normal">
+        {/* Phone top bar: logo, name and chevron in one row. Sidebar (narrow, 14rem): the logo takes its own row
+            above, name and chevron share the next one, so the chevron always sits beside the name. */}
+        <DropdownMenuTrigger ref={triggerRef} className="-ml-2 flex min-h-11 max-w-full min-w-0 items-center gap-x-2.5 gap-y-2.5 rounded-md px-2 py-2 text-left transition-colors duration-(--duration-fast) hover:bg-(--sidebar-hover) active:bg-(--sidebar-selection) active:duration-0 data-[state=open]:bg-(--sidebar-hover) md:ml-0 md:w-full md:flex-wrap md:px-2.5">
+          <TenantLogo />
+          <span className="type-headline min-w-0 flex-1 truncate md:line-clamp-2 md:whitespace-normal">
             <span className="sr-only">Betrieb: </span>
             {tenant.name}
           </span>

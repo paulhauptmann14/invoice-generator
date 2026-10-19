@@ -6,7 +6,7 @@ import { appearanceFormValues } from './merge'
 import { appearanceFormSchema, companyFormSchema, paymentFormSchema } from './schemas'
 
 vi.mock('server-only', () => ({}))
-const { loadSettings, saveAppearance, saveCompany, saveFilenameTemplate, savePayment } = await import('./repository')
+const { loadLogoVersion, loadSettings, saveAppearance, saveCompany, saveFilenameTemplate, savePayment } = await import('./repository')
 const { removeLogo, storeLogo } = await import('./logo-store')
 
 const supabase = createClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, {
@@ -97,6 +97,8 @@ describe('settings repository (local Supabase)', () => {
     if (!first.ok || !second.ok) throw new Error('upload failed')
     expect(second.path).toMatch(new RegExp(`^${SEED.gasthaus}/logo-\\d+\\.png$`))
     expect((await loadSettings(supabase, SEED.gasthaus)).theme.logo.path).toBe(second.path)
+    // The app shell shows the logo; its version changes with every upload (cache busting) and holds no tenant id.
+    expect(await loadLogoVersion(supabase, SEED.gasthaus)).toBe(second.path.split('/')[1])
     const { data } = await supabase.storage.from('assets').list(SEED.gasthaus)
     expect(data?.filter((f) => f.name.startsWith('logo-')).map((f) => f.name)).toEqual([second.path.split('/')[1]])
   })
@@ -112,6 +114,7 @@ describe('settings repository (local Supabase)', () => {
   test('removeLogo deletes the file and clears the path', async () => {
     await removeLogo(supabase, SEED.gasthaus)
     expect((await loadSettings(supabase, SEED.gasthaus)).theme.logo.path).toBeNull()
+    expect(await loadLogoVersion(supabase, SEED.gasthaus)).toBeNull()
     const { data } = await supabase.storage.from('assets').list(SEED.gasthaus)
     expect(data?.filter((f) => f.name.startsWith('logo-'))).toEqual([])
   })

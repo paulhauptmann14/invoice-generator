@@ -1,5 +1,6 @@
 import { SignOutButton } from '@/components/sign-out-button'
 import { SkipLink } from '@/components/skip-link'
+import { loadLogoVersion } from '@/features/settings/repository'
 import { TenantProvider } from '@/features/tenants/tenant-context'
 import { TenantSwitcher } from '@/features/tenants/tenant-switcher'
 import { requireTenant } from '@/lib/auth/require-tenant'
@@ -10,10 +11,11 @@ type Props = { children: React.ReactNode; params: Promise<{ betrieb: string }> }
 /** App shell of one tenant. Unknown or foreign tenants end in the global 404 (spec 3a). */
 export default async function TenantLayout({ children, params }: Props) {
   const { betrieb } = await params
-  const { email, tenant, tenants } = await requireTenant(betrieb)
+  const { supabase, email, tenant, tenants } = await requireTenant(betrieb)
+  const logoVersion = await loadLogoVersion(supabase, tenant.id)
 
   return (
-    <TenantProvider tenant={tenant} tenants={tenants}>
+    <TenantProvider tenant={tenant} tenants={tenants} logoVersion={logoVersion}>
       <div className="min-h-dvh md:grid md:grid-cols-[14rem_minmax(0,1fr)]">
         <SkipLink />
         <aside className="flex items-center justify-between gap-4 border-b border-border px-4 py-2 md:sticky md:top-0 md:h-dvh md:flex-col md:items-stretch md:justify-start md:border-r md:border-b-0 md:bg-(--sidebar) md:px-0 md:py-0">
