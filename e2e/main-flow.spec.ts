@@ -98,7 +98,7 @@ test('main flow', async ({ page }) => {
   await page.getByLabel('Beschreibung Position 1').fill('Beratung')
   await page.getByLabel('Menge Position 1').fill('2')
   await page.getByLabel('Einzelpreis brutto Position 1').fill('119,00')
-  await page.getByRole('button', { name: 'Freie Position' }).click()
+  await page.getByRole('button', { name: 'Leere Position' }).click()
   await page.getByLabel('Beschreibung Position 2').fill('Material')
   await page.getByLabel('Menge Position 2').fill('1')
   await page.getByLabel('Einzelpreis brutto Position 2').fill('50,00')

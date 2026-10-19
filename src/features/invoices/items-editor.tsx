@@ -101,6 +101,8 @@ export function ItemsEditor({
           const total = lineTotals.get(item.key)
           return (
             <li key={item.key} className={`rounded-lg border border-border p-4 @4xl:rounded-none @4xl:border-0 @4xl:p-0 ${GRID}`}>
+              {/* Cards need the number to tell positions apart; the desktop rows read as a table, so there it only serves screen readers. */}
+              <h2 className="mb-3 text-base font-semibold @4xl:sr-only">Position {n}</h2>
               <div className="space-y-1">
                 <label htmlFor={field('description')} className="text-sm font-medium @4xl:sr-only">
                   Beschreibung<span className="sr-only"> Position {n}</span>
@@ -266,7 +268,7 @@ export function ItemsEditor({
             setRemoved(null)
           }}>
           <Plus aria-hidden className="size-4" />
-          Freie Position
+          Leere Position
         </Button>
       </div>
     </FormSection>

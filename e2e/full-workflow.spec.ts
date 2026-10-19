@@ -557,7 +557,7 @@ test.describe('invoice', () => {
     await expect(page.getByLabel('Einzelpreis brutto Position 1')).toHaveValue('24,00')
     await page.getByLabel('Menge Position 1').fill('2')
     // Position 2: free position, 1 x 100,00 EUR at 19 %.
-    await page.getByRole('button', { name: 'Freie Position' }).click()
+    await page.getByRole('button', { name: 'Leere Position' }).click()
     await page.getByLabel('Beschreibung Position 2').fill('Beratung')
     await page.getByLabel('Menge Position 2').fill('1')
     await page.getByLabel('Einzelpreis brutto Position 2').fill('100,00')
