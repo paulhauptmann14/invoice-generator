@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/supabase/database.types'
 import { parseTheme, type Theme } from '@/lib/domain/theme'
-import { calcTotals } from '@/lib/domain/totals'
+import { calcTotals, discountFromColumns } from '@/lib/domain/totals'
 import { escapeLike, normalizeSearch } from '@/lib/search'
 import type { InvoiceRecordWithItems, NumberRangeChoice, PickerArticle, PickerCustomer } from './draft'
 
@@ -21,7 +21,7 @@ export type InvoiceListRow = {
 export async function listInvoices(supabase: Client, tenantId: string, opts: { q: string }): Promise<InvoiceListRow[]> {
   let query = supabase
     .from('invoices')
-    .select('id, number, issue_date, due_date, recipient, invoice_items(quantity, unit_price_gross, vat_rate)')
+    .select('id, number, issue_date, due_date, recipient, discount_kind, discount_value, invoice_items(quantity, unit_price_gross, vat_rate, discount_kind, discount_value)')
     .eq('tenant_id', tenantId)
     .order('issue_date', { ascending: false })
     .order('number', { ascending: false })
@@ -34,7 +34,13 @@ export async function listInvoices(supabase: Client, tenantId: string, opts: { q
   return data.map((row) => {
     const recipient = (row.recipient ?? {}) as { name?: unknown }
     const totals = calcTotals(
-      row.invoice_items.map((i) => ({ quantity: i.quantity, unitPriceGross: i.unit_price_gross, vatRate: i.vat_rate })),
+      row.invoice_items.map((i) => ({
+        quantity: i.quantity,
+        unitPriceGross: i.unit_price_gross,
+        vatRate: i.vat_rate,
+        discount: discountFromColumns(i.discount_kind, i.discount_value),
+      })),
+      discountFromColumns(row.discount_kind, row.discount_value),
     )
     return {
       id: row.id,
@@ -55,7 +61,7 @@ export async function getInvoice(
   const { data, error } = await supabase
     .from('invoices')
     .select(
-      'id, updated_at, number, number_range_id, customer_id, recipient, issue_date, service_date_from, service_date_to, payment_days, intro_text, closing_text, invoice_items(id, position, description, quantity, unit, unit_price_gross, vat_rate, article_id)',
+      'id, updated_at, number, number_range_id, customer_id, recipient, issue_date, service_date_from, service_date_to, payment_days, intro_text, closing_text, discount_kind, discount_value, invoice_items(id, position, description, quantity, unit, unit_price_gross, vat_rate, article_id, discount_kind, discount_value)',
     )
     .eq('id', id)
     .eq('tenant_id', tenantId)

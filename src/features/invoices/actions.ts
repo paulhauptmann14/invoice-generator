@@ -29,6 +29,8 @@ function rpcArgs(s: InvoiceSubmission) {
       payment_days: s.paymentDays,
       intro_text: s.introText,
       closing_text: s.closingText,
+      discount_kind: s.discount?.kind ?? null,
+      discount_value: s.discount?.value ?? null,
     },
     p_items: s.items.map((i) => ({
       description: i.description,
@@ -38,6 +40,8 @@ function rpcArgs(s: InvoiceSubmission) {
       vat_rate: i.vatRate,
       article_id: i.articleId,
       save_as_article: i.saveAsArticle,
+      discount_kind: i.discount?.kind ?? null,
+      discount_value: i.discount?.value ?? null,
     })),
   }
 }
@@ -111,6 +115,8 @@ export async function copyInvoice(tenantId: string, id: string): Promise<void> {
       payment_days: source.payment_days,
       intro_text: source.intro_text,
       closing_text: source.closing_text,
+      discount_kind: source.discount_kind,
+      discount_value: source.discount_value,
     },
     p_items: source.invoice_items.map((i) => ({
       description: i.description,
@@ -119,6 +125,8 @@ export async function copyInvoice(tenantId: string, id: string): Promise<void> {
       unit_price_gross: i.unit_price_gross,
       vat_rate: i.vat_rate,
       article_id: i.article_id,
+      discount_kind: i.discount_kind,
+      discount_value: i.discount_value,
     })),
   })
   if (error) throw new Error(`Copying invoice failed: ${error.message}`)

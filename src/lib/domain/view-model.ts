@@ -3,7 +3,7 @@ import { addDays, formatDateDe } from './dates'
 import { formatEuro, formatQuantity, formatVatRate, toCents } from './money'
 import { fillPlaceholders } from './placeholders'
 import type { Theme } from './theme'
-import { calcTotals } from './totals'
+import { calcTotals, type Discount } from './totals'
 
 export type Recipient = {
   name: string
@@ -21,6 +21,7 @@ export type InvoiceItemInput = {
   unit: string
   unitPriceGross: number | string
   vatRate: number | string
+  discount?: Discount
 }
 
 export type InvoiceInput = {
@@ -34,6 +35,7 @@ export type InvoiceInput = {
   introText: string | null
   closingText: string | null
   items: InvoiceItemInput[]
+  discount?: Discount
 }
 
 /** Fully formatted invoice content. Renderers (PDF, DOCX, form preview) must not calculate anything themselves. */
@@ -60,9 +62,19 @@ export type InvoiceViewModel = {
     total: string
     /** "1 Gutschein à 60,00 €" – one-line form used by the "Briefpapier" layout. */
     line: string
+    /** "abzüglich 10 % Rabatt (−49,80 €)"; null without an item discount. */
+    discount: string | null
   }[]
   taxGroups: { rate: string; net: string; vat: string; gross: string }[]
-  totals: { gross: string; net: string; vat: string }
+  totals: {
+    gross: string
+    net: string
+    vat: string
+    /** Sum of the line totals; only set together with an invoice discount. */
+    subtotal: string | null
+    /** "abzüglich 5 % Rabatt" / "−30,41 €"; null without an invoice discount. */
+    discount: { label: string; amount: string } | null
+  }
   footerColumns: string[]
   /** "St.-Nr.: …" (or "USt-IdNr.: …"), shown next to the number in the "Briefpapier" layout. */
   taxIdLine: string
@@ -73,7 +85,13 @@ export type InvoiceViewModel = {
 }
 
 const regionNames = new Intl.DisplayNames(['de'], { type: 'region' })
+const MINUS = '\u2212'
 const joinLines = (lines: (string | false | null | undefined)[]) => lines.filter(Boolean).join('\n')
+
+/** "abzüglich 10 % Rabatt" (percent) or "abzüglich Rabatt" (amount). */
+export function discountLabel(discount: NonNullable<Discount>): string {
+  return discount.kind === 'percent' ? `abzüglich ${formatVatRate(discount.value)} Rabatt` : 'abzüglich Rabatt'
+}
 
 function recipientLines(r: Recipient): string[] {
   const lines = [r.name, r.contactPerson ? `z. Hd. ${r.contactPerson}` : '', r.street, `${r.postalCode} ${r.city}`.trim()]
@@ -95,7 +113,7 @@ function autoFooter(c: Company): string[] {
 }
 
 export function buildInvoiceViewModel(input: InvoiceInput, company: Company, theme: Theme): InvoiceViewModel {
-  const totals = calcTotals(input.items)
+  const totals = calcTotals(input.items, input.discount)
   const dueIso = input.paymentDays === null ? null : addDays(input.issueDate, input.paymentDays)
 
   const singleServiceDay = !input.serviceDateTo || input.serviceDateTo === input.serviceDateFrom
@@ -136,6 +154,7 @@ export function buildInvoiceViewModel(input: InvoiceInput, company: Company, the
       unitPrice: formatEuro(toCents(item.unitPriceGross)),
       vatRate: formatVatRate(item.vatRate),
       total: formatEuro(totals.lineTotalsCents[i]),
+      discount: item.discount ? `${discountLabel(item.discount)} (${MINUS}${formatEuro(totals.lineDiscountsCents[i])})` : null,
       line: `${[formatQuantity(item.quantity), item.unit, item.description].filter((part) => part !== '').join(' ')} à ${formatEuro(toCents(item.unitPriceGross))}`,
     })),
     taxGroups: totals.taxGroups.map((g) => ({
@@ -148,6 +167,10 @@ export function buildInvoiceViewModel(input: InvoiceInput, company: Company, the
       gross: formatEuro(totals.grossCents),
       net: formatEuro(totals.netCents),
       vat: formatEuro(totals.vatCents),
+      subtotal: input.discount ? formatEuro(totals.subtotalCents) : null,
+      discount: input.discount
+        ? { label: discountLabel(input.discount), amount: `${MINUS}${formatEuro(totals.invoiceDiscountCents)}` }
+        : null,
     },
     footerColumns: theme.texts.footerColumns.length > 0 ? theme.texts.footerColumns.map(fill) : autoFooter(company),
     taxIdLine: company.taxNumber ? `St.-Nr.: ${company.taxNumber}` : company.vatId ? `USt-IdNr.: ${company.vatId}` : '',

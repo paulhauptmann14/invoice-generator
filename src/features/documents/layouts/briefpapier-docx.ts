@@ -11,7 +11,7 @@ import {
   TextWrappingType,
   VerticalPositionRelativeFrom,
 } from 'docx'
-import type { Theme } from '@/lib/domain/theme'
+import { DOCUMENT_COLORS, type Theme } from '@/lib/domain/theme'
 import type { InvoiceViewModel } from '@/lib/domain/view-model'
 import { din5008 } from '../din5008'
 import type { DocumentLogo } from '../logo'
@@ -68,9 +68,10 @@ export function buildBriefpapierDocx(vm: InvoiceViewModel, theme: Theme, fontFam
       : [],
   })
 
-  const amountRow = (label: string, amount: string, opts: { at: number; bold?: boolean; before?: number }) =>
+  const amountRow = (label: string, amount: string, opts: { at: number; bold?: boolean; before?: number; keepNext?: boolean }) =>
     new Paragraph({
       keepLines: true,
+      keepNext: opts.keepNext,
       spacing: { before: opts.before ? twip(opts.before) : 0 },
       tabStops: [rightTab(opts.at)],
       children: [new TextRun({ text: `${label}\t${amount}`, bold: opts.bold, color: opts.bold ? hex(c.primary) : undefined })],
@@ -153,8 +154,24 @@ export function buildBriefpapierDocx(vm: InvoiceViewModel, theme: Theme, fontFam
           ...(vm.recipientVatId ? [new Paragraph({ spacing: { before: twip(1) }, children: [new TextRun(`Ihre USt-IdNr.: ${vm.recipientVatId}`)] })] : []),
           ...(vm.serviceDateNote !== '' ? [new Paragraph({ spacing: { before: twip(1) }, children: [new TextRun(vm.serviceDateNote)] })] : []),
           ...(vm.intro !== '' ? [new Paragraph({ spacing: { before: twip(6) }, children: lines(vm.intro.split('\n')) })] : []),
-          ...vm.items.map((item, i) => amountRow(item.line, item.total, { at: contentWidthMm, before: i === 0 ? 14 : 0 })),
-          amountRow('Gesamtbetrag brutto', vm.totals.gross, { at: contentWidthMm, bold: true, before: 8 }),
+          ...vm.items.flatMap((item, i) => [
+            amountRow(item.line, item.total, { at: contentWidthMm, before: i === 0 ? 14 : 0, keepNext: item.discount !== null || undefined }),
+            ...(item.discount !== null
+              ? [
+                  new Paragraph({
+                    indent: { left: twip(6) },
+                    children: [new TextRun({ text: item.discount, size: halfPoints(base - 1.5), color: hex(DOCUMENT_COLORS.muted) })],
+                  }),
+                ]
+              : []),
+          ]),
+          ...(vm.totals.subtotal !== null && vm.totals.discount !== null
+            ? [
+                amountRow('Zwischensumme', vm.totals.subtotal, { at: contentWidthMm, before: 8 }),
+                amountRow(vm.totals.discount.label, vm.totals.discount.amount, { at: contentWidthMm }),
+              ]
+            : []),
+          amountRow('Gesamtbetrag brutto', vm.totals.gross, { at: contentWidthMm, bold: true, before: vm.totals.discount !== null ? 2 : 8 }),
           ...vm.taxGroups.flatMap((g, i) => [
             amountRow(`davon ${g.rate} USt`, g.vat, { at: contentWidthMm * 0.75, before: i === 0 ? 8 : 0 }),
             amountRow('Rechnungsbetrag netto', g.net, { at: contentWidthMm * 0.75 }),

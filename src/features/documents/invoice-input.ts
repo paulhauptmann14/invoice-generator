@@ -1,6 +1,8 @@
 import type { InvoiceRecordWithItems } from '@/features/invoices/draft'
 import { parseIsoDate } from '@/lib/domain/dates'
 import { priceSchema, quantitySchema, vatRateSchema } from '@/lib/domain/input-schemas'
+import { discountSchema, invoiceDiscountIssue, itemDiscountIssue } from '@/features/invoices/schema'
+import { discountFromColumns } from '@/lib/domain/totals'
 import type { InvoiceInput, Recipient } from '@/lib/domain/view-model'
 
 const str = (v: unknown) => (typeof v === 'string' ? v : '')
@@ -30,6 +32,7 @@ export function inputFromInvoice(invoice: InvoiceRecordWithItems): InvoiceInput 
     recipient: recipientFrom(invoice.recipient),
     introText: invoice.intro_text,
     closingText: invoice.closing_text,
+    discount: discountFromColumns(invoice.discount_kind, invoice.discount_value),
     items: [...invoice.invoice_items]
       .sort((a, b) => a.position - b.position)
       .map((i) => ({
@@ -38,6 +41,7 @@ export function inputFromInvoice(invoice: InvoiceRecordWithItems): InvoiceInput 
         unit: i.unit,
         unitPriceGross: Number(i.unit_price_gross),
         vatRate: Number(i.vat_rate),
+        discount: discountFromColumns(i.discount_kind, i.discount_value),
       })),
   }
 }
@@ -69,8 +73,15 @@ export function inputFromPayload(payload: unknown, today: string): InvoiceInput 
     const price = priceSchema.safeParse(str(i.unitPriceGross))
     const rate = vatRateSchema.safeParse(str(i.vatRate))
     if (!quantity.success || !price.success || !rate.success) return []
-    return [{ description: str(i.description), quantity: quantity.data, unit: str(i.unit), unitPriceGross: price.data, vatRate: rate.data }]
+    const line = { quantity: quantity.data, unitPriceGross: price.data, vatRate: rate.data }
+    // A discount that could not be saved (unreadable, too high, on a non-positive line) is left out.
+    const parsedDiscount = discountSchema.safeParse(i.discount)
+    const discount = parsedDiscount.success && itemDiscountIssue({ ...line, discount: parsedDiscount.data }) === null ? parsedDiscount.data : null
+    return [{ description: str(i.description), unit: str(i.unit), ...line, discount }]
   })
+  const parsedInvoiceDiscount = discountSchema.safeParse(p.discount)
+  const discount =
+    parsedInvoiceDiscount.success && invoiceDiscountIssue(items, parsedInvoiceDiscount.data) === null ? parsedInvoiceDiscount.data : null
   return {
     number: str(p.number).trim(),
     issueDate,
@@ -80,6 +91,7 @@ export function inputFromPayload(payload: unknown, today: string): InvoiceInput 
     recipient: recipientFrom(p.recipient),
     introText: str(p.introText),
     closingText: str(p.closingText),
+    discount,
     items,
   }
 }

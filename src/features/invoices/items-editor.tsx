@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { RequiredMark } from '@/components/form/required-mark'
 import { VAT_RATES } from '@/lib/domain/input-schemas'
 import { formatEuro, toCents } from '@/lib/domain/money'
+import { DiscountControl } from './discount-control'
 import type { DraftAction, DraftItem, PickerArticle } from './draft'
 import { FormSection } from '@/components/form/form-section'
 
@@ -20,6 +21,8 @@ const GRID = '@4xl:grid @4xl:grid-cols-[minmax(0,1fr)_5.5rem_5.5rem_7.5rem_6rem_
 export function ItemsEditor({
   items,
   lineTotals,
+  lineDiscounts,
+  discountMessages,
   invalidKeys,
   articles,
   dispatch,
@@ -27,6 +30,9 @@ export function ItemsEditor({
 }: {
   items: DraftItem[]
   lineTotals: Map<string, number>
+  lineDiscounts: Map<string, number>
+  /** Live message per item key for a discount the server would reject; a server error wins. */
+  discountMessages: Map<string, string>
   invalidKeys: string[]
   articles: PickerArticle[]
   dispatch: React.Dispatch<DraftAction>
@@ -193,6 +199,20 @@ export function ItemsEditor({
                 <Button type="button" variant="ghost" size="icon" className="size-11 @4xl:size-8" aria-label={`Position ${n} entfernen`} onClick={() => remove(item, index)}>
                   <Trash2 aria-hidden />
                 </Button>
+              </div>
+
+              {/* Full-width row under the item fields; starts at the description column in the desktop grid. */}
+              <div role="group" aria-label={`Rabatt Position ${n}`} className="mt-3 @4xl:col-span-full @4xl:mt-0">
+                <DiscountControl
+                  idPrefix={`inv-items.${index}`}
+                  label="Rabatt"
+                  kind={item.discountKind}
+                  value={item.discountValue}
+                  deductionCents={lineDiscounts.get(item.key) ?? null}
+                  error={err('discount') ?? discountMessages.get(item.key)}
+                  onKindChange={(kind) => dispatch({ type: 'setItemDiscountKind', key: item.key, kind })}
+                  onValueChange={(value) => dispatch({ type: 'setItemDiscountValue', key: item.key, value })}
+                />
               </div>
             </li>
           )

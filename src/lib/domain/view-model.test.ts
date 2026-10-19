@@ -84,6 +84,7 @@ describe('buildInvoiceViewModel', () => {
       vatRate: '7 %',
       total: `49,80${NBSP}€`,
       line: `2 Pers. Buffet pro Person à 24,90${NBSP}€`,
+      discount: null,
     })
     expect(vm.items.map((i) => i.position)).toEqual([1, 2, 3])
   })
@@ -93,7 +94,7 @@ describe('buildInvoiceViewModel', () => {
       { rate: '7 %', net: `55,89${NBSP}€`, vat: `3,91${NBSP}€`, gross: `59,80${NBSP}€` },
       { rate: '19 %', net: `8,82${NBSP}€`, vat: `1,68${NBSP}€`, gross: `10,50${NBSP}€` },
     ])
-    expect(vm.totals).toEqual({ gross: `70,30${NBSP}€`, net: `64,71${NBSP}€`, vat: `5,59${NBSP}€` })
+    expect(vm.totals).toEqual({ gross: `70,30${NBSP}€`, net: `64,71${NBSP}€`, vat: `5,59${NBSP}€`, subtotal: null, discount: null })
   })
 
   test('texts with placeholders', () => {
@@ -134,6 +135,72 @@ describe('buildInvoiceViewModel', () => {
   test('custom footer with placeholders', () => {
     const theme = parseTheme({ texts: { footerColumns: ['Rechnung {Nr}', 'Danke!'] } })
     expect(buildInvoiceViewModel(input, company, theme).footerColumns).toEqual(['Rechnung 2026-0001', 'Danke!'])
+  })
+})
+
+describe('discounts', () => {
+  const MINUS = '\u2212'
+  const discounted: InvoiceInput = {
+    ...input,
+    closingText: 'Bitte {Betrag} überweisen.',
+    items: [
+      { description: 'Buffet', quantity: 20, unit: 'Pers.', unitPriceGross: 24.9, vatRate: 7, discount: { kind: 'percent', value: 10 } },
+      { description: 'Getränkepauschale', quantity: 20, unit: 'Pers.', unitPriceGross: 8, vatRate: 19 },
+    ],
+    discount: { kind: 'percent', value: 5 },
+  }
+  const vm = buildInvoiceViewModel(discounted, company, defaultTheme)
+
+  test('percent item discount line and discounted line total', () => {
+    expect(vm.items[0].discount).toBe(`abzüglich 10 % Rabatt (${MINUS}49,80${NBSP}€)`)
+    expect(vm.items[0].total).toBe(`448,20${NBSP}€`)
+    expect(vm.items[1].discount).toBeNull()
+  })
+
+  test('invoice discount rows', () => {
+    expect(vm.totals.subtotal).toBe(`608,20${NBSP}€`)
+    expect(vm.totals.discount).toEqual({ label: 'abzüglich 5 % Rabatt', amount: `${MINUS}30,41${NBSP}€` })
+    expect(vm.totals.gross).toBe(`577,79${NBSP}€`)
+    expect(vm.totals.net).toBe(`525,66${NBSP}€`)
+    expect(vm.totals.vat).toBe(`52,13${NBSP}€`)
+  })
+
+  test('tax groups come from the discounted totals', () => {
+    expect(vm.taxGroups).toEqual([
+      { rate: '7 %', net: `397,93${NBSP}€`, vat: `27,86${NBSP}€`, gross: `425,79${NBSP}€` },
+      { rate: '19 %', net: `127,73${NBSP}€`, vat: `24,27${NBSP}€`, gross: `152,00${NBSP}€` },
+    ])
+  })
+
+  test('{Betrag} is the total after all discounts', () => {
+    expect(vm.closing).toBe(`Bitte 577,79${NBSP}€ überweisen.`)
+  })
+
+  test('amount discounts read "abzüglich Rabatt"', () => {
+    const amount = buildInvoiceViewModel(
+      {
+        ...discounted,
+        items: [{ ...discounted.items[0], discount: { kind: 'amount', value: 50 } }, discounted.items[1]],
+        discount: { kind: 'amount', value: 30 },
+      },
+      company,
+      defaultTheme,
+    )
+    expect(amount.items[0].discount).toBe(`abzüglich Rabatt (${MINUS}50,00${NBSP}€)`)
+    expect(amount.totals.discount).toEqual({ label: 'abzüglich Rabatt', amount: `${MINUS}30,00${NBSP}€` })
+    expect(amount.totals.subtotal).toBe(`608,00${NBSP}€`)
+  })
+
+  test('fractional percentages use the VAT rate format', () => {
+    const frac = buildInvoiceViewModel({ ...discounted, discount: { kind: 'percent', value: '12,5' } }, company, defaultTheme)
+    expect(frac.totals.discount?.label).toBe('abzüglich 12,5 % Rabatt')
+  })
+
+  test('null discounts behave like none', () => {
+    const none = buildInvoiceViewModel({ ...input, discount: null, items: input.items.map((i) => ({ ...i, discount: null })) }, company, defaultTheme)
+    expect(none).toEqual(buildInvoiceViewModel(input, company, defaultTheme))
+    expect(none.totals.subtotal).toBeNull()
+    expect(none.totals.discount).toBeNull()
   })
 })
 

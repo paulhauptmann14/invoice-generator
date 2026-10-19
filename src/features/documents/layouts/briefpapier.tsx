@@ -1,5 +1,5 @@
 import { Document, Image, Page, StyleSheet, Text, View } from '@react-pdf/renderer'
-import type { Theme } from '@/lib/domain/theme'
+import { DOCUMENT_COLORS, type Theme } from '@/lib/domain/theme'
 import type { InvoiceViewModel } from '@/lib/domain/view-model'
 import { din5008, mm } from '../din5008'
 import type { DocumentLogo } from '../logo'
@@ -66,7 +66,10 @@ export function BriefpapierInvoice({ vm, theme, fontFamily, logo }: Props) {
     row: { flexDirection: 'row', justifyContent: 'space-between', gap: mm(6) },
     rowText: { flexGrow: 1, flexShrink: 1 },
     amount: { width: mm(30), textAlign: 'right' },
+    itemDiscount: { paddingLeft: mm(6), fontSize: base - 1.5, color: DOCUMENT_COLORS.muted },
     grandTotal: { flexDirection: 'row', justifyContent: 'space-between', marginTop: mm(8), fontWeight: 700, color: c.primary },
+    subtotals: { marginTop: mm(8) },
+    grandTotalAfterDiscount: { marginTop: mm(2) },
     taxes: { marginTop: mm(8), width: mm(contentWidthMm * 0.75) },
     payment: { marginTop: mm(16) },
     banks: { marginTop: mm(4) },
@@ -106,15 +109,30 @@ export function BriefpapierInvoice({ vm, theme, fontFamily, logo }: Props) {
 
           <View style={s.items}>
             {vm.items.map((item) => (
-              <View key={item.position} style={s.row} wrap={false}>
-                <Text style={s.rowText}>{item.line}</Text>
-                <Text style={s.amount}>{item.total}</Text>
+              <View key={item.position} wrap={false}>
+                <View style={s.row}>
+                  <Text style={s.rowText}>{item.line}</Text>
+                  <Text style={s.amount}>{item.total}</Text>
+                </View>
+                {item.discount !== null && <Text style={s.itemDiscount}>{item.discount}</Text>}
               </View>
             ))}
           </View>
 
           <View wrap={false}>
-            <View style={s.grandTotal}>
+            {vm.totals.subtotal !== null && vm.totals.discount !== null && (
+              <View style={s.subtotals}>
+                <View style={s.row}>
+                  <Text>Zwischensumme</Text>
+                  <Text style={s.amount}>{vm.totals.subtotal}</Text>
+                </View>
+                <View style={s.row}>
+                  <Text>{vm.totals.discount.label}</Text>
+                  <Text style={s.amount}>{vm.totals.discount.amount}</Text>
+                </View>
+              </View>
+            )}
+            <View style={vm.totals.discount !== null ? [s.grandTotal, s.grandTotalAfterDiscount] : s.grandTotal}>
               <Text>Gesamtbetrag brutto</Text>
               <Text style={s.amount}>{vm.totals.gross}</Text>
             </View>

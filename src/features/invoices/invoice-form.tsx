@@ -15,6 +15,7 @@ import { RequiredMark } from '@/components/form/required-mark'
 import { addDays, formatDateDe } from '@/lib/domain/dates'
 import { type InvoiceFormState, saveInvoice } from './actions'
 import { createDraftReducer, draftTotals, type InvoiceDraft, type NumberContext, type PickerArticle, type PickerCustomer, recipientNotice, toPayload } from './draft'
+import { DiscountControl } from './discount-control'
 import { useReportDirty } from './editor-context'
 import { ItemsEditor } from './items-editor'
 import { PreviewToggle, usePreviewMode, WithPreview } from './with-preview'
@@ -44,7 +45,7 @@ export function InvoiceForm({
   const rangeChoices = numberContext.ranges.filter((r) => !r.archived || r.id === draft.numberRangeId)
   const [state, action, pending] = useActionState(saveInvoice.bind(null, tenant.id, id), initialState)
   const formRef = useRef<HTMLFormElement>(null)
-  const { totals, invalidKeys, lineTotals } = draftTotals(draft)
+  const { totals, invalidKeys, lineTotals, lineDiscounts, invoiceDiscount, discountMessages, invoiceDiscountMessage } = draftTotals(draft)
   const notice = recipientNotice(draft, totals.grossCents)
   // Baseline from the first render: a router.refresh() passes a new (equal) initialDraft object, which must not
   // count as a change. After a save the page remounts the form (key), which resets the baseline.
@@ -180,8 +181,23 @@ export function InvoiceForm({
         </p>
       )}
 
-      <ItemsEditor items={draft.items} lineTotals={lineTotals} invalidKeys={invalidKeys} articles={articles} dispatch={dispatch} errors={err} />
-      <TotalsPanel totals={totals} />
+      <ItemsEditor items={draft.items} lineTotals={lineTotals} lineDiscounts={lineDiscounts} discountMessages={discountMessages} invalidKeys={invalidKeys} articles={articles} dispatch={dispatch} errors={err} />
+      <div className="space-y-4">
+        <div className="ml-auto w-full max-w-sm">
+          <DiscountControl
+            idPrefix="inv"
+            inputId="inv-discount"
+            label="Rabatt auf die Rechnung"
+            kind={draft.discountKind}
+            value={draft.discountValue}
+            deductionCents={totals.invoiceDiscountCents}
+            error={err.discount ?? invoiceDiscountMessage ?? undefined}
+            onKindChange={(kind) => dispatch({ type: 'setInvoiceDiscountKind', kind })}
+            onValueChange={(value) => dispatch({ type: 'setInvoiceDiscountValue', value })}
+          />
+        </div>
+        <TotalsPanel totals={totals} invoiceDiscount={invoiceDiscount} />
+      </div>
 
       <FormSection title="Texte">
         <div className="space-y-1.5">

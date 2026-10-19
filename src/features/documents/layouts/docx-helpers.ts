@@ -49,6 +49,8 @@ export type Column = {
   pct: number
   align: (typeof AlignmentType)[keyof typeof AlignmentType]
   value: (item: InvoiceViewModel['items'][number]) => string
+  /** Optional second, smaller line below the value (item discount in the description column). */
+  detail?: (item: InvoiceViewModel['items'][number]) => string | null
 }
 
 /** Columns of the items table (Klassisch, Kompakt, Modern) in the same order and widths as the PDF. */
@@ -68,6 +70,7 @@ export function itemColumns(theme: Theme): Column[] {
     pct: 100 - others.reduce((sum, col) => sum + col.pct, 0),
     align: AlignmentType.LEFT,
     value: (i) => i.description,
+    detail: (i) => i.discount,
   }
   // Description is second when the position column is shown, otherwise first (same order as the PDF).
   return theme.table.showPosition ? [others[0], description, ...others.slice(1)] : [description, ...others]

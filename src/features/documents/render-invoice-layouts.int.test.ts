@@ -13,6 +13,7 @@ const { renderInvoiceDocx } = await import('./render-invoice-docx')
 const klassisch = themeSchema.parse({ layout: 'klassisch' })
 const kompakt = themeSchema.parse({ layout: 'kompakt' })
 const modern = themeSchema.parse({ layout: 'modern', colors: { accent: '#1F5F74' } })
+const briefpapier = themeSchema.parse({ layout: 'briefpapier' })
 
 const company = parseCompany({
   name: 'Gasthaus & Metzgerei Beispiel',
@@ -167,5 +168,65 @@ describe('layout "modern"', () => {
     expect((await renderInvoicePdf(vm, modern, { logo })).toString('latin1')).toContain('/Subtype /Image')
     const withLogo = await docxParts(await renderInvoiceDocx(vm, modern, { logo }))
     expect(withLogo.names.some((n) => n.startsWith('word/media/'))).toBe(true)
+  })
+})
+
+// Discounts (spec "Rabatte", section 7): the layouts print the view-model strings only.
+const discounted = (): InvoiceInput => ({
+  ...input(0),
+  items: [
+    { description: 'Buffet', quantity: 20, unit: 'Pers.', unitPriceGross: 24.9, vatRate: 7, discount: { kind: 'percent', value: 10 } },
+    { description: 'Getränkepauschale', quantity: 20, unit: 'Pers.', unitPriceGross: 8, vatRate: 19 },
+  ],
+  discount: { kind: 'percent', value: 5 },
+})
+const flat = (t: string) => t.replace(/\s+/g, ' ')
+
+describe.each([
+  ['klassisch', klassisch],
+  ['kompakt', kompakt],
+  ['modern', modern],
+  ['briefpapier', briefpapier],
+] as const)('discounts in layout "%s"', (_name, theme) => {
+  test('item discount, subtotal and invoice discount rows in reading order (PDF and Word)', async () => {
+    const vm = buildInvoiceViewModel(discounted(), company, theme)
+    const pdf = flat((await pdfPages(await renderInvoicePdf(vm, theme))).text)
+    const word = flat((await docxParts(await renderInvoiceDocx(vm, theme))).docText)
+    for (const t of [pdf, word]) {
+      const order = ['abzüglich 10 % Rabatt (\u221249,80 €)', 'Zwischensumme', '608,20 €', 'abzüglich 5 % Rabatt', '\u221230,41 €', 'Gesamtbetrag', '577,79 €']
+      const positions = order.map((s) => t.indexOf(s))
+      expect(positions.every((p) => p >= 0)).toBe(true)
+      expect(positions).toEqual([...positions].sort((a, b) => a - b))
+      // The subtotal and discount rows come before the VAT rows.
+      const vatRow = t.search(/MwSt\. 7 %|davon 7 %/)
+      expect(vatRow).toBeGreaterThan(-1)
+      expect(t.indexOf('\u221230,41 €')).toBeLessThan(vatRow)
+      expect(t).toContain('448,20 €')
+    }
+  })
+
+  test('amount discounts read "abzüglich Rabatt"', async () => {
+    const amount: InvoiceInput = {
+      ...discounted(),
+      items: [{ ...discounted().items[0], discount: { kind: 'amount', value: 50 } }, discounted().items[1]],
+      discount: { kind: 'amount', value: 30 },
+    }
+    const vm = buildInvoiceViewModel(amount, company, theme)
+    const pdf = flat((await pdfPages(await renderInvoicePdf(vm, theme))).text)
+    const word = flat((await docxParts(await renderInvoiceDocx(vm, theme))).docText)
+    for (const t of [pdf, word]) {
+      expect(t).toContain('abzüglich Rabatt (\u221250,00 €)')
+      expect(t).toContain('\u221230,00 €')
+    }
+  })
+
+  test('without discounts there are no extra rows', async () => {
+    const vm = buildInvoiceViewModel(input(2), company, theme)
+    const pdf = (await pdfPages(await renderInvoicePdf(vm, theme))).text
+    const word = (await docxParts(await renderInvoiceDocx(vm, theme))).docText
+    for (const t of [pdf, word]) {
+      expect(t).not.toContain('Rabatt')
+      expect(t).not.toContain('Zwischensumme')
+    }
   })
 })

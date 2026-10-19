@@ -73,14 +73,14 @@ isOneToOne: false
                   ]
                 },"invoice_items": {
                   Row: {
-                    "article_id": string | null,"description": string,"id": string,"invoice_id": string,"position": number,"quantity": number,"tenant_id": string,"unit": string,"unit_price_gross": number,"vat_rate": number
+                    "article_id": string | null,"description": string,"discount_kind": string | null,"discount_value": number | null,"id": string,"invoice_id": string,"position": number,"quantity": number,"tenant_id": string,"unit": string,"unit_price_gross": number,"vat_rate": number
                   }
                   ComputedFields: never
                   Insert: {
-                    "article_id"?: string | null,"description": string,"id"?: string,"invoice_id": string,"position": number,"quantity": number,"tenant_id": string,"unit"?: string,"unit_price_gross": number,"vat_rate": number
+                    "article_id"?: string | null,"description": string,"discount_kind"?: string | null,"discount_value"?: number | null,"id"?: string,"invoice_id": string,"position": number,"quantity": number,"tenant_id": string,"unit"?: string,"unit_price_gross": number,"vat_rate": number
                   }
                   Update: {
-                    "article_id"?: string | null,"description"?: string,"id"?: string,"invoice_id"?: string,"position"?: number,"quantity"?: number,"tenant_id"?: string,"unit"?: string,"unit_price_gross"?: number,"vat_rate"?: number
+                    "article_id"?: string | null,"description"?: string,"discount_kind"?: string | null,"discount_value"?: number | null,"id"?: string,"invoice_id"?: string,"position"?: number,"quantity"?: number,"tenant_id"?: string,"unit"?: string,"unit_price_gross"?: number,"vat_rate"?: number
                   }
                   Relationships: [
                     {
@@ -105,14 +105,14 @@ isOneToOne: false
                   ]
                 },"invoices": {
                   Row: {
-                    "closing_text": string | null,"created_at": string,"created_by": string | null,"customer_id": string | null,"due_date": string | null,"id": string,"intro_text": string | null,"issue_date": string,"number": string,"number_range_id": string | null,"payment_days": number | null,"recipient": NonNullable<Json>,"search_text": string | null,"service_date_from": string,"service_date_to": string | null,"tenant_id": string,"updated_at": string
+                    "closing_text": string | null,"created_at": string,"created_by": string | null,"customer_id": string | null,"discount_kind": string | null,"discount_value": number | null,"due_date": string | null,"id": string,"intro_text": string | null,"issue_date": string,"number": string,"number_range_id": string | null,"payment_days": number | null,"recipient": NonNullable<Json>,"search_text": string | null,"service_date_from": string,"service_date_to": string | null,"tenant_id": string,"updated_at": string
                   }
                   ComputedFields: never
                   Insert: {
-                    "closing_text"?: string | null,"created_at"?: string,"created_by"?: string | null,"customer_id"?: string | null,"due_date"?: never,"id"?: string,"intro_text"?: string | null,"issue_date"?: string,"number": string,"number_range_id"?: string | null,"payment_days"?: number | null,"recipient": NonNullable<Json>,"search_text"?: never,"service_date_from": string,"service_date_to"?: string | null,"tenant_id": string,"updated_at"?: string
+                    "closing_text"?: string | null,"created_at"?: string,"created_by"?: string | null,"customer_id"?: string | null,"discount_kind"?: string | null,"discount_value"?: number | null,"due_date"?: never,"id"?: string,"intro_text"?: string | null,"issue_date"?: string,"number": string,"number_range_id"?: string | null,"payment_days"?: number | null,"recipient": NonNullable<Json>,"search_text"?: never,"service_date_from": string,"service_date_to"?: string | null,"tenant_id": string,"updated_at"?: string
                   }
                   Update: {
-                    "closing_text"?: string | null,"created_at"?: string,"created_by"?: string | null,"customer_id"?: string | null,"due_date"?: never,"id"?: string,"intro_text"?: string | null,"issue_date"?: string,"number"?: string,"number_range_id"?: string | null,"payment_days"?: number | null,"recipient"?: NonNullable<Json>,"search_text"?: never,"service_date_from"?: string,"service_date_to"?: string | null,"tenant_id"?: string,"updated_at"?: string
+                    "closing_text"?: string | null,"created_at"?: string,"created_by"?: string | null,"customer_id"?: string | null,"discount_kind"?: string | null,"discount_value"?: number | null,"due_date"?: never,"id"?: string,"intro_text"?: string | null,"issue_date"?: string,"number"?: string,"number_range_id"?: string | null,"payment_days"?: number | null,"recipient"?: NonNullable<Json>,"search_text"?: never,"service_date_from"?: string,"service_date_to"?: string | null,"tenant_id"?: string,"updated_at"?: string
                   }
                   Relationships: [
                     {

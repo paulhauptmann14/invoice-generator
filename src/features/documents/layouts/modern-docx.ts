@@ -42,7 +42,7 @@ export function buildModernDocx(vm: InvoiceViewModel, theme: Theme, fontFamily: 
   const columns = itemColumns(theme)
   const widthOf = (col: Column) => twip((contentWidthMm * col.pct) / 100)
 
-  const cell = (col: Column, text: string, header: boolean) =>
+  const cell = (col: Column, text: string, header: boolean, detail?: string | null) =>
     new TableCell({
       width: { size: widthOf(col), type: WidthType.DXA },
       margins: { top: 60, bottom: 60, left: 0, right: 80 },
@@ -69,6 +69,15 @@ export function buildModernDocx(vm: InvoiceViewModel, theme: Theme, fontFamily: 
             }),
           ],
         }),
+        ...(detail
+          ? [
+              new Paragraph({
+                alignment: col.align,
+                spacing: { ...lineHeight(base - 1.5, 1.35), after: 0 },
+                children: [new TextRun({ text: detail, size: halfPoints(base - 1.5), color: MUTED })],
+              }),
+            ]
+          : []),
       ],
     })
   // No zebra rows in "Modern" (spec 3d), whatever the theme says.
@@ -87,7 +96,7 @@ export function buildModernDocx(vm: InvoiceViewModel, theme: Theme, fontFamily: 
         (item) =>
           new TableRow({
             cantSplit: true,
-            children: columns.map((col) => cell(col, col.value(item), false)),
+            children: columns.map((col) => cell(col, col.value(item), false, col.detail?.(item))),
           }),
       ),
     ],
@@ -129,6 +138,9 @@ export function buildModernDocx(vm: InvoiceViewModel, theme: Theme, fontFamily: 
     width: { size: twip(contentWidthMm / 2), type: WidthType.DXA },
     borders: NO_BORDERS,
     rows: [
+      ...(vm.totals.subtotal !== null && vm.totals.discount !== null
+        ? [totalsRow('Zwischensumme', vm.totals.subtotal), totalsRow(vm.totals.discount.label, vm.totals.discount.amount)]
+        : []),
       ...vm.taxGroups.flatMap((g) => [totalsRow(`Nettobetrag ${g.rate}`, g.net), totalsRow(`MwSt. ${g.rate}`, g.vat)]),
       totalsRow('Gesamtbetrag', vm.totals.gross, true),
     ],

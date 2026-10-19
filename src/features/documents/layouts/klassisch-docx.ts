@@ -33,6 +33,8 @@ export function buildKlassischDocx(vm: InvoiceViewModel, theme: Theme, fontFamil
   const c = theme.colors
   const base = theme.font.baseSizePt
   const rowSize = compact ? Math.max(7, base - 1) : base
+  // Item discount line: smaller than the row, but never below 6.5 pt (legible in Kompakt).
+  const detailSize = Math.max(6.5, rowSize - 1.5)
   const headingSize = compact ? Math.max(10, theme.font.headingSizePt * 0.75) : theme.font.headingSizePt
   const contentWidthMm = PAGE.widthMm - page.marginLeftMm - page.marginRightMm
   const bodyTopMm = din.addressTopMm + din.addressHeightMm + 8.46
@@ -40,7 +42,7 @@ export function buildKlassischDocx(vm: InvoiceViewModel, theme: Theme, fontFamil
   const columns = itemColumns(theme)
   const widthOf = (col: Column) => twip((contentWidthMm * col.pct) / 100)
 
-  const cell = (col: Column, text: string, opts: { header?: boolean; zebra?: boolean }) =>
+  const cell = (col: Column, text: string, opts: { header?: boolean; zebra?: boolean; detail?: string | null }) =>
     new TableCell({
       width: { size: widthOf(col), type: WidthType.DXA },
       margins: compact ? { top: 20, bottom: 20, left: 80, right: 80 } : { top: 60, bottom: 60, left: 80, right: 80 },
@@ -67,6 +69,15 @@ export function buildKlassischDocx(vm: InvoiceViewModel, theme: Theme, fontFamil
           spacing: compact ? { ...lineHeight(rowSize, 1.25), after: 0 } : undefined,
           children: [new TextRun({ text, bold: opts.header, size: compact ? halfPoints(rowSize) : undefined, color: opts.header ? hex(c.primary) : undefined })],
         }),
+        ...(opts.detail
+          ? [
+              new Paragraph({
+                alignment: col.align,
+                spacing: { ...lineHeight(detailSize, compact ? 1.25 : 1.35), after: 0 },
+                children: [new TextRun({ text: opts.detail, size: halfPoints(detailSize), color: hex(DOCUMENT_COLORS.muted) })],
+              }),
+            ]
+          : []),
       ],
     })
 
@@ -79,7 +90,7 @@ export function buildKlassischDocx(vm: InvoiceViewModel, theme: Theme, fontFamil
       new TableRow({ tableHeader: true, cantSplit: true, children: columns.map((col) => cell(col, col.label, { header: true })) }),
       ...vm.items.map(
         (item, i) =>
-          new TableRow({ cantSplit: true, children: columns.map((col) => cell(col, col.value(item), { zebra: c.zebra && i % 2 === 1 })) }),
+          new TableRow({ cantSplit: true, children: columns.map((col) => cell(col, col.value(item), { zebra: c.zebra && i % 2 === 1, detail: col.detail?.(item) })) }),
       ),
     ],
   })
@@ -106,6 +117,9 @@ export function buildKlassischDocx(vm: InvoiceViewModel, theme: Theme, fontFamil
     width: { size: twip(contentWidthMm / 2), type: WidthType.DXA },
     borders: NO_BORDERS,
     rows: [
+      ...(vm.totals.subtotal !== null && vm.totals.discount !== null
+        ? [totalsRow('Zwischensumme', vm.totals.subtotal), totalsRow(vm.totals.discount.label, vm.totals.discount.amount)]
+        : []),
       ...vm.taxGroups.flatMap((g) => [totalsRow(`Nettobetrag ${g.rate}`, g.net), totalsRow(`MwSt. ${g.rate}`, g.vat)]),
       totalsRow('Gesamtbetrag', vm.totals.gross, true),
     ],

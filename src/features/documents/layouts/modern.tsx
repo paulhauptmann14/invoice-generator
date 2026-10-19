@@ -73,6 +73,7 @@ export function ModernInvoice({ vm, theme, fontFamily, logo }: Props) {
     tr: { flexDirection: 'row', paddingVertical: 4, borderBottomWidth: 0.5, borderBottomColor: DOCUMENT_COLORS.rule },
     colPos: { width: '7%' },
     colDesc: { flexGrow: 1, flexBasis: 0, paddingRight: 6 },
+    itemDiscount: { fontSize: base - 1.5, color: DOCUMENT_COLORS.muted },
     colQty: { width: '9%', textAlign: 'right' },
     colUnit: { width: '9%', paddingLeft: 8 },
     colPrice: { width: '15%', textAlign: 'right' },
@@ -186,7 +187,10 @@ export function ModernInvoice({ vm, theme, fontFamily, logo }: Props) {
             {vm.items.map((item) => (
               <View key={item.position} style={s.tr} wrap={false}>
                 {t.showPosition && <Text style={s.colPos}>{item.position}</Text>}
-                <Text style={s.colDesc}>{item.description}</Text>
+                <View style={s.colDesc}>
+                  <Text>{item.description}</Text>
+                  {item.discount !== null && <Text style={s.itemDiscount}>{item.discount}</Text>}
+                </View>
                 <Text style={s.colQty}>{item.quantity}</Text>
                 {t.showUnit && <Text style={s.colUnit}>{item.unit}</Text>}
                 <Text style={s.colPrice}>{item.unitPrice}</Text>
@@ -197,6 +201,18 @@ export function ModernInvoice({ vm, theme, fontFamily, logo }: Props) {
           </View>
 
           <View style={s.totals} wrap={false}>
+            {vm.totals.subtotal !== null && vm.totals.discount !== null && (
+              <View>
+                <View style={s.totalRow}>
+                  <Text>Zwischensumme</Text>
+                  <Text>{vm.totals.subtotal}</Text>
+                </View>
+                <View style={s.totalRow}>
+                  <Text>{vm.totals.discount.label}</Text>
+                  <Text>{vm.totals.discount.amount}</Text>
+                </View>
+              </View>
+            )}
             {vm.taxGroups.map((g) => (
               <View key={g.rate}>
                 <View style={s.totalRow}>
