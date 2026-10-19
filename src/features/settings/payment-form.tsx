@@ -47,13 +47,12 @@ export function PaymentForm({ initial }: { initial: PaymentFormInput }) {
           {accounts.length === 0 && <p className="surface px-4 py-4 text-sm text-muted-foreground sm:px-6">Noch keine Bankverbindung hinterlegt.</p>}
           {accounts.map((_, index) => (
             <fieldset key={index} className="surface space-y-5 p-4 sm:p-6">
-              <div className="flex items-center justify-between gap-3">
-                <legend className="type-headline float-left">Bankverbindung {index + 1}</legend>
-                <Button type="button" variant="ghost" className="gap-2 text-muted-foreground" onClick={() => removeAccount(index)} aria-label={`Bankverbindung ${index + 1} entfernen`}>
-                  <Trash2 aria-hidden className="size-4" />
-                  Entfernen
-                </Button>
-              </div>
+              {/* The legend must be the fieldset's first child to name the group; the remove button floats beside it. */}
+              <legend className="type-headline float-left flex min-h-11 items-center md:min-h-9">Bankverbindung {index + 1}</legend>
+              <Button type="button" variant="ghost" className="float-right gap-2 text-muted-foreground" onClick={() => removeAccount(index)} aria-label={`Bankverbindung ${index + 1} entfernen`}>
+                <Trash2 aria-hidden className="size-4" />
+                Entfernen
+              </Button>
               <div className="clear-both grid gap-5 @lg:grid-cols-2">
                 <TextField form={form} path={`bankAccounts.${index}.bankName`} label="Bank" autoComplete="off" />
                 <TextField form={form} path={`bankAccounts.${index}.accountNumber`} label="Kontonummer" autoComplete="off" hint="Optional, nur wenn sie auf der Rechnung stehen soll." />

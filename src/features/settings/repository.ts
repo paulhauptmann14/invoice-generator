@@ -51,7 +51,8 @@ async function updateSettings(
   tenantId: string,
   values: { company?: Company; theme?: Theme; filename_template?: string; default_payment_days?: number | null },
 ) {
-  const { error } = await supabase
+  // select(…): an update that matches no row must not report success.
+  const { data, error } = await supabase
     .from('settings')
     .update({
       ...values,
@@ -60,14 +61,17 @@ async function updateSettings(
       theme: values.theme as NonNullable<Json> | undefined,
     })
     .eq('tenant_id', tenantId)
+    .select('tenant_id')
   if (error) throw new Error(`Saving settings failed: ${error.message}`)
+  if (data.length === 0) throw new Error('Saving settings failed: no settings row for this tenant')
 }
 
 /** The tenant name lives in tenants.name, the rest of the tab in settings.company. */
 export async function saveCompany(supabase: Client, tenantId: string, form: CompanyForm): Promise<void> {
   const current = await loadSettings(supabase, tenantId)
-  const { error } = await supabase.from('tenants').update({ name: form.tenantName }).eq('id', tenantId)
+  const { data, error } = await supabase.from('tenants').update({ name: form.tenantName }).eq('id', tenantId).select('id')
   if (error) throw new Error(`Renaming tenant failed: ${error.message}`)
+  if (data.length === 0) throw new Error('Renaming tenant failed: tenant not found')
   await updateSettings(supabase, tenantId, { company: applyCompanyForm(current.company, form) })
 }
 
@@ -113,13 +117,15 @@ export async function updateNumberRange(supabase: Client, tenantId: string, id: 
   return data.length > 0 ? { ok: true } : { ok: false, reason: 'not-found' }
 }
 
-export async function setNumberRangeArchived(supabase: Client, tenantId: string, id: string, archived: boolean): Promise<void> {
-  const { error } = await supabase
+export async function setNumberRangeArchived(supabase: Client, tenantId: string, id: string, archived: boolean): Promise<RangeResult> {
+  const { data, error } = await supabase
     .from('number_ranges')
     .update({ archived_at: archived ? new Date().toISOString() : null })
     .eq('id', id)
     .eq('tenant_id', tenantId)
+    .select('id')
   if (error) throw new Error(`Archiving number range failed: ${error.message}`)
+  return data.length > 0 ? { ok: true } : { ok: false, reason: 'not-found' }
 }
 
 export async function setDefaultNumberRange(supabase: Client, tenantId: string, id: string): Promise<RangeResult> {

@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { parseCompany } from './company'
 import { defaultTheme, parseTheme } from './theme'
-import { buildInvoiceViewModel, type InvoiceInput } from './view-model'
+import { buildInvoiceViewModel, cleanDocumentText, type InvoiceInput } from './view-model'
 
 const NBSP = ' '
 
@@ -259,5 +259,37 @@ describe('fields for the "Briefpapier" layout', () => {
       { bank: 'Volksbank', rows: [['Kto.-Nr.', '4711'], ['IBAN', 'DE02 1203 0000 0000 2020 51'], ['BIC', 'BYLADEM1001']] },
       { bank: 'Sparkasse', rows: [['IBAN', 'DE02 5001 0517 0137 0750 30']] },
     ])
+  })
+})
+
+describe('buildInvoiceViewModel – text cleaning', () => {
+  const dirty: InvoiceInput = {
+    ...input,
+    number: '2026\u0000-0001',
+    introText: 'Hallo\u0007 {Kunde}\r\nZweite Zeile',
+    closingText: 'Danke\u001F\u000C!',
+    recipient: { ...input.recipient, name: 'Müller\u0001 GmbH', city: 'Ort\u0008' },
+    items: [{ description: 'Zeile eins\u000BZeile zwei\u0002', quantity: 1, unit: 'St\u0003k.', unitPriceGross: 10, vatRate: 7 }],
+  }
+  const vm = buildInvoiceViewModel(dirty, parseCompany({ ...company, name: 'Gast\u0004haus' }), defaultTheme)
+  const CONTROL = /[\x00-\x08\x0B\x0C\x0E-\x1F]/
+
+  test('removes XML-invalid control characters from every string', () => {
+    expect(JSON.stringify(vm)).not.toMatch(CONTROL)
+    expect(vm.number).toBe('2026-0001')
+    expect(vm.companyName).toBe('Gasthaus')
+    expect(vm.recipientLines[0]).toBe('Müller GmbH')
+    expect(vm.closing).toBe('Danke!')
+    expect(vm.items[0].unit).toBe('Stk.')
+  })
+
+  test('turns the Word soft line break and CRLF into a newline', () => {
+    expect(vm.items[0].description).toBe('Zeile eins\nZeile zwei')
+    expect(vm.items[0].line).toBe('1 Stk. Zeile eins\nZeile zwei à 10,00 €')
+    expect(vm.intro).toBe('Hallo Müller GmbH\nZweite Zeile')
+  })
+
+  test('leaves clean text untouched', () => {
+    expect(cleanDocumentText('Şahin Łukasz\tTab\nZeile')).toBe('Şahin Łukasz\tTab\nZeile')
   })
 })

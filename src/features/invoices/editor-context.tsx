@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useState } from 'react'
+import { useReportUnsaved } from '@/components/unsaved-changes'
 
 type EditorState = { dirty: boolean; setDirty: (dirty: boolean) => void }
 
@@ -17,8 +18,9 @@ export function useEditorDirty(): boolean {
   return useContext(EditorContext)?.dirty ?? false
 }
 
-/** Called by the form; a no-op outside a provider. */
+/** Called by the form: shares the state with the export panel and the in-app navigation guard. */
 export function useReportDirty(dirty: boolean) {
+  useReportUnsaved(dirty)
   const setDirty = useContext(EditorContext)?.setDirty
   useEffect(() => {
     setDirty?.(dirty)

@@ -1,7 +1,7 @@
 # Operations guide (self-hosted)
 
 How to run the app on your own machine once it is installed ([Install](../../README.md#install) in the main README):
-certificates, everyday commands, registration, backups, restore and moving, security and troubleshooting.
+certificates, everyday commands, registration, backups, restore, a failed update, moving, security and troubleshooting.
 
 All commands run in `~/docker/invoice-generator/deploy/self-hosted` unless a block says otherwise.
 
@@ -12,6 +12,7 @@ All commands run in `~/docker/invoice-generator/deploy/self-hosted` unless a blo
 - [Registration](#registration)
 - [Backups](#backups)
 - [Restore](#restore)
+- [Update went wrong](#update-went-wrong)
 - [Move to another machine](#move-to-another-machine)
 - [Security](#security)
 - [Troubleshooting](#troubleshooting)
@@ -46,14 +47,14 @@ If a device cannot resolve `<name>.local` (some Windows PCs), add a DNS entry fo
 
 | Command | What it does |
 |---|---|
-| `scripts/status` | Containers, disk space, whether backups are on, the newest backup |
-| `scripts/update` | Backup (only if backups are on), `git pull`, new app image, migrations, restart |
+| `scripts/status` | Containers, disk space, whether backups are on, the newest backup, warnings about missing or failed backups |
+| `scripts/update` | Backup (also with backups off), `git pull`, new app image, migrations, restart, reload of the Caddy configuration |
 | `scripts/backup` | Backup now, also when automatic backups are off |
 | `scripts/set-password <email>` | New password for an account (the server sends no e-mail) |
 | `scripts/cert` | Export the root certificate ([Trust the certificate](#trust-the-certificate)) |
 | `scripts/restore <file>` | Replace all data with a backup ([Restore](#restore)) |
 
-With backups off, run `scripts/backup` by hand before `scripts/update`.
+`scripts/update --no-backup` skips the backup before the update, `--no-pull` skips `git pull`.
 
 ## Registration
 
@@ -67,8 +68,13 @@ docker compose up -d
 
 ## Backups
 
-Backups are **off by default** (`BACKUPS=off` in `.env`). Off means: the nightly timer does nothing, and `update` and
-`restore` skip their automatic backup or safety backup. `scripts/backup` always works by hand.
+Backups are **off by default** (`BACKUPS=off` in `.env`). Off means only: the nightly timer does nothing. `scripts/backup`
+always works by hand, and `update` and `restore` still save a local copy of your data before they change anything:
+
+- `update` writes `rechnungen-preupdate-<date>.tar[.age]` into the backup directory (`./backups` by default, on the
+  server's own disk) and keeps the newest two. With backups on, it makes a regular backup instead.
+- `restore` writes `rechnungen-safety-<date>.tar[.age]` there and never deletes it. Delete old ones by hand when you no
+  longer need them: `scripts/status` lists them.
 
 A backup is one file `rechnungen-YYYY-MM-DD-HHMM.tar` with the database data, stored files, the certificate authority and
 `.env`. The newest 14 are kept, plus the newest of each of the last 12 months.
@@ -78,7 +84,12 @@ A backup is one file `rechnungen-YYYY-MM-DD-HHMM.tar` with the database data, st
 Do this once you have an external disk.
 
 1. Mount the disk (ext4 recommended: exFAT, NTFS and FAT ignore file permissions) and create a directory on it that belongs
-   to your user:
+   to your user. Mount it permanently with a line like this in `/etc/fstab` (find the UUID with `lsblk -f`). Keep `nofail`:
+   without it the Pi does not boot when the disk is unplugged.
+
+   ```text
+   UUID=<uuid-of-the-disk>  /mnt/backup  ext4  defaults,nofail  0  2
+   ```
 
    ```bash
    sudo mkdir -p /mnt/backup/rechnungen && sudo chown "$USER": /mnt/backup/rechnungen
@@ -109,10 +120,11 @@ Do this once you have an external disk.
 
 3. Set `BACKUPS=on` in `.env`.
 
-4. Install the nightly timer (03:15):
+4. Install the nightly timer (03:15) and the unit that marks a failed run (run this again after an update changed the files
+   in `systemd/`):
 
    ```bash
-   sed -e "s|@USER@|$USER|" -e "s|@REPO_DIR@|$HOME/docker/invoice-generator|" systemd/rechnungen-backup.service | sudo tee /etc/systemd/system/rechnungen-backup.service && sudo cp systemd/rechnungen-backup.timer /etc/systemd/system/
+   for unit in rechnungen-backup rechnungen-backup-failed; do sed -e "s|@USER@|$USER|" -e "s|@REPO_DIR@|$HOME/docker/invoice-generator|" systemd/$unit.service | sudo tee /etc/systemd/system/$unit.service >/dev/null; done && sudo cp systemd/rechnungen-backup.timer /etc/systemd/system/
    ```
 
    ```bash
@@ -127,12 +139,16 @@ Do this once you have an external disk.
 
    `scripts/status` should show "Backups: on" and the new file as "encrypted" or "NOT encrypted".
 
-There is no alert when a backup fails: look at `scripts/status` now and then, and at `journalctl -u rechnungen-backup`.
+There is no e-mail when a backup fails. `scripts/status` shows a `WARNING` at the top when the last nightly run failed or
+when backups are on but the newest backup is older than 2 days (or missing). Look at it now and then, and find the reason in
+`journalctl -u rechnungen-backup`. The failure marker (`.backup-failed`) disappears with the next successful backup.
 
 ## Restore
 
-Restore replaces **all data** on the machine with a backup. It says so and asks for confirmation first. With backups on it
-makes a safety copy first; with backups off there is none, so run `scripts/backup` by hand if the current data matters.
+Restore replaces **all data** on the machine with a backup. It says so and asks for confirmation first. Before it deletes
+anything it saves the current data as `rechnungen-safety-*` in the backup directory, whether backups are on or off (skipped
+when the database has no accounts). `--no-safety-backup` turns that off, for example when the old installation is too broken
+to back up.
 
 ```bash
 scripts/restore /mnt/backup/rechnungen/<file>
@@ -141,6 +157,42 @@ scripts/restore /mnt/backup/rechnungen/<file>
 A `.tar.age` file needs `age` on the machine and the private key (restore asks for its path, or set `AGE_IDENTITY`). A `.tar`
 file needs neither.
 
+## Update went wrong
+
+`scripts/update` changes nothing when its backup, the pull or the build fails, and rolls a failing migration back: fix the
+cause and run it again. If the update finished but the app misbehaves, go back to the old version and the data from before:
+
+1. Find the commit you were on before the update (the commit before the `pull`) and the copy made right before it:
+
+   ```bash
+   git reflog -n 5
+   ```
+
+   ```bash
+   scripts/status
+   ```
+
+   The copy is the newest `rechnungen-preupdate-*` (backups off) or the newest regular backup (backups on), listed by
+   `scripts/status`.
+2. Check out the old code first, so the app and the database changes match the data, then restore:
+
+   ```bash
+   git checkout <old commit>
+   ```
+
+   ```bash
+   scripts/restore <path to that copy>
+   ```
+
+   Everything entered since the update is gone from the running app; restore saves it first as `rechnungen-safety-*`
+   (only versions with this safety copy do that: when rolling back further, run `scripts/backup` before `scripts/restore`).
+3. When a fixed version is available, return to the branch before updating again (`git pull` does not work on a detached
+   checkout):
+
+   ```bash
+   git checkout main && scripts/update
+   ```
+
 ## Move to another machine
 
 1. On the old machine, run `scripts/backup` by hand (works with backups off) and copy the file over.
@@ -148,7 +200,7 @@ file needs neither.
    [Install](../../README.md#install) steps, but run `scripts/restore` instead of `scripts/setup`.
 
 The restored `.env` is the old one. Set what differs on the new machine in the environment: each variable you set
-(`APP_HOST`, `HTTP_PORT`, `HTTPS_PORT`, `BACKUPS`, `BACKUP_DIR`, `AGE_RECIPIENT`) replaces its line, and invalid values are
+(`APP_HOST`, `HTTP_PORT`, `HTTPS_PORT`, `BACKUPS`, `REGISTRATION`, `BACKUP_DIR`, `AGE_RECIPIENT`) replaces its line, and invalid values are
 refused before anything changes. For example, from a test installation on a Mac to the Pi, without backups and without a key:
 
 ```bash

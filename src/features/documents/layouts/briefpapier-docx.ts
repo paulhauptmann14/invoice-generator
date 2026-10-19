@@ -21,7 +21,8 @@ const PX_PER_MM = 96 / 25.4
 
 /**
  * Layout "Briefpapier" as an editable Word document – same structure and measurements as the PDF (spec 9a).
- * Head = logo only (floating, so it never pushes the text), no footer, no page numbers. View-model strings only.
+ * Head = logo only, on page 1 only (first-page header; floating, so it never pushes the text), no footer, no page
+ * numbers. View-model strings only.
  */
 export function buildBriefpapierDocx(vm: InvoiceViewModel, theme: Theme, fontFamily: string, logo?: DocumentLogo | null): Document {
   const din = din5008(theme.page.din5008)
@@ -42,9 +43,12 @@ export function buildBriefpapierDocx(vm: InvoiceViewModel, theme: Theme, fontFam
       : theme.logo.position === 'mitte'
         ? (PAGE.widthMm - logoWidthMm) / 2
         : PAGE.widthMm - page.marginRightMm - logoWidthMm
-  const header = new Header({
-    children: logo
-      ? [
+  // A header part needs at least one paragraph; an exact 1 mm one stays far above the body (top margin >> 6 mm).
+  const emptyHeader = () => new Header({ children: [new Paragraph(spacer(1))] })
+  const header = !logo
+    ? emptyHeader()
+    : new Header({
+        children: [
           new Paragraph({
             children: [
               new ImageRun({
@@ -64,18 +68,21 @@ export function buildBriefpapierDocx(vm: InvoiceViewModel, theme: Theme, fontFam
               }),
             ],
           }),
-        ]
-      : [],
-  })
+        ],
+      })
 
-  const amountRow = (label: string, amount: string, opts: { at: number; bold?: boolean; before?: number; keepNext?: boolean }) =>
-    new Paragraph({
+  const amountRow = (label: string, amount: string, opts: { at: number; bold?: boolean; before?: number; keepNext?: boolean }) => {
+    const run = { bold: opts.bold, color: opts.bold ? hex(c.primary) : undefined }
+    // A multi-line label (item description) gets one run per line; the amount stays on the first line, as in the PDF.
+    const [first, ...rest] = label.split('\n')
+    return new Paragraph({
       keepLines: true,
       keepNext: opts.keepNext,
       spacing: { before: opts.before ? twip(opts.before) : 0 },
       tabStops: [rightTab(opts.at)],
-      children: [new TextRun({ text: `${label}\t${amount}`, bold: opts.bold, color: opts.bold ? hex(c.primary) : undefined })],
+      children: [new TextRun({ text: `${first}\t${amount}`, ...run }), ...rest.map((text) => new TextRun({ text, break: 1, ...run }))],
     })
+  }
 
   const bankParagraphs = vm.bankAccounts.flatMap((b) =>
     b.rows.map(
@@ -118,8 +125,10 @@ export function buildBriefpapierDocx(vm: InvoiceViewModel, theme: Theme, fontFam
               footer: twip(5),
             },
           },
+          // Different first page: the logo header applies to page 1 only, continuation pages get an empty header.
+          titlePage: true,
         },
-        headers: { default: header },
+        headers: { first: header, default: emptyHeader() },
         children: [
           // DIN 5008 elements in page-anchored frames.
           ...(page.senderLine && vm.senderLine !== ''

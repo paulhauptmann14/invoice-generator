@@ -302,21 +302,28 @@ cmd_setup() {
   err="$(bash "$SCRIPTS_DIR/status" 2>&1)"
   check "(al) status still lists the existing backup while backups are off" grep -qF "$(basename "$off_archive")" <<<"$err"
   err="$(bash "$SCRIPTS_DIR/update" --no-pull 2>&1)" || { echo "$err" | tail -n 8; fail "(al) update --no-pull succeeds while backups are off"; }
-  check "(al) update says it continues without a backup" grep -qi 'backups are off - updating without a backup' <<<"$err"
-  off_files="$(find "$off_dir" -type f ! -name .backup.lock | wc -l | tr -d ' ')"
-  check "(al) update made no backup" test "$off_files" = 1
+  check "(al) update says it makes a local copy first" grep -q 'Backups are off - making a local copy before the update' <<<"$err"
+  off_files="$(find "$off_dir" -type f -name 'rechnungen-preupdate-*.tar' | wc -l | tr -d ' ')"
+  check "(al) update made one rechnungen-preupdate-*.tar copy next to the manual backup" test "$off_files" = 1
   check "(al) the app serves the login page after the update" wait_for_login_page
   psql_test -c "delete from public.customers where name = 'Off Kunde'" >/dev/null
   psql_test -c "insert into public.customers (tenant_id, name) values ('$tenant', 'Added after off backup')" >/dev/null
   err="$(env -u AGE_IDENTITY bash "$SCRIPTS_DIR/restore" --yes "$off_archive" 2>&1 </dev/null)" || { echo "$err" | tail -n 12; fail "(al) restore succeeds while backups are off"; }
-  check "(al) restore says it skips the safety backup because backups are off" grep -q 'Backups are off - restoring without a safety backup' <<<"$err"
+  check "(al) restore announces the safety backup although backups are off" grep -q 'The current data is saved to .* first' <<<"$err"
   check "(al) the notice comes BEFORE the destructive step (and so before any confirmation)" bash -c "
-    notice=\$(grep -n 'Backups are off - restoring without a safety backup' <<<\"\$1\" | head -n 1 | cut -d: -f1); stop=\$(grep -n 'Stopping the current stack' <<<\"\$1\" | head -n 1 | cut -d: -f1)
+    notice=\$(grep -n 'The current data is saved to' <<<\"\$1\" | head -n 1 | cut -d: -f1); stop=\$(grep -n 'Stopping the current stack' <<<\"\$1\" | head -n 1 | cut -d: -f1)
     [ -n \"\$notice\" ] && [ -n \"\$stop\" ] && [ \"\$notice\" -lt \"\$stop\" ]" _ "$err"
-  check "(al) restore made no safety backup" bash -c "! grep -q 'Making a safety backup' <<<\"\$1\" && [ -z \"\$(find '$off_dir' -name 'rechnungen-safety-*')\" ]" _ "$err"
+  check "(al) restore made a safety backup (rechnungen-safety-*.tar) while backups are off" bash -c "grep -q 'Making a safety backup' <<<\"\$1\" && [ -n \"\$(find '$off_dir' -name 'rechnungen-safety-*.tar')\" ]" _ "$err"
   check "(al) restored: the customer from the backup is back, the later one is gone" test \
     "$(psql_test -c "select count(*) filter (where name = 'Off Kunde')::text || count(*) filter (where name = 'Added after off backup')::text from public.customers")" = 10
   check "(ao) the systemd service runs the backup with --if-enabled" grep -qE '^ExecStart=.*/scripts/backup --if-enabled$' "$DEPLOY_DIR/systemd/rechnungen-backup.service"
+  check "(aq) the systemd service waits for the clock and reports failures" bash -c "
+    grep -qE '^After=.*time-sync.target' '$DEPLOY_DIR/systemd/rechnungen-backup.service' &&
+    grep -qx 'OnFailure=rechnungen-backup-failed.service' '$DEPLOY_DIR/systemd/rechnungen-backup.service' &&
+    grep -qE '^ExecStart=/usr/bin/touch .*/deploy/self-hosted/.backup-failed\$' '$DEPLOY_DIR/systemd/rechnungen-backup-failed.service'"
+  check "(ar) the database stays out of the way on shutdown and keeps warnings in its log" bash -c "
+    cfg=\$(docker compose --project-directory '$DEPLOY_DIR' --env-file '$ENV_FILE' -p '$TEST_PROJECT' config) &&
+    grep -q 'stop_grace_period: 1m0s' <<<\"\$cfg\" && grep -q 'log_min_messages=warning' <<<\"\$cfg\" && grep -q 'log_min_error_statement=fatal' <<<\"\$cfg\""
 }
 
 # ---- backup / restore / update ----
@@ -787,6 +794,88 @@ SQL
   check "(aa) the migrations did not run (the build failed first)" bash -c "! grep -q 'Applying database migrations' <<<\"\$1\"" _ "$out"
   check "(aa) the old app still serves the login page" login_page_ok
 
+  echo "== update with backups off (local pre-update copy, --no-backup)"
+  local off_dir="$TMP_DIR/offb" off_env="$TMP_DIR/off.env" off_out pre_count regular_count
+  mkdir -p "$off_dir"
+  sed -e 's|^BACKUPS=.*|BACKUPS=off|' -e 's|^AGE_RECIPIENT=.*|AGE_RECIPIENT=|' -e "s|^BACKUP_DIR=.*|BACKUP_DIR=$off_dir|" "$ENV_FILE" >"$off_env"
+  ENV_FILE="$off_env" bash "$SCRIPTS_DIR/backup" >/dev/null 2>&1 || fail "(ap) a manual backup works while backups are off"
+  if off_out="$(ENV_FILE="$off_env" bash "$SCRIPTS_DIR/update" --no-pull 2>&1)"; then
+    pass "(ap) update --no-pull succeeds while backups are off"
+  else
+    echo "$off_out" | tail -n 8
+    fail "(ap) update --no-pull succeeds while backups are off"
+  fi
+  check "(ap) update says it makes a local copy" grep -q 'Backups are off - making a local copy before the update' <<<"$off_out"
+  pre_count="$(find "$off_dir" -maxdepth 1 -type f -name 'rechnungen-preupdate-*.tar' | wc -l | tr -d ' ')"
+  check "(ap) update wrote one rechnungen-preupdate-*.tar" test "$pre_count" = 1
+  check "(ap) the copy is a complete archive" archive_lists "$(find "$off_dir" -maxdepth 1 -type f -name 'rechnungen-preupdate-*.tar')"
+  check "(ap) the copy has mode 600" test "$(file_mode "$(find "$off_dir" -maxdepth 1 -type f -name 'rechnungen-preupdate-*.tar')")" = 600
+  check "(ap) the app serves the login page after the update" wait_for_login_page
+  ENV_FILE="$off_env" bash "$SCRIPTS_DIR/backup" --pre-update >/dev/null 2>&1 || fail "(ap) backup --pre-update works"
+  ENV_FILE="$off_env" bash "$SCRIPTS_DIR/backup" --pre-update >/dev/null 2>&1 || fail "(ap) backup --pre-update works a third time"
+  pre_count="$(find "$off_dir" -maxdepth 1 -type f -name 'rechnungen-preupdate-*.tar' | wc -l | tr -d ' ')"
+  regular_count="$(find "$off_dir" -maxdepth 1 -type f -name 'rechnungen-[0-9]*.tar' | wc -l | tr -d ' ')"
+  check "(ap) only the newest two pre-update copies are kept" test "$pre_count" = 2
+  check "(ap) pruning the copies left the regular backup alone" test "$regular_count" = 1
+  check "(ap) --safety and --pre-update together are refused" bash -c "! ENV_FILE='$off_env' bash '$SCRIPTS_DIR/backup' --safety --pre-update >/dev/null 2>&1"
+  sed 's/^BACKUPS=.*/BACKUPS=off/' "$TMP_DIR/bad-recipient.env" >"$TMP_DIR/bad-off.env"
+  if ENV_FILE="$TMP_DIR/bad-off.env" bash "$SCRIPTS_DIR/update" --no-pull >"$TMP_DIR/bad-off-update.log" 2>&1; then
+    fail "(ap) update stops when the pre-update copy fails"
+  else
+    check "(ap) update stops when the pre-update copy fails (no build or migration) and names --no-backup" bash -c "
+      ! grep -qE 'applying|0 applied|Building' '$TMP_DIR/bad-off-update.log' && grep -q -- '--no-backup' '$TMP_DIR/bad-off-update.log'"
+  fi
+
+  echo "== update reloads a changed Caddyfile"
+  # The Caddyfile directory is replaced by a copy in the test directory. The file is then replaced the way git does it (a new
+  # inode) with one extra route; update must make Caddy serve it, with --no-backup it must not back up.
+  local caddy_dir="$TMP_DIR/caddy-alt" caddy_override="$TMP_DIR/caddy-alt.yml" caddy_marker="$TMP_DIR/caddy-marker" caddy_out
+  mkdir -p "$caddy_dir"
+  cp "$DEPLOY_DIR/caddy/Caddyfile" "$caddy_dir/Caddyfile"
+  printf 'services:\n  caddy:\n    volumes:\n      - %s:/etc/caddy:ro\n' "$caddy_dir" >"$caddy_override"
+  COMPOSE_FILE="$DEPLOY_DIR/compose.yml:$caddy_override" compose up -d caddy >/dev/null 2>&1
+  wait_for_login_page || true
+  awk '{ print } /^\ttls internal$/ { print "\trespond /stack-test-marker \"marker\" 200" }' "$caddy_dir/Caddyfile" >"$caddy_dir/Caddyfile.new"
+  mv "$caddy_dir/Caddyfile.new" "$caddy_dir/Caddyfile"
+  touch "$caddy_marker"
+  check "(as) before the update Caddy still serves the old configuration" test "$(https_get /stack-test-marker -w '%{http_code}')" != 200
+  if caddy_out="$(COMPOSE_FILE="$DEPLOY_DIR/compose.yml:$caddy_override" bash "$SCRIPTS_DIR/update" --no-pull --no-backup 2>&1)"; then
+    pass "(as) update --no-pull --no-backup succeeds"
+  else
+    echo "$caddy_out" | tail -n 8
+    fail "(as) update --no-pull --no-backup succeeds"
+  fi
+  check "(as) update says it skips the backup" grep -q 'Skipping the backup (--no-backup)' <<<"$caddy_out"
+  check "(as) --no-backup made no backup" test -z "$(find "$backups" "$off_dir" -maxdepth 1 -type f -name 'rechnungen-*.tar*' -newer "$caddy_marker")"
+  check "(as) update reloaded Caddy" grep -q 'Reloading the Caddy configuration' <<<"$caddy_out"
+  check "(as) Caddy now serves the new route" test "$(https_get /stack-test-marker -w '%{http_code}')" = 200
+  check "(as) the app still serves the login page" wait_for_login_page
+  # Back to the stack's own Caddyfile for the rest of the test.
+  compose up -d caddy >/dev/null 2>&1
+  wait_for_login_page || true
+  check "(as) without the override the extra route is gone again" test "$(https_get /stack-test-marker -w '%{http_code}')" != 200
+
+  echo "== status warns about stale and failed backups"
+  local stale_dir="$TMP_DIR/stale" stale_env="$TMP_DIR/stale.env" failed_marker="$TMP_DIR/backup-failed" status_out
+  mkdir -p "$stale_dir"
+  sed -e 's|^BACKUPS=.*|BACKUPS=on|' -e "s|^BACKUP_DIR=.*|BACKUP_DIR=$stale_dir|" "$ENV_FILE" >"$stale_env"
+  status_out="$(ENV_FILE="$stale_env" BACKUP_FAILED_MARKER="$failed_marker" bash "$SCRIPTS_DIR/status" 2>&1)"
+  check "(at) backups on and no backup at all: status warns" grep -q 'WARNING: backups are on, but there is no backup from the last 2 days' <<<"$status_out"
+  touch -t 202001010315 "$stale_dir/rechnungen-2020-01-01-0315.tar"
+  status_out="$(ENV_FILE="$stale_env" BACKUP_FAILED_MARKER="$failed_marker" bash "$SCRIPTS_DIR/status" 2>&1)"
+  check "(at) only an old backup: status warns" grep -q 'WARNING: backups are on, but there is no backup' <<<"$status_out"
+  check "(at) the warning is at the top (before the container list)" bash -c "
+    w=\$(grep -n 'WARNING' <<<\"\$1\" | head -n 1 | cut -d: -f1); c=\$(grep -n '== containers' <<<\"\$1\" | head -n 1 | cut -d: -f1); [ \"\$w\" -lt \"\$c\" ]" _ "$status_out"
+  status_out="$(sed 's/^BACKUPS=.*/BACKUPS=off/' "$stale_env" >"$stale_env.off"; ENV_FILE="$stale_env.off" BACKUP_FAILED_MARKER="$failed_marker" bash "$SCRIPTS_DIR/status" 2>&1)"
+  check "(at) backups off: no stale-backup warning" bash -c "! grep -q 'WARNING' <<<\"\$1\"" _ "$status_out"
+  touch "$failed_marker"
+  status_out="$(ENV_FILE="$stale_env.off" BACKUP_FAILED_MARKER="$failed_marker" bash "$SCRIPTS_DIR/status" 2>&1)"
+  check "(at) failure marker present: status reports the failed nightly backup" grep -q 'WARNING: the nightly backup failed at' <<<"$status_out"
+  ENV_FILE="$stale_env" BACKUP_FAILED_MARKER="$failed_marker" bash "$SCRIPTS_DIR/backup" >/dev/null 2>&1 || fail "(at) a backup into the stale directory works"
+  check "(at) a successful backup removes the failure marker" test ! -e "$failed_marker"
+  status_out="$(ENV_FILE="$stale_env" BACKUP_FAILED_MARKER="$failed_marker" bash "$SCRIPTS_DIR/status" 2>&1)"
+  check "(at) with a fresh backup and no marker status shows no warning" bash -c "! grep -q 'WARNING' <<<\"\$1\"" _ "$status_out"
+
   echo "== restore with machine overrides (moving to another machine)"
   local ov_env="$TMP_DIR/nokey.env" ov_out bad ov_rc
   cp "$ov_env" "$TMP_DIR/ov-before.env"
@@ -819,6 +908,23 @@ SQL
   check "(an) the restored data is there" test "$(psql_test -c "select count(*) from public.customers where name = 'Plain Kunde'")" = 1
   check "(an) status reports backups off afterwards" bash -c "ENV_FILE='$ov_env' bash '$SCRIPTS_DIR/status' | head -n 1 | grep -q '^Backups: OFF'"
   check "(an) the age program was never called" test ! -e "$TMP_DIR/age-called"
+
+  echo "== restore with backups off still makes a safety backup"
+  local safety_before safety_after
+  safety_before="$(find "$plain" -maxdepth 1 -type f -name 'rechnungen-safety-*.tar' | wc -l | tr -d ' ')"
+  check "(au) the current .env has BACKUPS=off" grep -qx 'BACKUPS=off' "$ov_env"
+  ov_out="$(env -u AGE_IDENTITY ENV_FILE="$ov_env" PATH="$fakeage:$PATH" bash "$SCRIPTS_DIR/restore" --yes "$plain_archive" 2>&1 </dev/null)" \
+    || { echo "$ov_out" | tail -n 15; fail "(au) restore with BACKUPS=off succeeds"; }
+  safety_after="$(find "$plain" -maxdepth 1 -type f -name 'rechnungen-safety-*.tar' | wc -l | tr -d ' ')"
+  check "(au) restore announced and made a safety backup although BACKUPS was off" bash -c "
+    grep -q 'The current data is saved to' <<<\"\$1\" && grep -q 'Making a safety backup' <<<\"\$1\" && [ '$safety_after' = \$(( $safety_before + 1 )) ]" _ "$ov_out"
+  wait_for_login_page || true
+  if ov_out="$(env -u AGE_IDENTITY ENV_FILE="$ov_env" PATH="$fakeage:$PATH" bash "$SCRIPTS_DIR/restore" --no-safety-backup "$plain_archive" 2>&1 </dev/null)"; then
+    fail "(au) restore without --yes and without a terminal is refused"
+  else
+    check "(au) --no-safety-backup is announced and the restore still waits for confirmation" bash -c "
+      grep -q 'No safety backup of the current data will be made' <<<\"\$1\" && grep -q 'use --yes' <<<\"\$1\"" _ "$ov_out"
+  fi
 }
 
 retention_oldest_daily_pruned() { # day 16..22 daily files must be gone unless they are the newest backup of an older month

@@ -284,6 +284,19 @@ describe('discounts in the draft', () => {
     expect(draftTotals(reduce(d, { type: 'setInvoiceDiscountValue', value: '10,555' })).invoiceDiscountMessage).toBe('Höchstens zwei Nachkommastellen.')
     expect(draftTotals(reduce(d, { type: 'setInvoiceDiscountValue', value: '498,01' })).invoiceDiscountMessage).toBe('Der Rabatt ist höher als die Zwischensumme.')
   })
+  test('a fixed invoice discount on a zero subtotal is ignored and reported, a percent discount is not', () => {
+    let d = base()
+    d = reduce(d, { type: 'updateItem', key: d.items[0].key, field: 'unitPriceGross', value: '0' })
+    d = reduce(d, { type: 'setInvoiceDiscountKind', kind: 'amount' })
+    d = reduce(d, { type: 'setInvoiceDiscountValue', value: '5' })
+    const fixed = draftTotals(d)
+    expect(fixed.invoiceDiscount).toBeNull()
+    expect(fixed.invoiceDiscountMessage).toBe('Der Rabatt ist höher als die Zwischensumme.')
+    d = reduce(d, { type: 'setInvoiceDiscountKind', kind: 'percent' })
+    const percent = draftTotals(d)
+    expect(percent.invoiceDiscount).toEqual({ kind: 'percent', value: 5 })
+    expect(percent.invoiceDiscountMessage).toBeNull()
+  })
   test('an invoice discount is ignored while a line is negative', () => {
     let d = withBuffet().d
     d = reduce(d, { type: 'addFreeItem', key: 'refund' })

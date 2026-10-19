@@ -1,10 +1,10 @@
 'use client'
 
 import { CircleCheck, Download, ExternalLink, FileText, Info } from 'lucide-react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useId, useRef, useState } from 'react'
 import { FormAlert } from '@/components/form-alert'
+import { GuardedLink } from '@/components/unsaved-changes'
 import { useTenant } from '@/features/tenants/tenant-context'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
@@ -12,9 +12,10 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { normalizeUserFilename } from '@/lib/domain/filename'
 import { useEditorDirty } from './editor-context'
+import { recipientAddressMessage } from './recipient-address-message'
 import { chooseLocation, savePicker, writeFile } from './save-file'
 
-type ExportError = { kind: 'missing'; fields: string[] } | { kind: 'failed' } | { kind: 'expired' } | { kind: 'write' }
+type ExportError = { kind: 'missing'; fields: string[]; recipient: string[] } | { kind: 'failed' } | { kind: 'expired' } | { kind: 'write' }
 type Format = 'pdf' | 'docx'
 
 // One dialog for both formats; only the PDF is archived (the archived PDF is the record of the invoice).
@@ -66,12 +67,15 @@ export function ExportPanel({
   invoiceId,
   defaultFilenames,
   missing,
+  recipientMissing = [],
   hasLogo = false,
   leading,
 }: {
   invoiceId: string
   defaultFilenames: Record<Format, string>
   missing: string[]
+  /** Empty address fields of the recipient on an invoice above 250 EUR (§ 14 UStG); export is blocked while any are missing. */
+  recipientMissing?: string[]
   /** Offers "Ohne Logo (für Briefpapier)" when a logo is configured. */
   hasLogo?: boolean
   /** Shown left of the PDF actions (the invoice number). */
@@ -90,10 +94,13 @@ export function ExportPanel({
   // Whether this browser can ask for the location; read when the dialog opens (never during server render).
   const [picks, setPicks] = useState(false)
   const alertRef = useRef<HTMLDivElement>(null)
+  // The dialog has no DialogTrigger, so focus goes back to the opening button by hand.
+  const pdfButtonRef = useRef<HTMLButtonElement>(null)
+  const docxButtonRef = useRef<HTMLButtonElement>(null)
   const inputId = useId()
   const hintId = useId()
 
-  const blocked = missing.length > 0 || dirty
+  const blocked = missing.length > 0 || recipientMissing.length > 0 || dirty
   const finalName = normalizeUserFilename(name, format)
   const copy = COPY[format]
 
@@ -124,8 +131,8 @@ export function ExportPanel({
       })
       if (response.status === 401) return setError({ kind: 'expired' })
       if (response.status === 409) {
-        const body = (await response.json().catch(() => ({}))) as { missing?: string[] }
-        return setError({ kind: 'missing', fields: body.missing ?? missing })
+        const body = (await response.json().catch(() => ({}))) as { missing?: string[]; recipientMissing?: string[] }
+        return setError({ kind: 'missing', fields: body.missing ?? missing, recipient: body.recipientMissing ?? recipientMissing })
       }
       if (!response.ok) throw new Error(`Export failed with ${response.status}`)
       const filename = filenameFrom(response.headers.get('Content-Disposition'), finalName)
@@ -180,6 +187,7 @@ export function ExportPanel({
             </Button>
           )}
           <Button
+            ref={docxButtonRef}
             type="button"
             variant="outline"
             className="gap-2"
@@ -191,7 +199,7 @@ export function ExportPanel({
             Word-Datei exportieren
           </Button>
           {/* The archived PDF is the main action (one primary button per screen). */}
-          <Button type="button" className="gap-2" disabled={blocked} aria-describedby={blocked ? 'pdf-blocked' : undefined} onClick={() => openDialog('pdf')}>
+          <Button ref={pdfButtonRef} type="button" className="gap-2" disabled={blocked} aria-describedby={blocked ? 'pdf-blocked' : undefined} onClick={() => openDialog('pdf')}>
             <Download aria-hidden className="size-4" />
             PDF exportieren
           </Button>
@@ -199,19 +207,31 @@ export function ExportPanel({
       </div>
 
       {blocked && (
-        <p id="pdf-blocked" className="mt-3 flex items-start gap-2 text-sm text-muted-foreground sm:justify-end sm:text-right">
-          <Info aria-hidden className="mt-0.5 size-4 shrink-0" />
-          {missing.length > 0 ? (
-            <span>
-              Export gesperrt – Firmendaten unvollständig: {fieldList(missing)}{' '}
-              <Link href={path('einstellungen/firma')} className="font-medium text-foreground underline underline-offset-4">
-                Firmendaten ergänzen
-              </Link>
-            </span>
-          ) : (
-            <span>Ungespeicherte Änderungen – bitte zuerst speichern. Exportiert wird die gespeicherte Fassung.</span>
+        <div id="pdf-blocked" className="mt-3 space-y-1.5 text-sm text-muted-foreground">
+          {missing.length > 0 && (
+            <p className="flex items-start gap-2 sm:justify-end sm:text-right">
+              <Info aria-hidden className="mt-0.5 size-4 shrink-0" />
+              <span>
+                Export gesperrt – Firmendaten unvollständig: {fieldList(missing)}{' '}
+                <GuardedLink href={path('einstellungen/firma')} className="font-medium text-foreground underline underline-offset-4">
+                  Firmendaten ergänzen
+                </GuardedLink>
+              </span>
+            </p>
           )}
-        </p>
+          {recipientMissing.length > 0 && (
+            <p className="flex items-start gap-2 sm:justify-end sm:text-right">
+              <Info aria-hidden className="mt-0.5 size-4 shrink-0" />
+              <span>Export gesperrt – {recipientAddressMessage(recipientMissing)} Bitte unten im Formular ergänzen und speichern.</span>
+            </p>
+          )}
+          {dirty && (
+            <p className="flex items-start gap-2 sm:justify-end sm:text-right">
+              <Info aria-hidden className="mt-0.5 size-4 shrink-0" />
+              <span>Ungespeicherte Änderungen – bitte zuerst speichern. Exportiert wird die gespeicherte Fassung.</span>
+            </p>
+          )}
+        </div>
       )}
       {done && !blocked && (
         <p role="status" className="mt-3 flex items-start gap-2 text-sm sm:justify-end">
@@ -221,7 +241,15 @@ export function ExportPanel({
       )}
 
       <Dialog open={open} onOpenChange={(next) => !pending && setOpen(next)}>
-        <DialogContent showCloseButton={false} className="gap-5 p-5 sm:max-w-md">
+        <DialogContent
+          showCloseButton={false}
+          className="gap-5 p-5 sm:max-w-md"
+          onCloseAutoFocus={(event) => {
+            // Escape, Abbrechen and a finished export all end up here: back to the button that opened the dialog.
+            event.preventDefault()
+            ;(format === 'pdf' ? pdfButtonRef : docxButtonRef).current?.focus()
+          }}
+        >
           <div className="space-y-1.5">
             <DialogTitle className="type-title">{copy.title}</DialogTitle>
             <DialogDescription className="text-sm text-muted-foreground">{copy.description(picks)}</DialogDescription>
@@ -231,10 +259,16 @@ export function ExportPanel({
               <FormAlert ref={alertRef}>
                 {error.kind === 'missing' ? (
                   <>
-                    Firmendaten unvollständig: {fieldList(error.fields)}{' '}
-                    <Link href={path('einstellungen/firma')} className="font-medium underline underline-offset-4">
-                      Zu den Einstellungen
-                    </Link>
+                    {error.fields.length > 0 && (
+                      <>
+                        Firmendaten unvollständig: {fieldList(error.fields)}{' '}
+                        <GuardedLink href={path('einstellungen/firma')} className="font-medium underline underline-offset-4">
+                          Zu den Einstellungen
+                        </GuardedLink>
+                      </>
+                    )}
+                    {error.fields.length > 0 && error.recipient.length > 0 && ' '}
+                    {error.recipient.length > 0 && recipientAddressMessage(error.recipient)}
                   </>
                 ) : error.kind === 'expired' ? (
                   'Sitzung abgelaufen – bitte neu anmelden.'

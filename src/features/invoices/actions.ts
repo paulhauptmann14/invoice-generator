@@ -93,60 +93,73 @@ export async function copyInvoice(tenantId: string, id: string): Promise<void> {
   const source = await getInvoice(supabase, tenant.id, id)
   if (!source) throw new Error('Invoice not found')
 
-  const [ranges, existing] = await Promise.all([listNumberRanges(supabase, tenant.id), listInvoiceNumbers(supabase, tenant.id)])
   const today = todayIso()
-  // The copy keeps the range of the original; an archived (or missing) range falls back to the default.
-  const sourceRange = ranges.find((r) => r.id === source.number_range_id && !r.archived)
-  const rangeId = sourceRange?.id ?? defaultRange(ranges)?.id ?? null
-  const number = suggestForRange({ ranges, existing }, rangeId, today) || `${source.number}-Kopie`
+  // Reads the current numbers and ranges, so a retry after a number clash suggests a fresh one.
+  const suggest = async () => {
+    const [ranges, existing] = await Promise.all([listNumberRanges(supabase, tenant.id), listInvoiceNumbers(supabase, tenant.id)])
+    // The copy keeps the range of the original; an archived (or missing) range falls back to the default.
+    const sourceRange = ranges.find((r) => r.id === source.number_range_id && !r.archived)
+    const rangeId = sourceRange?.id ?? defaultRange(ranges)?.id ?? null
+    return { rangeId, number: suggestForRange({ ranges, existing }, rangeId, today) || `${source.number}-Kopie` }
+  }
 
-  const { data: newId, error } = await supabase.rpc('save_invoice', {
-    p_tenant_id: tenant.id,
-    p_id: null as unknown as string,
-    p_invoice: {
-      number,
-      number_range_id: rangeId,
-      customer_id: source.customer_id,
-      // Copied verbatim from the jsonb column it was read from.
-      recipient: source.recipient as Json,
-      issue_date: today,
-      service_date_from: today,
-      service_date_to: null,
-      payment_days: source.payment_days,
-      intro_text: source.intro_text,
-      closing_text: source.closing_text,
-      discount_kind: source.discount_kind,
-      discount_value: source.discount_value,
-    },
-    p_items: source.invoice_items.map((i) => ({
-      description: i.description,
-      quantity: i.quantity,
-      unit: i.unit,
-      unit_price_gross: i.unit_price_gross,
-      vat_rate: i.vat_rate,
-      article_id: i.article_id,
-      discount_kind: i.discount_kind,
-      discount_value: i.discount_value,
-    })),
-  })
-  if (error) throw new Error(`Copying invoice failed: ${error.message}`)
-  redirect(tenantPath(tenant.id, `rechnungen/${newId}?kopiert=1`))
+  const save = (target: { rangeId: string | null; number: string }) =>
+    supabase.rpc('save_invoice', {
+      p_tenant_id: tenant.id,
+      p_id: null as unknown as string,
+      p_invoice: {
+        number: target.number,
+        number_range_id: target.rangeId,
+        customer_id: source.customer_id,
+        // Copied verbatim from the jsonb column it was read from.
+        recipient: source.recipient as Json,
+        issue_date: today,
+        service_date_from: today,
+        service_date_to: null,
+        payment_days: source.payment_days,
+        intro_text: source.intro_text,
+        closing_text: source.closing_text,
+        discount_kind: source.discount_kind,
+        discount_value: source.discount_value,
+      },
+      p_items: source.invoice_items.map((i) => ({
+        description: i.description,
+        quantity: i.quantity,
+        unit: i.unit,
+        unit_price_gross: i.unit_price_gross,
+        vat_rate: i.vat_rate,
+        article_id: i.article_id,
+        discount_kind: i.discount_kind,
+        discount_value: i.discount_value,
+      })),
+    })
+
+  let result = await save(await suggest())
+  // Another invoice took the suggested number in the meantime (unique violation): suggest again, once.
+  if (result.error?.code === '23505') result = await save(await suggest())
+  if (result.error) throw new Error(`Copying invoice failed: ${result.error.message}`)
+  redirect(tenantPath(tenant.id, `rechnungen/${result.data}?kopiert=1`))
 }
 
 export async function deleteInvoice(tenantId: string, id: string): Promise<void> {
   const { supabase, tenant } = await requireTenant(tenantId)
   if (!idSchema.safeParse(id).success) throw new Error('Invalid invoice id')
 
-  // Archived PDFs live under "<tenant id>/<invoice id>/" in the private bucket; remove them first.
+  // Archived PDFs live under "<tenant id>/<invoice id>/" in the private bucket. Collect their paths first,
+  // delete the row, and only then remove the files: a failure in between must never leave an invoice
+  // whose archived PDFs are gone.
   const folder = `${tenant.id}/${id}`
   const { data: files, error: listError } = await supabase.storage.from('invoice-pdfs').list(folder, { limit: 1000 })
   if (listError) throw new Error(`Listing invoice files failed: ${listError.message}`)
-  if (files.length > 0) {
-    const { error: removeError } = await supabase.storage.from('invoice-pdfs').remove(files.map((f) => `${folder}/${f.name}`))
-    if (removeError) throw new Error(`Removing invoice files failed: ${removeError.message}`)
-  }
+  const paths = files.map((f) => `${folder}/${f.name}`)
 
   const { error } = await supabase.from('invoices').delete().eq('id', id).eq('tenant_id', tenant.id)
   if (error) throw new Error(`Deleting invoice failed: ${error.message}`)
+
+  if (paths.length > 0) {
+    // The invoice is gone; files that could not be removed are orphans, which must not fail the deletion.
+    const { error: removeError } = await supabase.storage.from('invoice-pdfs').remove(paths)
+    if (removeError) console.error('Removing files of a deleted invoice failed', { invoiceId: id, error: removeError })
+  }
   redirect(tenantPath(tenant.id, 'rechnungen?geloescht=1'))
 }

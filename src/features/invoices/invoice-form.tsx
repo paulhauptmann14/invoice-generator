@@ -1,10 +1,10 @@
 'use client'
 
 import { CircleAlert, Info } from 'lucide-react'
-import Link from 'next/link'
 import { useActionState, useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { FieldError } from '@/components/field-error'
 import { FormAlert } from '@/components/form-alert'
+import { GuardedLink } from '@/components/unsaved-changes'
 import { useTenant } from '@/features/tenants/tenant-context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -45,6 +45,7 @@ export function InvoiceForm({
   const rangeChoices = numberContext.ranges.filter((r) => !r.archived || r.id === draft.numberRangeId)
   const [state, action, pending] = useActionState(saveInvoice.bind(null, tenant.id, id), initialState)
   const formRef = useRef<HTMLFormElement>(null)
+  const alertRef = useRef<HTMLDivElement>(null)
   const { totals, invalidKeys, lineTotals, lineDiscounts, invoiceDiscount, discountMessages, invoiceDiscountMessage } = draftTotals(draft)
   const notice = recipientNotice(draft, totals.grossCents)
   // Baseline from the first render: a router.refresh() passes a new (equal) initialDraft object, which must not
@@ -56,10 +57,15 @@ export function InvoiceForm({
   // Side-by-side preview from 80rem; below that it opens in a full-screen dialog.
   const preview = usePreviewMode('rechnung-vorschau')
 
-  // Focus the first invalid control after a failed save.
+  // After a failed save, focus the first invalid control; without one (general failure, or an error on a group such
+  // as "items" that has no single control) focus the alert. The alert sits at the top, the submit button at the
+  // bottom, so without this the message would go unnoticed.
   useEffect(() => {
     const first = Object.keys(state.errors)[0]
-    if (first) document.getElementById(`inv-${first}`)?.focus()
+    const target = (first ? document.getElementById(`inv-${first}`) : null) ?? (state.message ? alertRef.current : null)
+    if (!target) return
+    target.focus()
+    target.scrollIntoView({ block: 'center' })
   }, [state])
 
   // Warn before closing the tab with unsaved changes.
@@ -81,7 +87,7 @@ export function InvoiceForm({
     <form ref={formRef} action={action} noValidate className="space-y-10">
       <input type="hidden" name="payload" value={payloadJson} />
       {state.message && (
-        <FormAlert>
+        <FormAlert ref={alertRef}>
           {state.message}
           {state.suggestedNumber && (
             <>
@@ -218,7 +224,7 @@ export function InvoiceForm({
           {pending ? 'Speichern …' : id ? 'Änderungen speichern' : 'Rechnung speichern'}
         </Button>
         <Button asChild variant="ghost">
-          <Link href={path('rechnungen')}>Abbrechen</Link>
+          <GuardedLink href={path('rechnungen')}>Abbrechen</GuardedLink>
         </Button>
       </div>
     </form>

@@ -3,6 +3,7 @@
 import { Plus } from 'lucide-react'
 import { useActionState, useState } from 'react'
 import { FormAlert } from '@/components/form-alert'
+import { SubmitButton } from '@/components/submit-button'
 import { Button } from '@/components/ui/button'
 import type { NumberRangeChoice } from '@/features/invoices/draft'
 import { useTenant } from '@/features/tenants/tenant-context'
@@ -56,7 +57,7 @@ function RangeEditor({ range, year, onCancel }: { range: NumberRangeChoice | nul
 function RangeRow({ range, year }: { range: NumberRangeChoice; year: number }) {
   const { tenant } = useTenant()
   const [editing, setEditing] = useState(false)
-  const [archiveState, archiveAction, archivePending] = useActionState(archiveNumberRange.bind(null, tenant.id, range.id, !range.archived), noMessage)
+  const [archiveState, archiveAction] = useActionState(archiveNumberRange.bind(null, tenant.id, range.id, !range.archived), noMessage)
   const [defaultState, defaultAction, defaultPending] = useActionState(makeDefaultNumberRange.bind(null, tenant.id, range.id), noMessage)
   const message = archiveState.message ?? defaultState.message
 
@@ -94,9 +95,9 @@ function RangeRow({ range, year }: { range: NumberRangeChoice; year: number }) {
           )}
           {!range.isDefault && (
             <form action={archiveAction}>
-              <Button type="submit" variant="ghost" disabled={archivePending}>
+              <SubmitButton variant="ghost" pendingLabel={range.archived ? 'Wird wiederhergestellt …' : 'Wird archiviert …'}>
                 {range.archived ? 'Wiederherstellen' : 'Archivieren'}
-              </Button>
+              </SubmitButton>
             </form>
           )}
         </div>

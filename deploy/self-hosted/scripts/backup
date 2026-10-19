@@ -14,6 +14,10 @@
 #   backup --if-enabled  the same, but does nothing (exit 0, one message) when .env says BACKUPS=off; the nightly timer uses this
 #   backup --safety  the safety copy that restore makes of the current data: named rechnungen-safety-YYYY-MM-DD-HHMM.tar.age
 #                    (or .tar), never pruned and not counted by pruning, so it can neither delete nor crowd out a real backup
+#   backup --pre-update  the copy that update makes before migrating when backups are off: rechnungen-preupdate-YYYY-MM-DD-HHMM.tar[.age].
+#                    Only the newest KEEP_PRE_UPDATE of these are kept; they are not counted by the regular pruning either
+#
+# A successful regular backup removes the failure marker that the nightly service leaves behind (see status).
 set -euo pipefail
 
 # shellcheck source=lib/common.sh
@@ -21,6 +25,7 @@ set -euo pipefail
 
 KEEP_RECENT=14
 KEEP_MONTHS=12
+KEEP_PRE_UPDATE=2
 # A Raspberry Pi has no battery-backed clock: before the network time arrives it can believe it is 1970 or 2024.
 # Such a backup would get a misleading name and could be pruned as "old", so we refuse to run.
 MIN_YEAR=2026
@@ -28,14 +33,18 @@ MIN_YEAR=2026
 LOCK_TIMEOUT="${BACKUP_LOCK_TIMEOUT:-600}"
 
 SAFETY=0
+PRE_UPDATE=0
 IF_ENABLED=0
+USAGE="usage: backup [--if-enabled | --safety | --pre-update]"
 for arg in "$@"; do
   case "$arg" in
     --safety) SAFETY=1 ;;
+    --pre-update) PRE_UPDATE=1 ;;
     --if-enabled) IF_ENABLED=1 ;;
-    *) die "usage: backup [--if-enabled] [--safety]" ;;
+    *) die "$USAGE" ;;
   esac
 done
+[ $((SAFETY + PRE_UPDATE + IF_ENABLED)) -le 1 ] || die "$USAGE"
 
 [ -f "$ENV_FILE" ] || die "$ENV_FILE does not exist (run setup first)"
 if [ "$IF_ENABLED" = 1 ] && ! backups_enabled; then
@@ -107,7 +116,7 @@ stamp() { # stamp <epoch>
 
 # Keeps the newest KEEP_RECENT backups plus the newest backup of each of the last KEEP_MONTHS calendar months (counted back from
 # the current one). Encrypted (.tar.age) and unencrypted (.tar) backups are counted together. Only files named like our
-# backups are touched (not the safety copies). Works on the timestamp in the name, no date arithmetic.
+# backups are touched (not the safety or pre-update copies). Works on the timestamp in the name, no date arithmetic.
 prune() { # prune <dir> <file name that must stay>
   local dir=$1 protected=$2 file name month seen=" " position=0 month_index cutoff keep
   cutoff=$(( 10#$(date +%Y) * 12 + 10#$(date +%m) - KEEP_MONTHS ))
@@ -135,6 +144,20 @@ prune() { # prune <dir> <file name that must stay>
       info "Removed old backup $name"
     fi
   done < <(find "$dir" -maxdepth 1 -type f \( -name 'rechnungen-*.tar.age' -o -name 'rechnungen-*.tar' \) | LC_ALL=C sort -r)
+}
+
+# Keeps the newest KEEP_PRE_UPDATE pre-update copies (names sort chronologically); never the one this run just made.
+prune_pre_update() { # prune_pre_update <dir> <file name that must stay>
+  local dir=$1 protected=$2 file name position=0
+  while IFS= read -r file; do
+    name="$(basename "$file")"
+    [[ "$name" =~ ^rechnungen-preupdate-[0-9]{4}-[0-9]{2}-[0-9]{2}-[0-9]{4}\.tar(\.age)?$ ]] || continue
+    position=$((position + 1))
+    if [ "$position" -gt "$KEEP_PRE_UPDATE" ] && [ "$name" != "$protected" ]; then
+      rm -f "$file"
+      info "Removed old pre-update backup $name"
+    fi
+  done < <(find "$dir" -maxdepth 1 -type f \( -name 'rechnungen-preupdate-*.tar.age' -o -name 'rechnungen-preupdate-*.tar' \) | LC_ALL=C sort -r)
 }
 
 acquire_lock
@@ -165,6 +188,8 @@ cp "$ENV_FILE" "$work/.env"
 name_prefix=rechnungen
 if [ "$SAFETY" = 1 ]; then
   name_prefix=rechnungen-safety
+elif [ "$PRE_UPDATE" = 1 ]; then
+  name_prefix=rechnungen-preupdate
 fi
 extension=tar
 if [ -n "$recipient" ]; then
@@ -194,6 +219,9 @@ if [ -z "$recipient" ]; then
   esac
 fi
 
-if [ "$SAFETY" = 0 ]; then
+if [ "$PRE_UPDATE" = 1 ]; then
+  prune_pre_update "$dest_dir" "$name"
+elif [ "$SAFETY" = 0 ]; then
   prune "$dest_dir" "$name"
+  rm -f "$BACKUP_FAILED_MARKER"
 fi

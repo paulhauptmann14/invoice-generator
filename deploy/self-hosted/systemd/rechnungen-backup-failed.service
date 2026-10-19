@@ -1,0 +1,9 @@
+# Template: same replacements and steps as rechnungen-backup.service. Started by its OnFailure= and leaves a marker file that
+# scripts/status reports; the next successful backup removes it.
+[Unit]
+Description=Invoice app: remember that the nightly backup failed
+
+[Service]
+Type=oneshot
+User=@USER@
+ExecStart=/usr/bin/touch @REPO_DIR@/deploy/self-hosted/.backup-failed

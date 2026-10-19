@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { z } from 'zod'
 import { PageHeader } from '@/components/page-header'
-import { Button } from '@/components/ui/button'
+import { SubmitButton } from '@/components/submit-button'
 import { setArticleArchived } from '@/features/articles/actions'
 import { ArticleForm } from '@/features/articles/article-form'
 import { getArticle } from '@/features/articles/queries'
@@ -26,9 +26,9 @@ export default async function EditArticlePage({ params }: { params: Promise<{ be
         description={archived ? 'Archiviert – erscheint nicht in der Artikelauswahl.' : 'Artikel bearbeiten'}
         actions={
           <form action={setArticleArchived.bind(null, tenant.id, article.id, !archived)}>
-            <Button type="submit" variant="outline">
+            <SubmitButton variant="outline" pendingLabel={archived ? 'Wird wiederhergestellt …' : 'Wird archiviert …'}>
               {archived ? 'Wiederherstellen' : 'Archivieren'}
-            </Button>
+            </SubmitButton>
           </form>
         }
       />

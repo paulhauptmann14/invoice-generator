@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useMemo, useRef, useState } from 'react'
 import type { z } from 'zod'
+import { useReportUnsaved } from '@/components/unsaved-changes'
 import { pathErrorsFrom } from '@/lib/form'
 import type { SettingsFormState } from './actions'
 import { setIn } from './form-state'
@@ -49,6 +50,8 @@ export function useSettingsForm<T>({
 
   const payload = useMemo(() => JSON.stringify(draft), [draft])
   const dirty = payload !== JSON.stringify(pristine)
+
+  useReportUnsaved(dirty)
 
   useEffect(() => {
     if (!dirty || pending) return

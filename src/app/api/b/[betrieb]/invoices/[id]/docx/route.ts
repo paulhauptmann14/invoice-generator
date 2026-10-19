@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { docxResponse } from '@/features/documents/document-response'
 import { loadInvoiceDocument } from '@/features/documents/load-document-data'
 import { renderInvoiceDocx } from '@/features/documents/render-invoice-docx'
+import { loadMissingRecipientAddress, recipientAddressMessage } from '@/features/invoices/recipient-address'
 import { requireTenantForRoute } from '@/lib/auth/require-tenant'
 import { normalizeUserFilename } from '@/lib/domain/filename'
 
@@ -22,8 +23,16 @@ export async function POST(request: Request, { params }: Params) {
 
   const doc = await loadInvoiceDocument(auth.supabase, auth.tenant.id, id)
   if (!doc) return Response.json({ error: 'not found' }, { status: 404 })
+  const recipientMissing = await loadMissingRecipientAddress(auth.supabase, auth.tenant.id, id)
   if (doc.missing.length > 0) {
-    return Response.json({ error: 'company data incomplete', missing: doc.missing }, { status: 409 })
+    return Response.json({ error: 'company data incomplete', missing: doc.missing, recipientMissing }, { status: 409 })
+  }
+  // Above 250 EUR the recipient's address is mandatory (§ 14 UStG).
+  if (recipientMissing.length > 0) {
+    return Response.json(
+      { error: 'recipient address incomplete', recipientMissing, message: recipientAddressMessage(recipientMissing) },
+      { status: 409 },
+    )
   }
 
   const filename = parsed.data.filename.trim() ? normalizeUserFilename(parsed.data.filename, 'docx') : doc.filenames.docx

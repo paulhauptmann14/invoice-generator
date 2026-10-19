@@ -12,8 +12,8 @@
 # A backup named *.tar.age is encrypted: restore asks for the path of your private age key (or reads AGE_IDENTITY). A backup
 # named *.tar is not encrypted and needs no key. --yes skips the confirmation question (tests).
 # Before it deletes anything it makes a safety copy of the current data (rechnungen-safety-*.tar.age or .tar in the backup directory,
-# never pruned; skipped when the database has no accounts yet, or with --no-safety-backup, e.g. when the old installation is
-# too broken to back up). If the restore fails half way, run it again with the same file.
+# never pruned), also with BACKUPS=off. It is skipped when the database has no accounts yet, or with --no-safety-backup (e.g. when
+# the old installation is too broken to back up). If the restore fails half way, run it again with the same file.
 #
 # The data is loaded into the schema the backup was made with: the migrations up to the backup's newest one are applied first,
 # then the data is loaded, then the remaining migrations of this checkout run on top (so backfills see the restored rows).
@@ -157,14 +157,13 @@ else
   echo "this copy of the repository; that only works if the schema has not changed since the backup was made." >&2
 fi
 
-# Whether a safety copy of the current data is made is decided now, so the confirmation can say it. With backups switched off
-# there is none (like --no-safety-backup). A machine without a .env has nothing to save anyway.
+# Whether a safety copy of the current data is made is decided now, so the confirmation can say it. It does not depend on
+# BACKUPS: that switch only controls the nightly timer. A machine without a .env has nothing to save anyway.
 SAFETY_NOTE=""
 if [ "$SAFETY_BACKUP" = 0 ]; then
   SAFETY_NOTE="No safety backup of the current data will be made (--no-safety-backup)."
-elif [ -f "$ENV_FILE" ] && ! backups_enabled; then
-  SAFETY_BACKUP=0
-  SAFETY_NOTE="Backups are off - restoring without a safety backup of the current data."
+elif [ -f "$ENV_FILE" ]; then
+  SAFETY_NOTE="The current data is saved to $(backup_dir) first (safety backup, if it holds accounts)."
 fi
 if [ -n "$OVERRIDE_KEYS" ]; then
   info "The restored .env gets these values from the environment:$OVERRIDE_KEYS"

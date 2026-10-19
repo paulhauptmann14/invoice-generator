@@ -1,5 +1,6 @@
 import { SignOutButton } from '@/components/sign-out-button'
 import { SkipLink } from '@/components/skip-link'
+import { UnsavedChangesProvider } from '@/components/unsaved-changes'
 import { loadLogoVersion } from '@/features/settings/repository'
 import { TenantProvider } from '@/features/tenants/tenant-context'
 import { TenantSwitcher } from '@/features/tenants/tenant-switcher'
@@ -16,31 +17,33 @@ export default async function TenantLayout({ children, params }: Props) {
 
   return (
     <TenantProvider tenant={tenant} tenants={tenants} logoVersion={logoVersion}>
-      <div className="min-h-dvh md:grid md:grid-cols-[14rem_minmax(0,1fr)]">
-        <SkipLink />
-        <aside className="flex items-center justify-between gap-4 border-b border-border px-4 py-2 md:sticky md:top-0 md:h-dvh md:flex-col md:items-stretch md:justify-start md:border-r md:border-b-0 md:bg-(--sidebar) md:px-0 md:py-0">
-          <div className="min-w-0 flex-1 md:flex-none md:px-3 md:pt-5 md:pb-3">
-            <TenantSwitcher />
-          </div>
-          <SideNav />
-          <div className="shrink-0 md:mt-auto md:px-3 md:py-4">
-            <p className="hidden truncate px-2.5 pb-1 text-xs text-muted-foreground md:block" title={email ?? undefined}>
-              {email}
-            </p>
-            <SignOutButton />
-          </div>
-        </aside>
-        {/* Bottom padding keeps content clear of the fixed mobile tab bar. */}
-        <main
-          id="inhalt"
-          tabIndex={-1}
-          className="px-4 pt-6 pb-[calc(5rem+env(safe-area-inset-bottom))] outline-none sm:px-8 md:px-12 md:py-10"
-        >
-          {/* Pages marked with data-wide (invoice editor with live preview) get more room. */}
-          <div className="mx-auto max-w-5xl has-[[data-wide]]:max-w-[96rem]">{children}</div>
-        </main>
-        <TabBar />
-      </div>
+      <UnsavedChangesProvider>
+        <div className="min-h-dvh md:grid md:grid-cols-[14rem_minmax(0,1fr)]">
+          <SkipLink />
+          <aside className="flex items-center justify-between gap-4 border-b border-border px-4 py-2 md:sticky md:top-0 md:h-dvh md:flex-col md:items-stretch md:justify-start md:border-r md:border-b-0 md:bg-(--sidebar) md:px-0 md:py-0">
+            <div className="min-w-0 flex-1 md:flex-none md:px-3 md:pt-5 md:pb-3">
+              <TenantSwitcher />
+            </div>
+            <SideNav />
+            <div className="shrink-0 md:mt-auto md:px-3 md:py-4">
+              <p className="hidden truncate px-2.5 pb-1 text-xs text-muted-foreground md:block" title={email ?? undefined}>
+                {email}
+              </p>
+              <SignOutButton />
+            </div>
+          </aside>
+          {/* Bottom padding keeps content clear of the fixed mobile tab bar. */}
+          <main
+            id="inhalt"
+            tabIndex={-1}
+            className="px-4 pt-6 pb-[calc(5rem+env(safe-area-inset-bottom))] outline-none sm:px-8 md:px-12 md:py-10"
+          >
+            {/* Pages marked with data-wide (invoice editor with live preview) get more room. */}
+            <div className="mx-auto max-w-5xl has-[[data-wide]]:max-w-[96rem]">{children}</div>
+          </main>
+          <TabBar />
+        </div>
+      </UnsavedChangesProvider>
     </TenantProvider>
   )
 }

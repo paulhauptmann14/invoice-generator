@@ -1,33 +1,42 @@
 #!/usr/bin/env bash
 # Updates the app: backup first, then new code, a new app image, database migrations and a restart of the app.
 #
-#   update            git pull (fast-forward only), then as above
-#   update --no-pull  skip git pull (tests, or code you updated yourself)
+#   update              git pull (fast-forward only), then as above
+#   update --no-pull    skip git pull (tests, or code you updated yourself)
+#   update --no-backup  skip the backup before the migrations (only if you know the data is safe elsewhere)
 #
-# With BACKUPS=off in .env the pre-update backup is skipped (with a message) and the update continues.
+# The backup comes first and is never skipped silently. With BACKUPS=on it is the regular backup; with BACKUPS=off (no external
+# disk yet) it is a local copy rechnungen-preupdate-*.tar[.age] in the backup directory, of which the newest two are kept (the
+# nightly timer stays off). If the backup fails, nothing is changed. To go back after a bad update see the README, "Update went
+# wrong".
 #
 # The running app keeps serving until the new image is built. The build comes before the migrations, so a failed backup, pull
 # or build changes neither the running app nor the database. A failed migration is rolled back (one transaction per file) and
-# the old app keeps running: do not restore the backup, fix the cause and run update again. At the end, old images and
-# build cache are removed.
+# the old app keeps running: do not restore the backup, fix the cause and run update again. At the end, Caddy reloads its
+# Caddyfile and old images and build cache are removed.
 set -euo pipefail
 
 main() {
   # shellcheck source=lib/common.sh
   . "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
-  local scripts pull=1
+  local scripts pull=1 backup=1 arg
   scripts="$(dirname "${BASH_SOURCE[0]}")"
-  case "${1:-}" in
-    --no-pull) pull=0 ;;
-    "") ;;
-    *) die "usage: update [--no-pull]" ;;
-  esac
+  for arg in "$@"; do
+    case "$arg" in
+      --no-pull) pull=0 ;;
+      --no-backup) backup=0 ;;
+      *) die "usage: update [--no-pull] [--no-backup]" ;;
+    esac
+  done
 
-  if backups_enabled; then
+  if [ "$backup" = 0 ]; then
+    info "Skipping the backup (--no-backup)."
+  elif backups_enabled; then
     info "Backing up before the update ..."
     "$scripts/backup" || die "the backup failed; nothing was changed"
   else
-    info "Backups are off - updating without a backup."
+    info "Backups are off - making a local copy before the update (kept: the newest two) ..."
+    "$scripts/backup" --pre-update || die "the backup failed; nothing was changed (use --no-backup to update without one)"
   fi
 
   if [ "$pull" = 1 ]; then
@@ -44,7 +53,14 @@ main() {
   # All services: compose recreates only those whose image, compose.yml entry or .env values changed (e.g. a new
   # REGISTRATION value for auth); unchanged ones keep running.
   compose up -d
-  wait_healthy app
+  # Caddy too: compose may just have recreated it (changed mount or image), and a reload needs it running.
+  wait_healthy app caddy
+
+  # Caddy reads its Caddyfile at start only, and an update may have changed it: reload (no downtime, a broken file is refused
+  # and the old one keeps running).
+  info "Reloading the Caddy configuration ..."
+  compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile ||
+    die "Caddy reload failed: the new Caddyfile was refused (Caddy keeps the old one) or Caddy is not running; see the message above"
 
   # Every build leaves the previous app image behind (dangling) and adds build cache; on an SD card that adds up. Only
   # images no container uses and cache older than a week are removed, never volumes. A failure here must not fail the update.

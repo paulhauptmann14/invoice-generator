@@ -68,12 +68,16 @@ export function itemDiscountIssue(line: LineInput): string | null {
   return null
 }
 
-/** Why the invoice discount cannot be applied to these lines (item discounts included); null = fine. Only negative line amounts block it. */
+/**
+ * Why the invoice discount cannot be applied to these lines (item discounts included); null = fine.
+ * Negative line amounts block it, and so does a discount above the subtotal (a percent discount on a
+ * zero subtotal is 0 and fine; a fixed amount on a zero subtotal is not).
+ */
 export function invoiceDiscountIssue(lines: LineInput[], discount: Discount): string | null {
   if (!discount) return null
   const totals = calcTotals(lines, discount)
   if (totals.lineTotalsCents.some((cents) => cents < 0)) return INVOICE_DISCOUNT_BLOCKED_BY_NEGATIVE
-  if (totals.grossCents < 0) return 'Der Rabatt ist höher als die Zwischensumme.'
+  if (totals.invoiceDiscountCents > totals.subtotalCents) return 'Der Rabatt ist höher als die Zwischensumme.'
   return null
 }
 

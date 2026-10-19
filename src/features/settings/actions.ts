@@ -112,6 +112,7 @@ export async function archiveNumberRange(tenantId: string, id: string, archived:
     const reason = archiveBlockReason(await listNumberRanges(supabase, tenant.id), id)
     if (reason) return { message: reason, errors: {} }
   }
-  await setNumberRangeArchived(supabase, tenant.id, id, archived)
+  const result = await setNumberRangeArchived(supabase, tenant.id, id, archived)
+  if (!result.ok) return { message: 'Diesen Nummernkreis gibt es nicht (mehr).', errors: {} }
   redirect(tenantPath(tenant.id, 'einstellungen/nummern?gespeichert=1'))
 }

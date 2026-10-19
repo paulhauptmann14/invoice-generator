@@ -2,12 +2,20 @@ import { z } from 'zod'
 import { loadInvoiceDocument } from '@/features/documents/load-document-data'
 import { pdfResponse } from '@/features/documents/document-response'
 import { renderInvoicePdf } from '@/features/documents/render-invoice-pdf'
+import { loadMissingRecipientAddress, recipientAddressMessage } from '@/features/invoices/recipient-address'
 import { requireTenantForRoute } from '@/lib/auth/require-tenant'
 import { normalizeUserFilename } from '@/lib/domain/filename'
 
 type Params = { params: Promise<{ betrieb: string; id: string }> }
 
 const notFound = () => Response.json({ error: 'not found' }, { status: 404 })
+
+// Above 250 EUR the recipient's address is mandatory (§ 14 UStG); the message is German for the UI.
+const recipientIncomplete = (recipientMissing: string[]) =>
+  Response.json(
+    { error: 'recipient address incomplete', recipientMissing, message: recipientAddressMessage(recipientMissing) },
+    { status: 409 },
+  )
 
 /** Preview of a saved invoice (inline, not archived). */
 export async function GET(_request: Request, { params }: Params) {
@@ -19,6 +27,8 @@ export async function GET(_request: Request, { params }: Params) {
   // An invoice of another tenant is not found (spec 3a).
   const doc = await loadInvoiceDocument(auth.supabase, auth.tenant.id, id)
   if (!doc) return notFound()
+  const recipientMissing = await loadMissingRecipientAddress(auth.supabase, auth.tenant.id, id)
+  if (recipientMissing.length > 0) return recipientIncomplete(recipientMissing)
   return pdfResponse(await renderInvoicePdf(doc.vm, doc.theme, { logo: doc.logo }), { type: 'inline', filename: doc.filenames.pdf })
 }
 
@@ -37,9 +47,11 @@ export async function POST(request: Request, { params }: Params) {
 
   const doc = await loadInvoiceDocument(auth.supabase, auth.tenant.id, id)
   if (!doc) return notFound()
+  const recipientMissing = await loadMissingRecipientAddress(auth.supabase, auth.tenant.id, id)
   if (doc.missing.length > 0) {
-    return Response.json({ error: 'company data incomplete', missing: doc.missing }, { status: 409 })
+    return Response.json({ error: 'company data incomplete', missing: doc.missing, recipientMissing }, { status: 409 })
   }
+  if (recipientMissing.length > 0) return recipientIncomplete(recipientMissing)
 
   const filename = parsedBody.data.filename.trim() ? normalizeUserFilename(parsedBody.data.filename, 'pdf') : doc.filenames.pdf
   const pdf = await renderInvoicePdf(doc.vm, doc.theme, { logo: parsedBody.data.withoutLogo ? null : doc.logo })

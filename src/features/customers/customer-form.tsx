@@ -1,10 +1,11 @@
 'use client'
 
-import Link from 'next/link'
 import { useActionState } from 'react'
 import { Field, RequiredNote } from '@/components/form/field'
 import { useBlurValidation } from '@/components/form/use-blur-validation'
+import { useFormDirty } from '@/components/form/use-form-dirty'
 import { FormAlert } from '@/components/form-alert'
+import { GuardedLink } from '@/components/unsaved-changes'
 import { useTenant } from '@/features/tenants/tenant-context'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -24,9 +25,10 @@ export function CustomerForm({ id, initial }: { id: string | null; initial: Part
   )
   const { errors, formRef, onBlur } = useBlurValidation(customerSchema, state, CUSTOMER_FIELDS)
   const v = state.values
+  const checkDirty = useFormDirty(formRef)
 
   return (
-    <form ref={formRef} action={action} onBlur={onBlur} noValidate className="mt-8 max-w-2xl space-y-8">
+    <form ref={formRef} action={action} onBlur={onBlur} onInput={checkDirty} onChange={checkDirty} noValidate className="mt-8 max-w-2xl space-y-8">
       {state.message && <FormAlert>{state.message}</FormAlert>}
       <RequiredNote />
 
@@ -81,7 +83,7 @@ export function CustomerForm({ id, initial }: { id: string | null; initial: Part
           {pending ? 'Speichern …' : id ? 'Änderungen speichern' : 'Kunde anlegen'}
         </Button>
         <Button asChild variant="ghost">
-          <Link href={path('kunden')}>Abbrechen</Link>
+          <GuardedLink href={path('kunden')}>Abbrechen</GuardedLink>
         </Button>
       </div>
     </form>

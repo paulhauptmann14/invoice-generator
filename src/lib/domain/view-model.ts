@@ -88,6 +88,28 @@ const regionNames = new Intl.DisplayNames(['de'], { type: 'region' })
 const MINUS = '\u2212'
 const joinLines = (lines: (string | false | null | undefined)[]) => lines.filter(Boolean).join('\n')
 
+/**
+ * Cleans user text for documents: line breaks become "\n" (CRLF, CR, and the vertical tab \x0B that Word uses as soft
+ * line break), characters that are invalid in XML 1.0 (and would make a .docx unreadable) are removed.
+ */
+export function cleanDocumentText(text: string): string {
+  return (
+    text
+      .replace(/\r\n?|\x0B/g, '\n')
+      .replace(/[\x00-\x08\x0C\x0E-\x1F\uFFFE\uFFFF]/g, '')
+  )
+}
+
+/** Applies `cleanDocumentText` to every string of the view model (all user text ends up in PDF and Word). */
+function cleanDeep<T>(value: T): T {
+  if (typeof value === 'string') return cleanDocumentText(value) as T
+  if (Array.isArray(value)) return value.map(cleanDeep) as T
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, v]) => [key, cleanDeep(v)])) as T
+  }
+  return value
+}
+
 /** "abzüglich 10 % Rabatt" (percent) or "abzüglich Rabatt" (amount). */
 export function discountLabel(discount: NonNullable<Discount>): string {
   return discount.kind === 'percent' ? `abzüglich ${formatVatRate(discount.value)} Rabatt` : 'abzüglich Rabatt'
@@ -113,6 +135,10 @@ function autoFooter(c: Company): string[] {
 }
 
 export function buildInvoiceViewModel(input: InvoiceInput, company: Company, theme: Theme): InvoiceViewModel {
+  return cleanDeep(buildRawViewModel(input, company, theme))
+}
+
+function buildRawViewModel(input: InvoiceInput, company: Company, theme: Theme): InvoiceViewModel {
   const totals = calcTotals(input.items, input.discount)
   const dueIso = input.paymentDays === null ? null : addDays(input.issueDate, input.paymentDays)
 

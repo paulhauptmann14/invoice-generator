@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import type { Database, Json } from '@/lib/supabase/database.types'
 import { SEED } from '@/test-support/seed-ids'
+import { loadMissingRecipientAddress } from './recipient-address'
 import { getInvoice, listArticleChoices, listInvoiceNumbers, listInvoices, listNumberRanges } from './queries'
 
 const supabase = createClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, {
@@ -130,6 +131,24 @@ describe('invoice queries (local Supabase)', () => {
     expect(await listInvoiceNumbers(supabase, SEED.gasthaus)).toContain(`${tag}-1`)
     const choice = (await listArticleChoices(supabase, SEED.gasthaus)).find((a) => a.id === articleId)
     expect(choice).toEqual({ id: articleId, name: `Artikel ${tag}`, description: null, unit: 'kg', unitPriceGross: 54.9, vatRate: 7 })
+  })
+  test('listInvoiceNumbers returns every row when more than one page exists', async () => {
+    const all = await listInvoiceNumbers(supabase, SEED.gasthaus)
+    expect(all.length).toBeGreaterThanOrEqual(3)
+    // Page size 2 forces several requests (and a last, full page when the count is even).
+    const paged = await listInvoiceNumbers(supabase, SEED.gasthaus, 2)
+    expect([...paged].sort()).toEqual([...all].sort())
+    expect(new Set(paged).size).toBe(paged.length)
+    expect(paged).toEqual(expect.arrayContaining([`${tag}-1`, `${tag}-2`, `${tag}-3`]))
+    expect(await listInvoiceNumbers(supabase, SEED.gasthaus, all.length)).toHaveLength(all.length)
+  })
+  test('export block: address required above 250 EUR only, per tenant', async () => {
+    // tag-1 is 59,80 EUR without an address: small-amount invoice, export allowed.
+    expect(await loadMissingRecipientAddress(supabase, SEED.gasthaus, invoiceId)).toEqual([])
+    // tag-2 is 577,79 EUR and the recipient has only a name.
+    expect(await loadMissingRecipientAddress(supabase, SEED.gasthaus, discountedId)).toEqual(['Straße', 'PLZ', 'Ort'])
+    // Not visible from another tenant: nothing to block.
+    expect(await loadMissingRecipientAddress(supabase, SEED.metzgerei, discountedId)).toEqual([])
   })
   test('invoices of another tenant are not visible', async () => {
     expect(await getInvoice(supabase, SEED.metzgerei, invoiceId)).toBeNull()

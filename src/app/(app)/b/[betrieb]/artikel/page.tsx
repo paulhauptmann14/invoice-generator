@@ -6,6 +6,7 @@ import { ListToolbar } from '@/components/list-toolbar'
 import { PageHeader } from '@/components/page-header'
 import { listLinkClass, pressableRowClass, rowLinkClass } from '@/components/pressable'
 import { StatusBanner } from '@/components/status-banner'
+import { SubmitButton } from '@/components/submit-button'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { setArticleArchived } from '@/features/articles/actions'
@@ -50,9 +51,9 @@ export default async function ArticlesPage(props: Props) {
         <StatusBanner>
           <span>Artikel archiviert.</span>
           <form action={setArticleArchived.bind(null, tenant.id, archivedId, false)}>
-            <Button type="submit" variant="link" className="h-auto min-h-11 p-0 md:min-h-0">
+            <SubmitButton variant="link" pendingLabel="Wird wiederhergestellt …" className="h-auto min-h-11 p-0 md:min-h-0">
               Rückgängig
-            </Button>
+            </SubmitButton>
           </form>
         </StatusBanner>
       )}

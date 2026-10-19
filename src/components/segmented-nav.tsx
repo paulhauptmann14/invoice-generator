@@ -1,4 +1,4 @@
-import Link from 'next/link'
+import { GuardedLink } from '@/components/unsaved-changes'
 
 export type Segment = { href: string; label: string; active: boolean }
 
@@ -13,7 +13,7 @@ export function SegmentedNav({ label, segments, className }: { label: string; se
       <ul className="grid w-full grid-cols-2 gap-0.5 rounded-lg bg-(--segment-track) p-0.5 sm:inline-flex sm:w-auto">
         {segments.map(({ href, label: text, active }) => (
           <li key={href}>
-            <Link
+            <GuardedLink
               href={href}
               aria-current={active ? 'page' : undefined}
               className={[
@@ -24,7 +24,7 @@ export function SegmentedNav({ label, segments, className }: { label: string; se
               ].join(' ')}
             >
               {text}
-            </Link>
+            </GuardedLink>
           </li>
         ))}
       </ul>

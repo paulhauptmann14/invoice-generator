@@ -1,9 +1,12 @@
 # Template: replace @USER@ (a user that may run docker) and @REPO_DIR@ (path of this repository), then copy to
-# /etc/systemd/system/. The README describes the steps.
+# /etc/systemd/system/. The README describes the steps. Install rechnungen-backup-failed.service the same way.
 [Unit]
 Description=Invoice app: nightly backup
 Wants=docker.service
-After=docker.service
+# The Raspberry Pi has no battery-backed clock; the backup refuses to run before the clock is right (time-sync.target only waits
+# if systemd-time-wait-sync.service is enabled; otherwise a wrong clock makes the run fail and the failure marker is written)
+After=docker.service time-sync.target
+OnFailure=rechnungen-backup-failed.service
 
 [Service]
 Type=oneshot

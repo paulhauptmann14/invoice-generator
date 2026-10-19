@@ -8,6 +8,10 @@ REPO_DIR="$(cd "$DEPLOY_DIR/../.." && pwd)"
 ENV_FILE="${ENV_FILE:-$DEPLOY_DIR/.env}"
 # Tests point MIGRATIONS_DIR at a copy that has an extra file.
 MIGRATIONS_DIR="${MIGRATIONS_DIR:-$REPO_DIR/supabase/migrations}"
+# The systemd unit rechnungen-backup-failed.service touches this file when the nightly backup fails; a successful regular
+# backup removes it and status reports it. It lives next to the scripts, not in the backup directory (that disk may be missing).
+# shellcheck disable=SC2034 # used by backup and status
+BACKUP_FAILED_MARKER="${BACKUP_FAILED_MARKER:-$DEPLOY_DIR/.backup-failed}"
 
 die() {
   echo "error: $*" >&2
@@ -32,7 +36,8 @@ env_get() { # env_get <KEY> [default]
 }
 
 # True unless .env says BACKUPS=off. A .env without the key (made before the switch existed) counts as on, so installations
-# that already had backups keep them. Manual `backup` ignores this; the timer, update and restore honour it.
+# that already had backups keep them. Manual `backup` ignores this; the timer honours it. update and restore do not depend on it:
+# they always make a safety copy of their own (see backup --pre-update and --safety).
 backups_enabled() {
   [ "$(env_get BACKUPS on)" != off ]
 }

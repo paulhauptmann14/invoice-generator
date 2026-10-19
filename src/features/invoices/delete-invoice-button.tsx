@@ -3,7 +3,6 @@
 import { Trash2 } from 'lucide-react'
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -12,6 +11,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog'
+import { SubmitButton } from '@/components/submit-button'
 import { Button } from '@/components/ui/button'
 import { useTenant } from '@/features/tenants/tenant-context'
 import { deleteInvoice } from './actions'
@@ -36,9 +36,10 @@ export function DeleteInvoiceButton({ id, number }: { id: string; number: string
         <AlertDialogFooter>
           <AlertDialogCancel>Abbrechen</AlertDialogCancel>
           <form action={deleteInvoice.bind(null, tenant.id, id)} className="w-full sm:w-auto">
-            <AlertDialogAction type="submit" variant="destructive" className="w-full sm:w-auto">
+            {/* Not AlertDialogAction: that would close the dialog on click and hide the pending state. */}
+            <SubmitButton variant="destructive" pendingLabel="Wird gelöscht …" className="w-full sm:w-auto">
               Endgültig löschen
-            </AlertDialogAction>
+            </SubmitButton>
           </form>
         </AlertDialogFooter>
       </AlertDialogContent>

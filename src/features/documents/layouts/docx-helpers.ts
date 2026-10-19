@@ -37,7 +37,7 @@ export function frame(xMm: number, yMm: number, widthMm: number, heightMm?: numb
   }
 }
 
-/** Lines as one paragraph with line breaks (keeps a frame in one piece). */
+/** Lines as one paragraph with line breaks (keeps a frame in one piece). Split multi-line user text with `text.split('\n')`. */
 export const lines = (texts: string[], run: { bold?: boolean; size?: number; color?: string } = {}) =>
   texts.map((text, i) => new TextRun({ text, break: i > 0 ? 1 : 0, ...run }))
 

@@ -4,7 +4,7 @@ import type { InvoiceViewModel } from '@/lib/domain/view-model'
 import { din5008, mm } from '../din5008'
 import { type Density, FOOTER_ROOM_MM, oneLine } from './density'
 
-type Props = { vm: InvoiceViewModel; theme: Theme; fontFamily: string; density?: Density }
+type Props = { vm: InvoiceViewModel; theme: Theme; fontFamily: string | string[]; density?: Density }
 
 /** Layout "Klassisch" (and "Kompakt"): DIN 5008 letter (form A/B). Displays view-model strings only, no calculations. */
 export function KlassischInvoice({ vm, theme, fontFamily, density = 'normal' }: Props) {

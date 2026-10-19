@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { InvoiceNumber } from '@/components/invoice-number'
 import { PageHeader } from '@/components/page-header'
 import { StatusBanner } from '@/components/status-banner'
-import { Button } from '@/components/ui/button'
+import { SubmitButton } from '@/components/submit-button'
 import { loadDocumentSettings } from '@/features/documents/load-document-data'
 import { copyInvoice } from '@/features/invoices/actions'
 import { ArchiveList } from '@/features/invoices/archive-list'
@@ -16,6 +16,7 @@ import { ExportPanel } from '@/features/invoices/export-panel'
 import { listExports } from '@/features/invoices/exports-queries'
 import { InvoiceForm } from '@/features/invoices/invoice-form'
 import { getInvoice, listArticleChoices, listCustomerChoices, listInvoiceNumbers, listNumberRanges } from '@/features/invoices/queries'
+import { missingRecipientAddressOf } from '@/features/invoices/recipient-address'
 import { requireTenant } from '@/lib/auth/require-tenant'
 import { buildFilename } from '@/lib/domain/filename'
 
@@ -56,10 +57,10 @@ export default async function EditInvoicePage({ params, searchParams }: { params
         actions={
           <>
             <form action={copyInvoice.bind(null, tenant.id, invoice.id)}>
-              <Button type="submit" variant="outline" className="gap-2">
+              <SubmitButton variant="outline" className="gap-2" pendingLabel="Wird kopiert …">
                 <Copy aria-hidden className="size-4" />
                 Kopieren
-              </Button>
+              </SubmitButton>
             </form>
             <DeleteInvoiceButton id={invoice.id} number={invoice.number} />
           </>
@@ -72,6 +73,7 @@ export default async function EditInvoicePage({ params, searchParams }: { params
           invoiceId={invoice.id}
           defaultFilenames={defaultFilenames}
           missing={documentSettings.missing}
+          recipientMissing={missingRecipientAddressOf(invoice)}
           hasLogo={documentSettings.logo !== null}
           leading={<InvoiceNumber number={invoice.number} size="lg" />}
         />

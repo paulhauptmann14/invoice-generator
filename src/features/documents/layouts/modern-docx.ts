@@ -61,13 +61,8 @@ export function buildModernDocx(vm: InvoiceViewModel, theme: Theme, fontFamily: 
       children: [
         new Paragraph({
           alignment: col.align,
-          children: [
-            new TextRun({
-              text,
-              bold: header,
-              color: header ? hex(c.primary) : undefined,
-            }),
-          ],
+          // Item descriptions may span several lines: one run per line with a break (a raw \n in <w:t> shows as a space in Word).
+          children: lines(text.split('\n'), { bold: header, color: header ? hex(c.primary) : undefined }),
         }),
         ...(detail
           ? [

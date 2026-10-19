@@ -7,7 +7,11 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   // react-pdf reads font files from disk at runtime; make sure they ship with the server bundle.
   outputFileTracingIncludes: {
-    '/api/**': ['./node_modules/@fontsource/*/files/*-latin-{400,700}-normal.woff'],
+    '/api/**': [
+      './node_modules/@fontsource/*/files/*-latin-{400,700}-normal.woff',
+      // Characters outside Latin-1 (Ş, Ł, ř …) come from the latin-ext subsets (fallback font stack).
+      './node_modules/@fontsource/*/files/*-latin-ext-{400,700}-normal.woff',
+    ],
   },
   turbopack: {
     rules: {

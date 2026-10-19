@@ -1,6 +1,6 @@
 'use server'
 
-import { redirect } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { z } from 'zod'
 import { requireTenant } from '@/lib/auth/require-tenant'
 import { type FormState, fieldErrorsFrom } from '@/lib/form'
@@ -36,10 +36,15 @@ export async function saveArticle(
     unit_price_gross: a.unitPriceGross,
     vat_rate: a.vatRate,
   }
-  const { error } =
-    id === null
-      ? await supabase.from('articles').insert({ ...row, tenant_id: tenant.id })
-      : await supabase.from('articles').update(row).eq('id', id).eq('tenant_id', tenant.id)
+  let error
+  if (id === null) {
+    ;({ error } = await supabase.from('articles').insert({ ...row, tenant_id: tenant.id }))
+  } else {
+    // select('id'): an update that matches no row (deleted meanwhile) must not report success.
+    const { data, error: updateError } = await supabase.from('articles').update(row).eq('id', id).eq('tenant_id', tenant.id).select('id')
+    if (!updateError && data.length === 0) return { message: 'Der Artikel wurde nicht gefunden.', fieldErrors: {}, values }
+    error = updateError
+  }
   if (error) {
     console.error('saveArticle failed', error)
     return { message: 'Der Artikel konnte nicht gespeichert werden. Bitte erneut versuchen.', fieldErrors: {}, values }
@@ -51,11 +56,13 @@ export async function setArticleArchived(tenantId: string, id: string, archived:
   const { supabase, tenant } = await requireTenant(tenantId)
   if (!idSchema.safeParse(id).success) throw new Error('Invalid article id')
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('articles')
     .update({ archived_at: archived ? new Date().toISOString() : null })
     .eq('id', id)
     .eq('tenant_id', tenant.id)
+    .select('id')
   if (error) throw new Error(`Archiving article failed: ${error.message}`)
+  if (data.length === 0) notFound()
   redirect(tenantPath(tenant.id, archived ? `artikel?archiviert=${id}` : 'artikel?wiederhergestellt=1'))
 }

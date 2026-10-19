@@ -23,6 +23,8 @@ async function prepare(page: Page, violations: string[]) {
     } catch {
       // storage blocked: the preview stays on, the test still works
     }
+    // Chromium offers the File System Access API (native save dialog); remove it so the export falls back to a normal download.
+    Object.defineProperty(window, 'showSaveFilePicker', { value: undefined, configurable: true, writable: true })
     document.addEventListener('securitypolicyviolation', (e) => window.__reportCsp(`${e.violatedDirective} ${e.blockedURI} on ${location.pathname} (${e.sourceFile}:${e.lineNumber}) ${e.sample}`))
   })
 }

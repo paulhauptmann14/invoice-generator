@@ -67,7 +67,8 @@ export function buildKlassischDocx(vm: InvoiceViewModel, theme: Theme, fontFamil
         new Paragraph({
           alignment: col.align,
           spacing: compact ? { ...lineHeight(rowSize, 1.25), after: 0 } : undefined,
-          children: [new TextRun({ text, bold: opts.header, size: compact ? halfPoints(rowSize) : undefined, color: opts.header ? hex(c.primary) : undefined })],
+          // Item descriptions may span several lines: one run per line with a break (a raw \n in <w:t> shows as a space in Word).
+          children: lines(text.split('\n'), { bold: opts.header, size: compact ? halfPoints(rowSize) : undefined, color: opts.header ? hex(c.primary) : undefined }),
         }),
         ...(opts.detail
           ? [

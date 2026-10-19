@@ -71,10 +71,27 @@ export async function getInvoice(
   return data
 }
 
-export async function listInvoiceNumbers(supabase: Client, tenantId: string): Promise<string[]> {
-  const { data, error } = await supabase.from('invoices').select('number').eq('tenant_id', tenantId)
-  if (error) throw new Error(`Loading invoice numbers failed: ${error.message}`)
-  return data.map((r) => r.number)
+/** PostgREST returns at most 1000 rows per request (its default max-rows). */
+const NUMBER_PAGE_SIZE = 1000
+
+/**
+ * Every invoice number of the tenant, read page by page: the next-number suggestion must see all of
+ * them, and a single request is capped. Ordered by id so pages never overlap or skip rows.
+ * `pageSize` is a parameter for tests only.
+ */
+export async function listInvoiceNumbers(supabase: Client, tenantId: string, pageSize = NUMBER_PAGE_SIZE): Promise<string[]> {
+  const numbers: string[] = []
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from('invoices')
+      .select('number')
+      .eq('tenant_id', tenantId)
+      .order('id')
+      .range(from, from + pageSize - 1)
+    if (error) throw new Error(`Loading invoice numbers failed: ${error.message}`)
+    numbers.push(...data.map((r) => r.number))
+    if (data.length < pageSize) return numbers
+  }
 }
 
 export async function getInvoiceSettings(

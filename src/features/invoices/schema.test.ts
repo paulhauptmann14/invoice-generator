@@ -125,6 +125,13 @@ describe('invoiceSchema discounts', () => {
     expect(errorsOf({ ...base, discount: { kind: 'amount', value: '49,81' } })).toEqual({ discount: 'Der Rabatt ist höher als die Zwischensumme.' })
     expect(errorsOf({ ...base, discount: { kind: 'percent', value: '100,01' } })).toEqual({ discount: 'Rabatt: 0,01 bis 100 %.' })
   })
+  test('a fixed invoice discount on a zero subtotal is rejected, a percent discount is fine', () => {
+    const free = { ...item, unitPriceGross: '0' }
+    expect(errorsOf({ ...base, items: [free], discount: { kind: 'amount', value: '0,01' } })).toEqual({
+      discount: 'Der Rabatt ist höher als die Zwischensumme.',
+    })
+    expect(invoiceSchema.safeParse({ ...base, items: [free], discount: { kind: 'percent', value: '10' } }).success).toBe(true)
+  })
   test('the invoice amount limit is the subtotal after item discounts', () => {
     // 20 x 24,90 = 498,00, minus 10 % = 448,20
     const items = [{ ...buffet, discount: { kind: 'percent', value: '10' } }]

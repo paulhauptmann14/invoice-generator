@@ -75,12 +75,13 @@ Everyday commands run in `~/docker/invoice-generator/deploy/self-hosted`:
 | Command | What it does |
 |---|---|
 | `scripts/status` | Containers, disk space, backups |
-| `scripts/update` | Pull the new version, rebuild, migrate, restart |
+| `scripts/update` | Back up, pull the new version, rebuild, migrate, restart |
 | `scripts/backup` | Backup now |
 | `scripts/set-password <email>` | New password for an account |
 
-Backups are **off** until you turn them on. Certificates, registration, backups, restore, moving to another machine and
-troubleshooting are described in the [operations guide](deploy/self-hosted/README.md).
+Automatic backups are **off** until you turn them on; `update` and `restore` still save a local copy first. Certificates,
+registration, backups, restore, going back after a bad update, moving to another machine and troubleshooting are described in
+the [operations guide](deploy/self-hosted/README.md).
 
 ## Security
 

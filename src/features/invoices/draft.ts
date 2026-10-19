@@ -464,7 +464,8 @@ export function draftTotals(draft: InvoiceDraft): {
   return { totals, invalidKeys, lineTotals, lineDiscounts, invoiceDiscount, discountMessages, invoiceDiscountMessage }
 }
 
-const SMALL_INVOICE_LIMIT_CENTS = 25000
+/** Small-amount invoices (Kleinbetragsrechnung, § 33 UStDV) go up to 250,00 EUR gross. */
+export const SMALL_INVOICE_LIMIT_CENTS = 25000
 
 /** § 14 UStG: full recipient address is mandatory above 250 EUR (small-amount invoices are exempt). */
 export function recipientNotice(draft: InvoiceDraft, grossCents: number): { level: 'warning' | 'info'; text: string } | null {

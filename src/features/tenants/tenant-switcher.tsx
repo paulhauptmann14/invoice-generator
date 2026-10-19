@@ -1,7 +1,6 @@
 'use client'
 
 import { Check, ChevronsUpDown, Plus } from 'lucide-react'
-import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useRef, useState } from 'react'
 import {
@@ -13,6 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { GuardedLink } from '@/components/unsaved-changes'
 import { switchTenantPath } from '@/lib/tenant-paths'
 import { NewTenantDialog } from './new-tenant-dialog'
 import { TenantLogo } from './tenant-logo'
@@ -46,12 +46,12 @@ export function TenantSwitcher() {
               const current = t.id === tenant.id
               return (
                 <DropdownMenuItem key={t.id} asChild>
-                  <Link href={switchTenantPath(pathname, t.id)} aria-current={current ? 'true' : undefined} className={current ? 'font-medium' : undefined}>
+                  <GuardedLink href={switchTenantPath(pathname, t.id)} aria-current={current ? 'true' : undefined} className={current ? 'font-medium' : undefined}>
                     <Check aria-hidden className={current ? undefined : 'invisible'} />
                     <span className="min-w-0 truncate" title={t.name}>
                       {t.name}
                     </span>
-                  </Link>
+                  </GuardedLink>
                 </DropdownMenuItem>
               )
             })}

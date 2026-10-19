@@ -30,8 +30,11 @@ services:
       PGDATABASE: postgres
       POSTGRES_DB: postgres
       JWT_EXP: ${JWT_EXPIRY:-3600}
-    # Failed statements can contain secrets as literals; keep them out of the log (the client still sees the error).
-    command: [postgres, -c, config_file=/etc/postgresql/postgresql.conf, -c, log_min_messages=fatal, -c, log_min_error_statement=fatal]
+    # Warnings and errors stay in the log (disk full, crash recovery). Failed statements can contain secrets as literals, so
+    # statement text stays out (log_min_error_statement) and so do DETAIL/HINT/CONTEXT lines (terse); the client still sees the error.
+    command: [postgres, -c, config_file=/etc/postgresql/postgresql.conf, -c, log_min_messages=warning, -c, log_min_error_statement=fatal, -c, log_error_verbosity=terse]
+    # The image stops Postgres with SIGINT (fast shutdown); give it time to checkpoint before Docker kills it (crash recovery on an SD card is slow).
+    stop_grace_period: 60s
     healthcheck:
       test: [CMD, pg_isready, -U, postgres, -h, localhost]
       interval: 5s
@@ -177,7 +180,9 @@ services:
       - ${HTTP_PORT:-80}:80
       - ${HTTPS_PORT:-443}:443
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # The directory, not the single file: git replaces the file on pull, and a file mount would keep showing the old inode
+      # (scripts/update reloads Caddy after every update).
+      - ./caddy:/etc/caddy:ro
       - caddy-data:/data
       - caddy-config:/config
     environment:

@@ -5,7 +5,7 @@ import { din5008, mm } from '../din5008'
 import type { DocumentLogo } from '../logo'
 import { modernHead } from './modern-metrics'
 
-type Props = { vm: InvoiceViewModel; theme: Theme; fontFamily: string; logo?: DocumentLogo | null }
+type Props = { vm: InvoiceViewModel; theme: Theme; fontFamily: string | string[]; logo?: DocumentLogo | null }
 
 /**
  * Layout "Modern" (spec 3d): large company name in the primary color, an accent rule, DIN 5008 address field,

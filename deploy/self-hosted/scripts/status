@@ -10,6 +10,24 @@ if backups_enabled; then
 else
   echo "Backups: OFF (enable: see README 'Turn on backups')"
 fi
+
+dir="$(backup_dir)"
+# With backups on, a backup older than this (the timer runs nightly) is a problem.
+STALE_MINUTES=2880
+if [ -e "$BACKUP_FAILED_MARKER" ]; then
+  echo "WARNING: the nightly backup failed at $(date -r "$BACKUP_FAILED_MARKER" '+%Y-%m-%d %H:%M'). See: journalctl -u rechnungen-backup"
+  echo "         (the warning goes away after the next successful backup)"
+fi
+if backups_enabled; then
+  recent=""
+  if [ -d "$dir" ]; then
+    recent="$(find "$dir" -maxdepth 1 -type f \( -name 'rechnungen-[0-9]*.tar.age' -o -name 'rechnungen-[0-9]*.tar' \) -mmin "-$STALE_MINUTES" | head -n 1)"
+  fi
+  if [ -z "$recent" ]; then
+    echo "WARNING: backups are on, but there is no backup from the last 2 days in $dir."
+    echo "         Check: journalctl -u rechnungen-backup, and that the backup disk is mounted."
+  fi
+fi
 echo
 
 echo "== containers"
@@ -27,11 +45,10 @@ fi
 
 echo
 echo "== newest backup (last successful one)"
-dir="$(backup_dir)"
 latest=""
 if [ -d "$dir" ]; then
   # Only finished archives count: the lock file is touched by every run (also a failed one) and .partial.* files are unfinished.
-  # rechnungen-<digit>... excludes the safety copies that restore makes (rechnungen-safety-...). Encrypted (.tar.age) and
+  # rechnungen-<digit>... excludes the safety and pre-update copies (rechnungen-safety-..., rechnungen-preupdate-...). Encrypted (.tar.age) and
   # unencrypted (.tar) backups both count.
   latest="$(find "$dir" -maxdepth 1 -type f \( -name 'rechnungen-[0-9]*.tar.age' -o -name 'rechnungen-[0-9]*.tar' \) -exec ls -t {} + 2>/dev/null | head -n 1 || true)"
 fi
@@ -52,13 +69,14 @@ if backups_enabled; then
   fi
 fi
 
-# Safety copies made by restore: they are never pruned, so list them for the user to delete when no longer needed.
+# Copies made by restore (never pruned: delete them when no longer needed) and by update while backups are off (the newest two stay).
 safety=""
 if [ -d "$dir" ]; then
-  safety="$(find "$dir" -maxdepth 1 -type f \( -name 'rechnungen-safety-*.tar.age' -o -name 'rechnungen-safety-*.tar' \) | LC_ALL=C sort)"
+  safety="$(find "$dir" -maxdepth 1 -type f \( -name 'rechnungen-safety-*.tar.age' -o -name 'rechnungen-safety-*.tar' -o -name 'rechnungen-preupdate-*.tar.age' -o -name 'rechnungen-preupdate-*.tar' \) | LC_ALL=C sort)"
 fi
 if [ -n "$safety" ]; then
   echo
-  echo "== safety copies made before a restore (not counted above, never deleted automatically)"
+  echo "== safety copies (made before a restore or an update with backups off; not counted above)"
   echo "$safety"
+  echo "rechnungen-safety-* are never deleted automatically, rechnungen-preupdate-* keep the newest two."
 fi

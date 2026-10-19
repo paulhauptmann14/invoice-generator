@@ -4,7 +4,7 @@ import type { InvoiceViewModel } from '@/lib/domain/view-model'
 import { din5008, mm } from '../din5008'
 import type { DocumentLogo } from '../logo'
 
-type Props = { vm: InvoiceViewModel; theme: Theme; fontFamily: string; logo?: DocumentLogo | null }
+type Props = { vm: InvoiceViewModel; theme: Theme; fontFamily: string | string[]; logo?: DocumentLogo | null }
 
 const PAGE_WIDTH_MM = 210
 
@@ -83,10 +83,10 @@ export function BriefpapierInvoice({ vm, theme, fontFamily, logo }: Props) {
   return (
     <Document title={`${vm.title} ${vm.number}`.trim()} author={vm.companyName} language="de">
       <Page size="A4" style={s.page}>
-        {/* Head: only the logo, on every page – like the business's letterhead. */}
+        {/* Head: only the logo, on page 1 only (not `fixed`): continuation pages start at the normal top margin. */}
         {/* react-pdf's Image draws into the PDF and has no alt attribute (not an HTML <img>). */}
         {/* eslint-disable-next-line jsx-a11y/alt-text */}
-        {logo && <Image fixed style={s.logo} src={{ data: logo.data, format: logo.type }} />}
+        {logo && <Image style={s.logo} src={{ data: logo.data, format: logo.type }} />}
 
         <View style={s.address}>
           <View style={s.endorsement}>{page.senderLine && vm.senderLine !== '' && <Text style={s.senderLine}>{vm.senderLine}</Text>}</View>

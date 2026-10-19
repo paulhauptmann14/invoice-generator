@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { z } from 'zod'
 import { PageHeader } from '@/components/page-header'
-import { Button } from '@/components/ui/button'
+import { SubmitButton } from '@/components/submit-button'
 import { setCustomerArchived } from '@/features/customers/actions'
 import { CustomerForm } from '@/features/customers/customer-form'
 import { getCustomer } from '@/features/customers/queries'
@@ -25,9 +25,9 @@ export default async function EditCustomerPage({ params }: { params: Promise<{ b
         description={archived ? 'Archiviert – erscheint nicht in der Kundenauswahl.' : 'Kunde bearbeiten'}
         actions={
           <form action={setCustomerArchived.bind(null, tenant.id, customer.id, !archived)}>
-            <Button type="submit" variant="outline">
+            <SubmitButton variant="outline" pendingLabel={archived ? 'Wird wiederhergestellt …' : 'Wird archiviert …'}>
               {archived ? 'Wiederherstellen' : 'Archivieren'}
-            </Button>
+            </SubmitButton>
           </form>
         }
       />

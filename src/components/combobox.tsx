@@ -33,7 +33,21 @@ export function Combobox({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button id={id} type="button" variant="outline" role="combobox" aria-expanded={open} className="w-full justify-between bg-card font-normal">
+        <Button
+          id={id}
+          type="button"
+          variant="outline"
+          role="combobox"
+          aria-expanded={open}
+          className="w-full justify-between bg-card font-normal"
+          onKeyDown={(event) => {
+            // WAI-ARIA combobox pattern: Down/Up Arrow opens the list (Enter and Space already toggle the popover).
+            if ((event.key === 'ArrowDown' || event.key === 'ArrowUp') && !open) {
+              event.preventDefault()
+              setOpen(true)
+            }
+          }}
+        >
           {trigger ?? <span className="truncate">{selected?.label ?? placeholder}</span>}
           <ChevronsUpDown aria-hidden className="size-4 shrink-0 text-muted-foreground" />
         </Button>
