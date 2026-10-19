@@ -1,0 +1,47 @@
+# Runs the same checks as locally (see package.json) on every push and pull request.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+# A newer push to the same pull request makes its running check obsolete; runs on main always finish.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      NEXT_TELEMETRY_DISABLED: 1
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false # no later step needs git credentials
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.22.0 # same as deploy/self-hosted/app.Dockerfile
+          cache: npm
+      - run: npm ci
+      - run: npm audit --omit=dev
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+        env:
+          # Only checked here, never deployed: placeholder values are enough.
+          NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-build-only
+      - run: git ls-files -z 'deploy/self-hosted/scripts/*' 'deploy/self-hosted/tests/*.sh' | xargs -0 shellcheck -x -P SCRIPTDIR
+
+      # Local Supabase in Docker (migrations + seed), then the database and integration tests.
+      - run: npx supabase start -x realtime,imgproxy,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+      - run: npm run db:test
+      - run: npx supabase status -o env | sed -nE 's/^API_URL=/NEXT_PUBLIC_SUPABASE_URL=/p; s/^PUBLISHABLE_KEY=/NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=/p' > .env.local
+      - run: npm run test:integration
