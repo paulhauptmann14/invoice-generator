@@ -54,7 +54,9 @@ if [ -n "$recipient" ]; then
 fi
 
 year="$(date +%Y)"
-[[ "$year" =~ ^[0-9]{4}$ ]] && [ "$year" -ge "$MIN_YEAR" ] || die "the system clock says year '$year'; refusing to back up with a clock that is clearly wrong (wait for the time sync, or set the date)"
+if ! [[ "$year" =~ ^[0-9]{4}$ ]] || [ "$year" -lt "$MIN_YEAR" ]; then
+  die "the system clock says year '$year'; refusing to back up with a clock that is clearly wrong (wait for the time sync, or set the date)"
+fi
 
 umask 077
 dest_dir="$(backup_dir)"
