@@ -99,7 +99,9 @@ create_env_file() {
     info "Keeping the existing $ENV_FILE"
     return
   fi
-  ask APP_HOST "Name the app is reached at on your network" "rechnungen.local"
+  # Default to the machine's own mDNS name (raspberrypi.local on a fresh Pi): devices resolve it without router changes,
+  # whereas any other .local name needs an extra DNS entry.
+  ask APP_HOST "Name the app is reached at on your network" "$(hostname -s 2>/dev/null || echo raspberrypi).local"
   # No question about backups: they are off until the owner turns them on. An AGE_RECIPIENT given in the environment is kept.
   AGE_RECIPIENT="${AGE_RECIPIENT:-}"
   [[ "$APP_HOST" =~ ^[A-Za-z0-9.-]+$ ]] || die "APP_HOST may only contain letters, digits, dots and hyphens"

@@ -53,7 +53,8 @@ git clone https://github.com/paulhauptmann14/invoice-generator.git ~/docker/invo
 cd ~/docker/invoice-generator/deploy/self-hosted && scripts/setup
 ```
 
-The setup asks for the name the app is reached at and creates all secrets in `deploy/self-hosted/.env`. The first build takes
+The setup asks for the name the app is reached at (it suggests the machine's own name, for example `raspberrypi.local`;
+keep it unless your router resolves another one) and creates all secrets in `deploy/self-hosted/.env`. The first build takes
 several minutes on a Pi. If it stops with "did not become healthy", see
 [Troubleshooting](deploy/self-hosted/README.md#troubleshooting).
 
