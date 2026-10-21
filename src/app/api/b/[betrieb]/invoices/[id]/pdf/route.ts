@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { forLetterhead } from '@/features/documents/letterhead'
 import { loadInvoiceDocument } from '@/features/documents/load-document-data'
 import { pdfResponse } from '@/features/documents/document-response'
 import { renderInvoicePdf } from '@/features/documents/render-invoice-pdf'
@@ -17,23 +18,24 @@ const recipientIncomplete = (recipientMissing: string[]) =>
     { status: 409 },
   )
 
-/** Preview of a saved invoice (inline, not archived). */
-export async function GET(_request: Request, { params }: Params) {
+/** Preview of a saved invoice (inline, not archived); also what "Drucken" prints. `?letterhead=1`: the letterhead version. */
+export async function GET(request: Request, { params }: Params) {
   const { betrieb, id } = await params
   const auth = await requireTenantForRoute(betrieb)
   if (auth.error) return auth.error
   if (!z.uuid().safeParse(id).success) return notFound()
 
   // An invoice of another tenant is not found (spec 3a).
-  const doc = await loadInvoiceDocument(auth.supabase, auth.tenant.id, id)
-  if (!doc) return notFound()
+  const loaded = await loadInvoiceDocument(auth.supabase, auth.tenant.id, id)
+  if (!loaded) return notFound()
   const recipientMissing = await loadMissingRecipientAddress(auth.supabase, auth.tenant.id, id)
   if (recipientMissing.length > 0) return recipientIncomplete(recipientMissing)
+  const doc = new URL(request.url).searchParams.get('letterhead') === '1' ? forLetterhead(loaded) : loaded
   return pdfResponse(await renderInvoicePdf(doc.vm, doc.theme, { logo: doc.logo }), { type: 'inline', filename: doc.filenames.pdf })
 }
 
-// withoutLogo: for printing on letterhead paper that already carries the logo.
-const exportBody = z.object({ filename: z.string().max(200), withoutLogo: z.boolean().optional() })
+// letterhead: for printing on letterhead paper that already carries the logo and the sender line.
+const exportBody = z.object({ filename: z.string().max(200), letterhead: z.boolean().optional() })
 
 /** Export: render, archive in storage + invoice_exports, then download. No download without archive. */
 export async function POST(request: Request, { params }: Params) {
@@ -45,8 +47,9 @@ export async function POST(request: Request, { params }: Params) {
   const parsedBody = exportBody.safeParse(await request.json().catch(() => null))
   if (!parsedBody.success) return Response.json({ error: 'invalid body' }, { status: 400 })
 
-  const doc = await loadInvoiceDocument(auth.supabase, auth.tenant.id, id)
-  if (!doc) return notFound()
+  const loaded = await loadInvoiceDocument(auth.supabase, auth.tenant.id, id)
+  if (!loaded) return notFound()
+  const doc = parsedBody.data.letterhead ? forLetterhead(loaded) : loaded
   const recipientMissing = await loadMissingRecipientAddress(auth.supabase, auth.tenant.id, id)
   if (doc.missing.length > 0) {
     return Response.json({ error: 'company data incomplete', missing: doc.missing, recipientMissing }, { status: 409 })
@@ -54,7 +57,7 @@ export async function POST(request: Request, { params }: Params) {
   if (recipientMissing.length > 0) return recipientIncomplete(recipientMissing)
 
   const filename = parsedBody.data.filename.trim() ? normalizeUserFilename(parsedBody.data.filename, 'pdf') : doc.filenames.pdf
-  const pdf = await renderInvoicePdf(doc.vm, doc.theme, { logo: parsedBody.data.withoutLogo ? null : doc.logo })
+  const pdf = await renderInvoicePdf(doc.vm, doc.theme, { logo: doc.logo })
   const storagePath = `${auth.tenant.id}/${id}/${new Date().toISOString().replace(/[:.]/g, '-')}_${filename}`
   const bucket = auth.supabase.storage.from('invoice-pdfs')
 

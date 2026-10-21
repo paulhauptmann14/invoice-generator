@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { docxResponse } from '@/features/documents/document-response'
+import { forLetterhead } from '@/features/documents/letterhead'
 import { loadInvoiceDocument } from '@/features/documents/load-document-data'
 import { renderInvoiceDocx } from '@/features/documents/render-invoice-docx'
 import { loadMissingRecipientAddress, recipientAddressMessage } from '@/features/invoices/recipient-address'
@@ -8,8 +9,8 @@ import { normalizeUserFilename } from '@/lib/domain/filename'
 
 type Params = { params: Promise<{ betrieb: string; id: string }> }
 
-// withoutLogo: for printing on letterhead paper that already carries the logo.
-const body = z.object({ filename: z.string().max(200), withoutLogo: z.boolean().optional() })
+// letterhead: for printing on letterhead paper that already carries the logo and the sender line.
+const body = z.object({ filename: z.string().max(200), letterhead: z.boolean().optional() })
 
 /** Editable Word version of a saved invoice. Not archived: the archived PDF is the record (spec 8). */
 export async function POST(request: Request, { params }: Params) {
@@ -21,8 +22,9 @@ export async function POST(request: Request, { params }: Params) {
   const parsed = body.safeParse(await request.json().catch(() => null))
   if (!parsed.success) return Response.json({ error: 'invalid body' }, { status: 400 })
 
-  const doc = await loadInvoiceDocument(auth.supabase, auth.tenant.id, id)
-  if (!doc) return Response.json({ error: 'not found' }, { status: 404 })
+  const loaded = await loadInvoiceDocument(auth.supabase, auth.tenant.id, id)
+  if (!loaded) return Response.json({ error: 'not found' }, { status: 404 })
+  const doc = parsed.data.letterhead ? forLetterhead(loaded) : loaded
   const recipientMissing = await loadMissingRecipientAddress(auth.supabase, auth.tenant.id, id)
   if (doc.missing.length > 0) {
     return Response.json({ error: 'company data incomplete', missing: doc.missing, recipientMissing }, { status: 409 })
@@ -37,7 +39,7 @@ export async function POST(request: Request, { params }: Params) {
 
   const filename = parsed.data.filename.trim() ? normalizeUserFilename(parsed.data.filename, 'docx') : doc.filenames.docx
   try {
-    return docxResponse(await renderInvoiceDocx(doc.vm, doc.theme, { logo: parsed.data.withoutLogo ? null : doc.logo }), filename)
+    return docxResponse(await renderInvoiceDocx(doc.vm, doc.theme, { logo: doc.logo }), filename)
   } catch (error) {
     console.error('DOCX rendering failed', error)
     return Response.json({ error: 'render failed' }, { status: 500 })

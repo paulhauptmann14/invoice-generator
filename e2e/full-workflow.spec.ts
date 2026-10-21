@@ -791,6 +791,51 @@ test.describe('invoice', () => {
     await deleteOpenInvoice(page)
     await archiveCustomer(page, customer)
   })
+
+  test('Drucken: letterhead version, print dialog or new tab, nothing archived', async ({ page }) => {
+    const customer = `${PREFIX} Kunde Druck ${RUN}`
+    await signIn(page)
+    await createCustomer(page, customer)
+    const { id } = await createSimpleInvoice(page, customer)
+    const letterhead = 'Für Briefpapier (ohne Logo und Absenderzeile)'
+
+    // The export dialogs offer the letterhead version too, with or without a logo.
+    await page.getByRole('button', { name: 'PDF exportieren' }).click()
+    await expect(page.getByRole('dialog').getByLabel(letterhead)).not.toBeChecked()
+    await page.getByRole('dialog').getByRole('button', { name: 'Abbrechen' }).click()
+
+    // Chromium: the PDF is fetched and printed from a hidden frame.
+    await page.getByRole('button', { name: 'Drucken', exact: true }).click()
+    const dialog = page.getByRole('dialog')
+    await expect(dialog.getByText('Der Druckdialog öffnet sich gleich. Es wird nichts archiviert.')).toBeVisible()
+    await expect(dialog.getByLabel('Dateiname')).toHaveCount(0)
+    await dialog.getByLabel(letterhead).check()
+    const printed = page.waitForResponse((r) => r.url().endsWith(`/invoices/${id}/pdf?letterhead=1`))
+    await dialog.getByRole('button', { name: 'Drucken', exact: true }).click()
+    const response = await printed
+    expect(response.status()).toBe(200)
+    expect(response.headers()['content-type']).toContain('application/pdf')
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+    await expect(page.locator('iframe[title="Druckfassung der Rechnung"]')).toHaveCount(1)
+    await expect(page.getByRole('button', { name: 'Drucken', exact: true })).toBeFocused()
+
+    // Other browsers (Firefox, Safari): the print version opens in a new tab.
+    await page.evaluate(() => Object.defineProperty(navigator, 'userAgentData', { configurable: true, value: undefined }))
+    await page.getByRole('button', { name: 'Drucken', exact: true }).click()
+    await expect(dialog.getByText(/öffnet sich in einem neuen Tab/)).toBeVisible()
+    // The new tab is opened without an opener, so watch the context's requests rather than this page's popups.
+    const opened = page.context().waitForEvent('request', (r) => r.url().endsWith(`/api/b/${GASTHAUS}/invoices/${id}/pdf`))
+    await dialog.getByRole('button', { name: 'Zum Drucken öffnen' }).click()
+    // A navigation (the tab opening the PDF), not a fetch of this page.
+    expect((await opened).isNavigationRequest()).toBe(true)
+    await expect(page.getByRole('dialog')).toHaveCount(0)
+
+    // Printing archives nothing.
+    await expect(page.getByText('Noch nicht exportiert.')).toBeVisible()
+
+    await deleteOpenInvoice(page)
+    await archiveCustomer(page, customer)
+  })
 })
 
 // ---------------------------------------------------------------------------------------------------------------

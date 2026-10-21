@@ -1,8 +1,8 @@
 'use client'
 
-import { CircleCheck, Download, ExternalLink, FileText, Info } from 'lucide-react'
+import { CircleCheck, Download, ExternalLink, FileText, Info, Printer } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { useId, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { FormAlert } from '@/components/form-alert'
 import { GuardedLink } from '@/components/unsaved-changes'
 import { useTenant } from '@/features/tenants/tenant-context'
@@ -13,10 +13,12 @@ import { Label } from '@/components/ui/label'
 import { normalizeUserFilename } from '@/lib/domain/filename'
 import { useEditorDirty } from './editor-context'
 import { recipientAddressMessage } from './recipient-address-message'
+import { canPrintDirectly, printPdf } from './print-pdf'
 import { chooseLocation, savePicker, writeFile } from './save-file'
 
 type ExportError = { kind: 'missing'; fields: string[]; recipient: string[] } | { kind: 'failed' } | { kind: 'expired' } | { kind: 'write' }
 type Format = 'pdf' | 'docx'
+type Action = Format | 'print'
 
 // One dialog for both formats; only the PDF is archived (the archived PDF is the record of the invoice).
 // `picks`: the browser asks where to save (Chrome, Edge); otherwise the file goes to the downloads folder.
@@ -36,6 +38,16 @@ const COPY: Record<Format, { title: string; description: (picks: boolean) => str
     writeFailed: 'Die Word-Datei konnte nicht gespeichert werden, bitte erneut versuchen.',
     done: (name) => `${name} exportiert.`,
   },
+}
+
+// Printing renders the invoice without archiving it (like "PDF ansehen"); `direct`: this browser opens the print dialog itself.
+const PRINT_COPY = {
+  title: 'Drucken',
+  description: (direct: boolean) =>
+    direct
+      ? 'Der Druckdialog öffnet sich gleich. Es wird nichts archiviert.'
+      : 'Die Rechnung öffnet sich in einem neuen Tab, dort mit ⌘P bzw. Strg+P drucken. Es wird nichts archiviert.',
+  failed: 'Die Druckfassung konnte nicht erstellt werden, bitte erneut versuchen.',
 }
 
 const withoutExtension = (filename: string) => filename.replace(/\.(pdf|docx)$/i, '')
@@ -68,7 +80,6 @@ export function ExportPanel({
   defaultFilenames,
   missing,
   recipientMissing = [],
-  hasLogo = false,
   leading,
 }: {
   invoiceId: string
@@ -76,8 +87,6 @@ export function ExportPanel({
   missing: string[]
   /** Empty address fields of the recipient on an invoice above 250 EUR (§ 14 UStG); export is blocked while any are missing. */
   recipientMissing?: string[]
-  /** Offers "Ohne Logo (für Briefpapier)" when a logo is configured. */
-  hasLogo?: boolean
   /** Shown left of the PDF actions (the invoice number). */
   leading?: React.ReactNode
 }) {
@@ -85,38 +94,77 @@ export function ExportPanel({
   const { path, api } = useTenant()
   const dirty = useEditorDirty()
   const [open, setOpen] = useState(false)
-  const [format, setFormat] = useState<Format>('pdf')
+  const [action, setAction] = useState<Action>('pdf')
   const [name, setName] = useState(withoutExtension(defaultFilenames.pdf))
-  const [withoutLogo, setWithoutLogo] = useState(false)
+  // Letterhead paper already carries the logo and the business address: leave both out.
+  const [letterhead, setLetterhead] = useState(false)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<ExportError | null>(null)
   const [done, setDone] = useState<string | null>(null)
   // Whether this browser can ask for the location; read when the dialog opens (never during server render).
   const [picks, setPicks] = useState(false)
+  const [direct, setDirect] = useState(false)
   const alertRef = useRef<HTMLDivElement>(null)
   // The dialog has no DialogTrigger, so focus goes back to the opening button by hand.
   const pdfButtonRef = useRef<HTMLButtonElement>(null)
   const docxButtonRef = useRef<HTMLButtonElement>(null)
+  const printButtonRef = useRef<HTMLButtonElement>(null)
+  const openerRefs = { pdf: pdfButtonRef, docx: docxButtonRef, print: printButtonRef }
+  // The hidden frame of the last print; removed with the next print or when the page goes away.
+  const printFrame = useRef<(() => void) | null>(null)
+  useEffect(() => () => printFrame.current?.(), [])
   const inputId = useId()
   const hintId = useId()
 
   const blocked = missing.length > 0 || recipientMissing.length > 0 || dirty
+  const format: Format = action === 'docx' ? 'docx' : 'pdf'
   const finalName = normalizeUserFilename(name, format)
   const copy = COPY[format]
 
-  function openDialog(next: Format) {
-    setFormat(next)
-    setName(withoutExtension(defaultFilenames[next]))
-    setWithoutLogo(false)
+  function openDialog(next: Action) {
+    setAction(next)
+    if (next !== 'print') setName(withoutExtension(defaultFilenames[next]))
+    setLetterhead(false)
     setError(null)
     setDone(null)
     setPicks(savePicker() !== null)
+    setDirect(canPrintDirectly())
     setOpen(true)
+  }
+
+  async function runPrint() {
+    const url = api(`invoices/${invoiceId}/pdf${letterhead ? '?letterhead=1' : ''}`)
+    if (!direct) {
+      // Opened right away, while the click still counts as user activation (no pop-up blocker); the browser's PDF viewer prints.
+      window.open(url, '_blank', 'noopener')
+      setOpen(false)
+      return
+    }
+    setPending(true)
+    try {
+      const response = await fetch(url)
+      if (response.status === 401) return setError({ kind: 'expired' })
+      if (response.status === 409) {
+        const body = (await response.json().catch(() => ({}))) as { recipientMissing?: string[] }
+        return setError({ kind: 'missing', fields: [], recipient: body.recipientMissing ?? recipientMissing })
+      }
+      if (!response.ok) throw new Error(`Print version failed with ${response.status}`)
+      printFrame.current?.()
+      printFrame.current = printPdf(await response.blob())
+      setOpen(false)
+    } catch (err) {
+      console.error(err)
+      setError({ kind: 'failed' })
+    } finally {
+      setPending(false)
+      window.setTimeout(() => alertRef.current?.focus(), 0)
+    }
   }
 
   async function runExport(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
+    if (action === 'print') return runPrint()
     // The save dialog has to come first, while the click still counts as user activation. Cancelling it
     // exports nothing (and archives nothing); where it is unavailable, the file is downloaded as before.
     const picker = savePicker()
@@ -127,7 +175,7 @@ export function ExportPanel({
       const response = await fetch(api(`invoices/${invoiceId}/${format}`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: name, withoutLogo }),
+        body: JSON.stringify({ filename: name, letterhead }),
       })
       if (response.status === 401) return setError({ kind: 'expired' })
       if (response.status === 409) {
@@ -186,6 +234,18 @@ export function ExportPanel({
               </a>
             </Button>
           )}
+          <Button
+            ref={printButtonRef}
+            type="button"
+            variant="outline"
+            className="gap-2"
+            disabled={blocked}
+            aria-describedby={blocked ? 'pdf-blocked' : undefined}
+            onClick={() => openDialog('print')}
+          >
+            <Printer aria-hidden className="size-4" />
+            Drucken
+          </Button>
           <Button
             ref={docxButtonRef}
             type="button"
@@ -247,12 +307,14 @@ export function ExportPanel({
           onCloseAutoFocus={(event) => {
             // Escape, Abbrechen and a finished export all end up here: back to the button that opened the dialog.
             event.preventDefault()
-            ;(format === 'pdf' ? pdfButtonRef : docxButtonRef).current?.focus()
+            openerRefs[action].current?.focus()
           }}
         >
           <div className="space-y-1.5">
-            <DialogTitle className="type-title">{copy.title}</DialogTitle>
-            <DialogDescription className="text-sm text-muted-foreground">{copy.description(picks)}</DialogDescription>
+            <DialogTitle className="type-title">{action === 'print' ? PRINT_COPY.title : copy.title}</DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
+              {action === 'print' ? PRINT_COPY.description(direct) : copy.description(picks)}
+            </DialogDescription>
           </div>
           <form onSubmit={runExport} noValidate className="space-y-5">
             {error && (
@@ -274,35 +336,44 @@ export function ExportPanel({
                   'Sitzung abgelaufen – bitte neu anmelden.'
                 ) : error.kind === 'write' ? (
                   copy.writeFailed
+                ) : action === 'print' ? (
+                  PRINT_COPY.failed
                 ) : (
                   copy.failed
                 )}
               </FormAlert>
             )}
-            <div className="space-y-1.5">
-              <Label htmlFor={inputId}>Dateiname</Label>
-              <Input id={inputId} value={name} onChange={(e) => setName(e.target.value)} aria-describedby={hintId} autoComplete="off" spellCheck={false} />
-              <p id={hintId} className="text-sm break-all text-muted-foreground">
-                {picks ? 'Vorschlag im Speichern-Dialog:' : 'Gespeichert als'} <span className="font-mono text-foreground">{finalName}</span>
-              </p>
-            </div>
-            {hasLogo && (
-              // The whole row is the click target (44px on mobile).
-              <label className="flex min-h-11 items-center gap-3 text-sm md:min-h-9">
-                <input type="checkbox" checked={withoutLogo} onChange={(e) => setWithoutLogo(e.target.checked)} className="size-4 accent-[var(--color-tinte)]" />
-                Ohne Logo (für Briefpapier)
-              </label>
+            {action !== 'print' && (
+              <div className="space-y-1.5">
+                <Label htmlFor={inputId}>Dateiname</Label>
+                <Input id={inputId} value={name} onChange={(e) => setName(e.target.value)} aria-describedby={hintId} autoComplete="off" spellCheck={false} />
+                <p id={hintId} className="text-sm break-all text-muted-foreground">
+                  {picks ? 'Vorschlag im Speichern-Dialog:' : 'Gespeichert als'} <span className="font-mono text-foreground">{finalName}</span>
+                </p>
+              </div>
             )}
+            {/* The whole row is the click target (44px on mobile). */}
+            <label className="flex min-h-11 items-center gap-3 text-sm md:min-h-9">
+              <input type="checkbox" checked={letterhead} onChange={(e) => setLetterhead(e.target.checked)} className="size-4 accent-[var(--color-tinte)]" />
+              Für Briefpapier (ohne Logo und Absenderzeile)
+            </label>
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <DialogClose asChild>
                 <Button type="button" variant="ghost" disabled={pending}>
                   Abbrechen
                 </Button>
               </DialogClose>
-              <Button type="submit" className="gap-2" disabled={pending} aria-busy={pending}>
-                <Download aria-hidden className="size-4" />
-                {pending ? 'Wird exportiert …' : picks ? 'Speichern unter …' : 'Exportieren'}
-              </Button>
+              {action === 'print' ? (
+                <Button type="submit" className="gap-2" disabled={pending} aria-busy={pending}>
+                  <Printer aria-hidden className="size-4" />
+                  {pending ? 'Wird vorbereitet …' : direct ? 'Drucken' : 'Zum Drucken öffnen'}
+                </Button>
+              ) : (
+                <Button type="submit" className="gap-2" disabled={pending} aria-busy={pending}>
+                  <Download aria-hidden className="size-4" />
+                  {pending ? 'Wird exportiert …' : picks ? 'Speichern unter …' : 'Exportieren'}
+                </Button>
+              )}
             </div>
           </form>
         </DialogContent>

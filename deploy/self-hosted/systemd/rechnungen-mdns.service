@@ -1,0 +1,16 @@
+# Template: replace @APP_HOST@ (a .local name other than the machine's own, for example rechnungen.local), then copy to
+# /etc/systemd/system/. Needs avahi-utils. The README ("Your own name in the network") describes the steps.
+# Announces the name with the machine's current IPv4 address, read at every start; a DHCP reservation keeps it stable.
+[Unit]
+Description=Invoice app: announce @APP_HOST@ in the home network
+After=network-online.target avahi-daemon.service
+Wants=network-online.target
+Requires=avahi-daemon.service
+
+[Service]
+ExecStart=/bin/sh -c 'exec /usr/bin/avahi-publish -a -R @APP_HOST@ "$$(ip -4 route get 1.1.1.1 | sed -n "s/.* src \([0-9.]*\).*/\1/p")"'
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

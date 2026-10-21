@@ -7,6 +7,7 @@ All commands run in `~/docker/invoice-generator/deploy/self-hosted` unless a blo
 
 ## Table of Contents
 
+- [Your own name in the network](#your-own-name-in-the-network)
 - [Trust the certificate](#trust-the-certificate)
 - [Everyday commands](#everyday-commands)
 - [Registration](#registration)
@@ -16,6 +17,24 @@ All commands run in `~/docker/invoice-generator/deploy/self-hosted` unless a blo
 - [Move to another machine](#move-to-another-machine)
 - [Security](#security)
 - [Troubleshooting](#troubleshooting)
+
+## Your own name in the network
+
+Devices find the machine by its own name (`raspberrypi.local` on a fresh Pi), which setup suggests. For a name of its own,
+for example `rechnungen.local`, enter it during setup (or later: change `APP_HOST` in `.env` and run `docker compose up -d`)
+and let the machine announce it in the network:
+
+```bash
+sudo apt install -y avahi-utils
+```
+
+```bash
+sed -e "s|@APP_HOST@|$(grep '^APP_HOST=' .env | cut -d= -f2)|" systemd/rechnungen-mdns.service | sudo tee /etc/systemd/system/rechnungen-mdns.service >/dev/null && sudo systemctl daemon-reload && sudo systemctl enable --now rechnungen-mdns.service
+```
+
+Check it from another device, for example `ping -c 2 rechnungen.local` on a Mac. The name follows the address the machine has
+at startup: reserve that address for it in the router (DHCP reservation). Some Windows PCs do not resolve `.local` names; add a
+DNS entry in the router or a line `<address> rechnungen.local` to `C:\Windows\System32\drivers\etc\hosts` there.
 
 ## Trust the certificate
 
@@ -39,9 +58,16 @@ scp <user>@<host>:rechnungen-root.crt ~/Downloads/
   this certificate" to "Always Trust".
 - **iPhone / iPad:** open the file (AirDrop), install the profile in Settings, then switch on full trust under Settings,
   General, About, Certificate Trust Settings.
-- **Windows:** double-click the `.crt`, "Install Certificate", store "Trusted Root Certification Authorities".
+  If Keychain Access refuses the import with error -25294, add it from the Terminal instead (asks for your password):
 
-If a device cannot resolve `<name>.local` (some Windows PCs), add a DNS entry for the server in your router instead.
+  ```bash
+  security add-trusted-cert -r trustRoot -k ~/Library/Keychains/login.keychain-db ~/Downloads/rechnungen-root.crt
+  ```
+- **Windows:** double-click the `.crt`, "Install Certificate", store "Trusted Root Certification Authorities".
+- **Firefox** keeps its own list: Settings, Privacy & Security, "View Certificates", tab "Authorities", "Import", and tick
+  "Trust this CA to identify websites".
+
+If a device cannot resolve `<name>.local`, see [Your own name in the network](#your-own-name-in-the-network).
 
 ## Everyday commands
 
