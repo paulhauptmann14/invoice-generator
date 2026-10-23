@@ -2,7 +2,7 @@ import 'server-only'
 import { renderToBuffer } from '@react-pdf/renderer'
 import type { Theme } from '@/lib/domain/theme'
 import type { InvoiceViewModel } from '@/lib/domain/view-model'
-import { registerFonts } from './fonts'
+import { prepareFonts } from './fonts'
 import { BriefpapierInvoice } from './layouts/briefpapier'
 import { KlassischInvoice } from './layouts/klassisch'
 import { ModernInvoice } from './layouts/modern'
@@ -12,7 +12,7 @@ import type { DocumentLogo } from './logo'
 export type RenderAssets = { logo?: DocumentLogo | null }
 
 export async function renderInvoicePdf(vm: InvoiceViewModel, theme: Theme, assets: RenderAssets = {}): Promise<Buffer> {
-  const fontFamily = registerFonts(theme)
+  const fontFamily = await prepareFonts(theme)
   switch (theme.layout) {
     case 'briefpapier':
       return renderToBuffer(<BriefpapierInvoice vm={vm} theme={theme} fontFamily={fontFamily} logo={assets.logo} />)

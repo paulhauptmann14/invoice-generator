@@ -46,10 +46,45 @@ function register(family: string) {
  * first, the latin-ext subset as per-glyph fallback (react-pdf picks the first font of the stack that has a glyph).
  * Custom fonts (M9) fall back for now.
  */
-export function registerFonts(theme: Theme): string[] {
+function registerFonts(theme: Theme): string[] {
   const family = resolveFontFamily(theme)
   register(family)
   const fallback = GLYPH_FALLBACK[family]
   if (fallback) register(fallback)
   return [family, extFamily(family), ...(fallback ? [extFamily(fallback)] : [])]
+}
+
+// The part of a fontkit font used here (react-pdf does not export fontkit's types).
+type GlyphLookup = { characterSet: number[]; glyphForCodePoint: (codePoint: number) => { codePoints: number[] } }
+const primed = new WeakSet<object>()
+
+/**
+ * fontkit keeps one glyph object per glyph for the life of the process, with the code points of its first lookup, and
+ * the PDF's Unicode map is built from them. Embedding a composite glyph (the "Ü" of "Überweisung" is drawn from "U"
+ * and "¨") looks its components up without code points; from then on every "U" in every PDF had no Unicode mapping,
+ * so Firefox's viewer dropped it and copied text lost it. Looking every character up once before the first layout
+ * gives each glyph its own code point (and repairs one cached without).
+ */
+function primeGlyphs(font: GlyphLookup) {
+  if (primed.has(font)) return
+  for (const codePoint of font.characterSet) {
+    const glyph = font.glyphForCodePoint(codePoint)
+    if (glyph.codePoints.length === 0) glyph.codePoints = [codePoint]
+  }
+  primed.add(font)
+}
+
+/** Registers and loads the theme's fonts for rendering; returns the font stack (see `registerFonts`). */
+export async function prepareFonts(theme: Theme): Promise<string[]> {
+  const stack = registerFonts(theme)
+  await Promise.all(
+    stack.flatMap((fontFamily) =>
+      ([400, 700] as const).map(async (fontWeight) => {
+        await Font.load({ fontFamily, fontWeight })
+        const data = Font.getFont({ fontFamily, fontWeight }).data as GlyphLookup | null
+        if (data) primeGlyphs(data)
+      }),
+    ),
+  )
+  return stack
 }
