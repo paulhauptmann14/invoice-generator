@@ -172,6 +172,7 @@ services:
       start_period: 15s
 
   caddy:
+    # With TLS_MODE=duckdns, compose.duckdns.yml replaces this image by a build (COMPOSE_FILE in .env, see .env.example).
     image: caddy:2.11.7-alpine
     restart: unless-stopped
     logging: *logging

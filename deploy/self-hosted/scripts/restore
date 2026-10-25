@@ -2,12 +2,14 @@
 # Replaces ALL data on this machine with the content of a backup made by scripts/backup. Also the way to move the app to a new
 # machine: install Docker and this repository there (and age, for encrypted backups), then run restore (no setup needed first).
 #
-#   [APP_HOST=...] [HTTP_PORT=...] [HTTPS_PORT=...] [BACKUPS=on|off] [REGISTRATION=on|off] [BACKUP_DIR=...] [AGE_RECIPIENT=...] restore [--yes] [--no-safety-backup] <backup file>
+#   [APP_HOST=...] [HTTP_PORT=...] [HTTPS_PORT=...] [BACKUPS=on|off] [REGISTRATION=on|off] [TLS_MODE=internal|duckdns] [BACKUP_DIR=...] [AGE_RECIPIENT=...] restore [--yes] [--no-safety-backup] <backup file>
 #
 # The backed-up .env comes back as it was. When the machine is different (new name, backups to switch off, other key), set the
 # matching variable in the environment: each one that is set (an empty AGE_RECIPIENT means "no encryption", an empty BACKUP_DIR
 # means ./backups) replaces that line in the restored .env. Values are validated like in setup, before anything is changed.
 # Example: APP_HOST=raspberrypi.local BACKUPS=off AGE_RECIPIENT= scripts/restore backup.tar
+# TLS_MODE=duckdns needs DUCKDNS_TOKEN in the restored .env (the token itself is never an override: it comes back with the .env);
+# a TLS_MODE override also sets or removes the COMPOSE_FILE line that goes with it.
 #
 # A backup named *.tar.age is encrypted: restore asks for the path of your private age key (or reads AGE_IDENTITY). A backup
 # named *.tar is not encrypted and needs no key. --yes skips the confirmation question (tests).
@@ -43,7 +45,7 @@ done
 
 # Overrides for the restored .env (see the header). Checked now, before anything is touched.
 OVERRIDE_KEYS=""
-for key in APP_HOST HTTP_PORT HTTPS_PORT BACKUPS REGISTRATION BACKUP_DIR AGE_RECIPIENT; do
+for key in APP_HOST HTTP_PORT HTTPS_PORT BACKUPS REGISTRATION TLS_MODE BACKUP_DIR AGE_RECIPIENT; do
   if [ -n "${!key+x}" ]; then
     value="${!key}"
     if [ "$key" = BACKUP_DIR ] && [ -z "$value" ]; then
@@ -157,6 +159,19 @@ else
   echo "this copy of the repository; that only works if the schema has not changed since the backup was made." >&2
 fi
 
+# The certificate settings must fit together (see check_tls_settings); setup would refuse the restored .env only after the old data
+# is gone, so check the values that will apply now: the override from the environment first, else the backed-up .env. A TLS_MODE
+# override also sets COMPOSE_FILE below (compose.duckdns.yml for duckdns, none for internal). Nothing is printed.
+effective_env() { # effective_env <KEY>
+  if [ -n "${!1+x}" ]; then echo "${!1}"; else ENV_FILE="$work/.env" env_get "$1"; fi
+}
+TLS_COMPOSE_FILE="$(ENV_FILE="$work/.env" env_get COMPOSE_FILE)"
+if [ -n "${TLS_MODE+x}" ]; then
+  TLS_COMPOSE_FILE=""
+  [ "$TLS_MODE" != duckdns ] || TLS_COMPOSE_FILE="compose.yml:compose.duckdns.yml"
+fi
+check_tls_settings "$(effective_env TLS_MODE)" "$(ENV_FILE="$work/.env" env_get DUCKDNS_TOKEN)" "$(effective_env APP_HOST)" "$TLS_COMPOSE_FILE"
+
 # Whether a safety copy of the current data is made is decided now, so the confirmation can say it. It does not depend on
 # BACKUPS: that switch only controls the nightly timer. A machine without a .env has nothing to save anyway.
 SAFETY_NOTE=""
@@ -222,6 +237,16 @@ for key in $OVERRIDE_KEYS; do
   fi
   set_env_value "$ENV_FILE" "$key" "$value"
 done
+if [ -n "${TLS_MODE+x}" ]; then
+  # COMPOSE_FILE follows TLS_MODE: the DuckDNS override is part of it only for duckdns.
+  if [ "$TLS_MODE" = duckdns ]; then
+    set_env_value "$ENV_FILE" COMPOSE_FILE compose.yml:compose.duckdns.yml
+  else
+    tmp_env="$(umask 077 && mktemp "$ENV_FILE.XXXXXX")"
+    grep -v '^COMPOSE_FILE=' "$ENV_FILE" >"$tmp_env" || true
+    mv "$tmp_env" "$ENV_FILE"
+  fi
+fi
 # A stack of the restored project name may still exist from an earlier attempt.
 compose down -v --remove-orphans
 

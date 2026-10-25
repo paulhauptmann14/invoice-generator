@@ -9,6 +9,7 @@ All commands run in `~/docker/invoice-generator/deploy/self-hosted` unless a blo
 
 - [Your own name in the network](#your-own-name-in-the-network)
 - [Trust the certificate](#trust-the-certificate)
+- [Trusted certificate with DuckDNS (optional)](#trusted-certificate-with-duckdns-optional)
 - [Everyday commands](#everyday-commands)
 - [Registration](#registration)
 - [Backups](#backups)
@@ -56,25 +57,89 @@ scp <user>@<host>:rechnungen-root.crt ~/Downloads/
 
 - **macOS:** double-click the file, then in Keychain Access open "Caddy Local Authority ...", expand "Trust" and set "When using
   this certificate" to "Always Trust".
-- **iPhone / iPad:** open the file (AirDrop), install the profile in Settings, then switch on full trust under Settings,
-  General, About, Certificate Trust Settings.
   If Keychain Access refuses the import with error -25294, add it from the Terminal instead (asks for your password):
 
   ```bash
   security add-trusted-cert -r trustRoot -k ~/Library/Keychains/login.keychain-db ~/Downloads/rechnungen-root.crt
   ```
+- **iPhone / iPad:** open the file (AirDrop), install the profile in Settings, then switch on full trust under Settings,
+  General, About, Certificate Trust Settings.
 - **Windows:** double-click the `.crt`, "Install Certificate", store "Trusted Root Certification Authorities".
-- **Firefox** keeps its own list: Settings, Privacy & Security, "View Certificates", tab "Authorities", "Import", and tick
-  "Trust this CA to identify websites".
+- **Firefox** keeps its own list and ignores the system's trust settings by default. Either let it use them (after trusting the
+  file in the system as above): open `about:config`, set `security.enterprise_roots.enabled` to `true` and restart Firefox. Or
+  import the file into Firefox: Settings, Privacy & Security, "View Certificates", tab "Authorities", "Import", and tick "Trust
+  this CA to identify websites".
+  If "Drucken" or "PDF ansehen" asks where to save a file instead of showing the PDF, set Settings, General, Applications,
+  "Portable Document Format (PDF)" to "Open in Firefox" (the app sends the PDF for viewing; "Always ask where to save files"
+  can stay on).
 
 If a device cannot resolve `<name>.local`, see [Your own name in the network](#your-own-name-in-the-network).
+
+## Trusted certificate with DuckDNS (optional)
+
+Instead of trusting Caddy's own authority on every device ([Trust the certificate](#trust-the-certificate)), the app can get a
+real Let's Encrypt certificate that every browser accepts without any setup. You need a free name from [DuckDNS](https://www.duckdns.org),
+for example `myhome.duckdns.org`. The name points to the **local** address of your server, so the app stays reachable only in
+your home network: no port is opened and no tunnel is involved. Let's Encrypt only checks that you own the name (a DNS
+challenge, answered with your DuckDNS token); it never connects to your server.
+
+1. Sign in at duckdns.org (with an account of Google, GitHub and so on), choose a name under "domains" and add it.
+2. Set the name's "current ip" to the **local address of the server** (for example `192.168.1.50`, not the address DuckDNS
+   suggests) and click "update ip". Reserve that address for the server in your router so it does not change.
+3. Copy the token from the top of the DuckDNS page. Treat it like a password: with it anyone can change your names.
+4. In `.env` (`nano .env`) set these four lines. If `TLS_MODE=internal` or an `APP_HOST` line is there, change it; do not add a
+   second one:
+
+   ```text
+   TLS_MODE=duckdns
+   DUCKDNS_TOKEN=<your token>
+   APP_HOST=myhome.duckdns.org
+   COMPOSE_FILE=compose.yml:compose.duckdns.yml
+   ```
+
+   The last line makes Compose build Caddy with the DuckDNS module (the plain Caddy image has none); `scripts/update` and the
+   other scripts refuse a `.env` where these lines do not fit together. The token must be the 36-character one from DuckDNS.
+5. Apply it. This builds the Caddy image that includes the DuckDNS module once: it downloads a builder image of about 1 GB and
+   the Go packages, so it needs internet and takes a few minutes on a Pi. Afterwards the app and Caddy restart with the new name:
+
+   ```bash
+   scripts/update
+   ```
+
+   Without the update script: `docker compose up -d --build`. It must be the whole stack, not only `caddy`, because the
+   login service also uses `APP_HOST` (for the links in its e-mails).
+6. Open `https://myhome.duckdns.org`. From now on Caddy serves only this name: `rechnungen.local` (or whatever `APP_HOST` was)
+   no longer works, and the mDNS unit from [Your own name in the network](#your-own-name-in-the-network) is not needed any more
+   (`sudo systemctl disable --now rechnungen-mdns.service`). The first issuance takes a minute; until then the page does not load. Watch it with
+   `docker compose logs -f caddy` (look for "certificate obtained successfully").
+
+Good to know:
+
+- Some routers refuse DNS answers that point to a local address ("DNS rebind protection", for example on a FRITZ!Box). The
+  page then does not load, although the server is fine. Allow the name `myhome.duckdns.org` as an exception in the router
+  (FRITZ!Box: Home Network, Network, Network Settings, "DNS rebind protection").
+- The server needs internet access, also later: the certificate is valid for 90 days and Caddy renews it by itself about every
+  60 days. If the server stays offline until the certificate has expired, browsers warn until it is online again and has
+  renewed it.
+- The name appears in public certificate lists (Certificate Transparency), as it does for every Let's Encrypt certificate.
+  Choose a name that does not reveal anything private.
+- The token stays in `.env` and in every backup of it. It is not part of any image. **When a request to DuckDNS fails, the
+  DuckDNS library writes the token into Caddy's log**, so `docker compose logs caddy` can contain it: never share those logs
+  without removing it first. If it did leak, create a new token on the DuckDNS page and change it in `.env`.
+- `scripts/cert` and the root certificate are not needed in this mode.
+- When you [move to another machine](#move-to-another-machine) in this mode, set the "current ip" of the DuckDNS name to the new
+  machine's local address.
+
+**Go back to Caddy's own authority.** In `.env` set `TLS_MODE=internal`, delete the `DUCKDNS_TOKEN` and `COMPOSE_FILE` lines and
+put the old `APP_HOST` back, then run `docker compose up -d` (Caddy is the plain official image again). The certificate authority your devices trusted earlier is still
+in the Caddy data, so they trust the app again without a new import.
 
 ## Everyday commands
 
 | Command | What it does |
 |---|---|
 | `scripts/status` | Containers, disk space, whether backups are on, the newest backup, warnings about missing or failed backups |
-| `scripts/update` | Backup (also with backups off), `git pull`, new app image, migrations, restart, reload of the Caddy configuration |
+| `scripts/update` | Backup (also with backups off), `git pull`, new app image (and Caddy image with DuckDNS), migrations, restart, reload of the Caddy configuration |
 | `scripts/backup` | Backup now, also when automatic backups are off |
 | `scripts/set-password <email>` | New password for an account (the server sends no e-mail) |
 | `scripts/cert` | Export the root certificate ([Trust the certificate](#trust-the-certificate)) |
@@ -226,12 +291,16 @@ cause and run it again. If the update finished but the app misbehaves, go back t
    [Install](../../README.md#install) steps, but run `scripts/restore` instead of `scripts/setup`.
 
 The restored `.env` is the old one. Set what differs on the new machine in the environment: each variable you set
-(`APP_HOST`, `HTTP_PORT`, `HTTPS_PORT`, `BACKUPS`, `REGISTRATION`, `BACKUP_DIR`, `AGE_RECIPIENT`) replaces its line, and invalid values are
+(`APP_HOST`, `HTTP_PORT`, `HTTPS_PORT`, `BACKUPS`, `REGISTRATION`, `TLS_MODE`, `BACKUP_DIR`, `AGE_RECIPIENT`) replaces its line, and invalid values are
 refused before anything changes. For example, from a test installation on a Mac to the Pi, without backups and without a key:
 
 ```bash
 APP_HOST=raspberrypi.local BACKUPS=off AGE_RECIPIENT= scripts/restore <file>
 ```
+
+With `TLS_MODE=duckdns` the restored `.env` keeps the DuckDNS settings; also set the "current ip" of your DuckDNS name to the new
+machine's local address, otherwise the name still points to the old one. The first start there builds the Caddy image
+(internet, a few minutes).
 
 Accounts, invoices and the certificate authority come along, so devices that already trust it keep trusting it. Only the
 address in the browser changes if you chose a new name.

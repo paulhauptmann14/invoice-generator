@@ -167,6 +167,95 @@ login_page_has_signup_link() {
 
 login_page_without_signup_link() { ! login_page_has_signup_link; }
 
+# Which services of the rendered Compose file (for the current ENV_FILE) get TLS_MODE / DUCKDNS_TOKEN, e.g. "caddy:" or "".
+services_with_tls_settings() {
+  compose config | awk '/^  [a-z0-9_-]+:$/ { svc = $1 } /^      (TLS_MODE|DUCKDNS_TOKEN):/ { print svc }' | sort -u | tr -d '\n'
+}
+
+caddy_image_is_plain_official() {
+  local id
+  id="$(compose ps -q caddy)"
+  [ "$(docker inspect -f '{{.Config.Image}}' "$id")" = caddy:2.11.7-alpine ] &&
+    ! docker image inspect "$TEST_PROJECT-caddy" >/dev/null 2>&1 &&
+    ! compose exec -T caddy caddy list-modules | grep -qx dns.providers.duckdns
+}
+
+# tools_image as the scripts see it for an env file (stdout: the image, or the error on stderr -> stdout).
+tools_image_for() { # tools_image_for <env file>
+  ENV_FILE="$1" bash -c '. "$1/scripts/lib/common.sh"; tools_image' _ "$DEPLOY_DIR" 2>&1
+}
+
+# check_tls_settings in duckdns mode with one COMPOSE_FILE form: succeeds or dies (nothing is printed on success).
+compose_file_form_accepted() { # compose_file_form_accepted <COMPOSE_FILE value>
+  bash -c '. "$1/scripts/lib/common.sh"; check_tls_settings duckdns a1b2c3d4-0000-4000-8000-123456789abc myhome.duckdns.org "$2"' _ "$DEPLOY_DIR" "$1" >/dev/null 2>&1
+}
+
+compose_file_form_refused() { ! compose_file_form_accepted "$1"; }
+
+# The first switch of a running installation to duckdns (and back) through scripts/update with backups ON. The backup must come
+# before the Caddy build and must not need the DuckDNS image. The dummy token cannot get a certificate; only the steps up to the
+# build and the recreation of Caddy are asserted.
+duckdns_switch_checks() { # duckdns_switch_checks <dummy token>
+  local token=$1 image="$TEST_PROJECT-caddy" duck_env="$TMP_DIR/switch-duck.env" dir="$TMP_DIR/switch-backups" out rc=0 files="$DEPLOY_DIR/compose.yml:$DEPLOY_DIR/compose.duckdns.yml"
+  mkdir -p "$dir"
+  sed -e 's/^TLS_MODE=.*/TLS_MODE=duckdns/' -e 's/^APP_HOST=.*/APP_HOST=stack-test.duckdns.org/' -e 's/^BACKUPS=.*/BACKUPS=on/' \
+    -e "s|^BACKUP_DIR=.*|BACKUP_DIR=$dir|" "$ENV_FILE" >"$duck_env"
+  { echo "DUCKDNS_TOKEN=$token"; echo "COMPOSE_FILE=compose.yml:compose.duckdns.yml"; } >>"$duck_env"
+  check "(dw) before the switch no DuckDNS image exists and Caddy is the plain image" caddy_image_is_plain_official
+  out="$(ENV_FILE="$duck_env" bash "$SCRIPTS_DIR/update" --no-pull 2>&1 </dev/null)" || rc=$?
+  tail -n 4 <<<"$out" | sed 's/^/  | /'
+  echo "  (update exit status $rc; a certificate cannot be issued with a dummy token, so only the steps up to the build count)"
+  check "(dw) update with backups on made its backup first (rechnungen-*.tar in the backup directory)" test -n "$(find "$dir" -maxdepth 1 -type f -name 'rechnungen-[0-9]*.tar')"
+  check "(dw) the backup came before the Caddy build (and no 'run scripts/update first' loop)" bash -c "
+    b=\$(grep -n 'Backing up before the update' <<<\"\$1\" | head -n 1 | cut -d: -f1); c=\$(grep -n 'Building the new app and Caddy images' <<<\"\$1\" | head -n 1 | cut -d: -f1)
+    [ -n \"\$b\" ] && [ -n \"\$c\" ] && [ \"\$b\" -lt \"\$c\" ] && ! grep -q 'run scripts/update first' <<<\"\$1\"" _ "$out"
+  check "(dw) the DuckDNS Caddy image was built" quietly docker image inspect "$image"
+  check "(dw) Caddy was recreated from it with the DuckDNS settings" bash -c "
+    id=\$(docker compose --project-directory '$DEPLOY_DIR' --env-file '$duck_env' -p '$TEST_PROJECT' ps -q caddy) &&
+    [ \"\$(docker inspect -f '{{.Config.Image}}' \"\$id\")\" = '$image' ]"
+  check "(dw) the token reached the Caddy container only" test "$(ENV_FILE="$duck_env" COMPOSE_FILE="$files" services_with_tls_settings)" = caddy:
+  echo "== and back to internal"
+  rc=0
+  out="$(bash "$SCRIPTS_DIR/update" --no-pull 2>&1 </dev/null)" || rc=$?
+  tail -n 3 <<<"$out" | sed 's/^/  | /'
+  check "(dw) switching back: update succeeds (exit status $rc)" test "$rc" = 0
+  check "(dw) switching back: update builds only the app (no Caddy build)" bash -c "grep -q 'Building the new app image' <<<\"\$1\" && ! grep -q 'Caddy images' <<<\"\$1\"" _ "$out"
+  check "(dw) switching back: Caddy runs the plain official image again" bash -c "
+    id=\$(docker compose --project-directory '$DEPLOY_DIR' --env-file '$ENV_FILE' -p '$TEST_PROJECT' ps -q caddy) &&
+    [ \"\$(docker inspect -f '{{.Config.Image}}' \"\$id\")\" = caddy:2.11.7-alpine ]"
+  check "(dw) switching back: the app serves the login page" wait_for_login_page
+  docker rmi "$image" >/dev/null 2>&1 || true
+}
+
+# DuckDNS mode without a running stack (a real one would try to get a certificate): the image is built from caddy.Dockerfile through
+# compose.duckdns.yml, then checked with a dummy token; nothing is requested from Let's Encrypt or DuckDNS.
+duckdns_mode_checks() { # duckdns_mode_checks <valid duckdns env file> <dummy token>
+  local env_file=$1 token=$2 image="$TEST_PROJECT-caddy" out validate
+  # The test's compose() has no path logic of its own: give it the absolute file list the scripts derive from the .env line.
+  local files="$DEPLOY_DIR/compose.yml:$DEPLOY_DIR/compose.duckdns.yml"
+  validate=(docker run --rm --network none -v "$DEPLOY_DIR/caddy:/etc/caddy:ro" -e APP_HOST=myhome.duckdns.org -e TLS_MODE=duckdns -e "DUCKDNS_TOKEN=$token" "$image")
+  check "(dv) duckdns mode: only the Caddy service gets TLS_MODE and the token" test "$(ENV_FILE="$env_file" COMPOSE_FILE="$files" services_with_tls_settings)" = caddy:
+  check "(dv) duckdns mode: Compose builds Caddy as <project>-caddy" test "$(ENV_FILE="$env_file" COMPOSE_FILE="$files" compose config --images | grep -E 'caddy' | tr -d '\n')" = "$image"
+  check "(dv) tools_image works before the DuckDNS image exists (always the plain pinned image)" test "$(tools_image_for "$env_file")" = caddy:2.11.7-alpine
+  echo "== building the DuckDNS Caddy image (needs internet, takes a minute)"
+  if ENV_FILE="$env_file" COMPOSE_FILE="$files" compose build caddy >"$TMP_DIR/caddy-build.log" 2>&1; then
+    pass "(dv) the Caddy image builds from caddy.Dockerfile"
+  else
+    tail -n 15 "$TMP_DIR/caddy-build.log"
+    fail "(dv) the Caddy image builds from caddy.Dockerfile"
+    return
+  fi
+  check "(dv) the built image has the DuckDNS DNS module" bash -c "docker run --rm --network none '$image' caddy list-modules | grep -qx dns.providers.duckdns"
+  check "(dv) the Caddyfile is valid in mode duckdns inside that image (dummy token, nothing is requested)" quietly "${validate[@]}" caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+  out="$("${validate[@]}" caddy adapt --config /etc/caddy/Caddyfile --adapter caddyfile 2>&1)"
+  check "(dv) the adapted configuration uses the DuckDNS provider" grep -q '"name":"duckdns"' <<<"$out"
+  check "(dv) the adapted configuration keeps the token as a placeholder, never its value" \
+    bash -c "grep -qF '{env.DUCKDNS_TOKEN}' <<<\"\$1\" && ! grep -qF '$token' <<<\"\$1\"" _ "$out"
+  check "(dv) the token is not part of the image" bash -c "! docker history --no-trunc '$image' | grep -qF '$token'"
+  check "(dv) tools_image still uses the plain pinned image after the build" test "$(tools_image_for "$env_file")" = caddy:2.11.7-alpine
+  docker rmi "$image" >/dev/null 2>&1 || true
+}
+
 cmd_setup() {
   # The setup part runs with an empty AGE_RECIPIENT (the key is optional) and the new-install default REGISTRATION=on.
   run_setup nokey register
@@ -281,6 +370,63 @@ cmd_setup() {
   check "(i) status runs" quietly bash "$SCRIPTS_DIR/status"
   check "(j) cert exports the root certificate" cert_exported
 
+  echo "== trusted certificate option (DuckDNS)"
+  local caddy_validate='caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile' dummy_token='a1b2c3d4-0000-4000-8000-123456789abc'
+  check "(du) a new install writes TLS_MODE=internal and neither a token nor COMPOSE_FILE" \
+    bash -c "grep -qx 'TLS_MODE=internal' '$ENV_FILE' && ! grep -qE '^(DUCKDNS_TOKEN|COMPOSE_FILE)=' '$ENV_FILE'"
+  check "(du) internal mode runs the plain official Caddy image (caddy:2.11.7-alpine, nothing built)" caddy_image_is_plain_official
+  check "(du) internal mode: no service gets TLS_MODE or the token" test -z "$(services_with_tls_settings)"
+  check "(du) tools_image uses the official image in internal mode" test "$(tools_image_for "$ENV_FILE")" = caddy:2.11.7-alpine
+  check "(du) the Caddyfile is valid in mode internal (the default, TLS_MODE unset)" quietly compose exec -T caddy sh -c "unset TLS_MODE; $caddy_validate"
+  check "(du) the Caddyfile is valid in mode internal" quietly compose exec -T -e TLS_MODE=internal caddy sh -c "$caddy_validate"
+  err="$(compose exec -T -e TLS_MODE=bogus caddy sh -c "$caddy_validate" 2>&1 || true)"
+  check "(du) an unknown TLS_MODE is refused by Caddy" grep -q 'File to import not found: tls_bogus' <<<"$err"
+  err="$(compose exec -T -e TLS_MODE=duckdns -e "DUCKDNS_TOKEN=$dummy_token" caddy sh -c "$caddy_validate" 2>&1 || true)"
+  check "(du) the plain image cannot do duckdns (module not registered)" grep -q 'module not registered: dns.providers.duckdns' <<<"$err"
+  err="$(ENV_FILE="$TMP_DIR/never-written-4.env" APP_HOST=myhome.duckdns.org TLS_MODE=duckdns bash "$SCRIPTS_DIR/setup" 2>&1 </dev/null || true)"
+  check "(du) setup refuses TLS_MODE=duckdns without a token and writes no .env" \
+    bash -c "[ ! -e '$TMP_DIR/never-written-4.env' ] && grep -q 'needs DUCKDNS_TOKEN' <<<\"\$1\"" _ "$err"
+  err="$(ENV_FILE="$TMP_DIR/never-written-5.env" APP_HOST=rechnungen.local TLS_MODE=duckdns DUCKDNS_TOKEN=$dummy_token bash "$SCRIPTS_DIR/setup" 2>&1 </dev/null || true)"
+  check "(du) setup refuses TLS_MODE=duckdns with a name outside duckdns.org, without printing the token" \
+    bash -c "[ ! -e '$TMP_DIR/never-written-5.env' ] && grep -q 'DuckDNS name' <<<\"\$1\" && ! grep -qF '$dummy_token' <<<\"\$1\"" _ "$err"
+  err="$(ENV_FILE="$TMP_DIR/never-written-7.env" APP_HOST=myhome.duckdns.org TLS_MODE=duckdns DUCKDNS_TOKEN=not-a-uuid-token bash "$SCRIPTS_DIR/setup" 2>&1 </dev/null || true)"
+  check "(dt) setup refuses a token that is not a 36-character UUID, writes no .env and does not print it" \
+    bash -c "[ ! -e '$TMP_DIR/never-written-7.env' ] && grep -q 'does not look like a DuckDNS token' <<<\"\$1\" && ! grep -qF 'not-a-uuid-token' <<<\"\$1\"" _ "$err"
+  err="$(ENV_FILE="$TMP_DIR/never-written-6.env" APP_HOST=rechnungen.local TLS_MODE=sometimes bash "$SCRIPTS_DIR/setup" 2>&1 </dev/null || true)"
+  check "(du) setup refuses TLS_MODE=sometimes and writes no .env" \
+    bash -c "[ ! -e '$TMP_DIR/never-written-6.env' ] && grep -q \"TLS_MODE must be 'internal' or 'duckdns'\" <<<\"\$1\"" _ "$err"
+  # Existing .env files with wrong certificate settings: setup and update both refuse them. update does so before the backup,
+  # the pull and the build, and leaves the running stack alone.
+  local duck_base="$TMP_DIR/duck-base.env" bad_name caddy_before update_out
+  sed -e 's/^TLS_MODE=.*/TLS_MODE=duckdns/' -e 's/^APP_HOST=.*/APP_HOST=myhome.duckdns.org/' "$ENV_FILE" >"$duck_base"
+  cp "$duck_base" "$TMP_DIR/duck-no-token.env"
+  { cat "$duck_base"; echo "DUCKDNS_TOKEN=bad token!"; echo "COMPOSE_FILE=compose.yml:compose.duckdns.yml"; } >"$TMP_DIR/duck-bad-token.env"
+  { cat "$duck_base"; echo "DUCKDNS_TOKEN=$dummy_token"; } >"$TMP_DIR/duck-no-compose-file.env"
+  sed -e 's/^TLS_MODE=.*/TLS_MODE=duckDNS/' "$ENV_FILE" >"$TMP_DIR/duck-wrong-case.env"
+  sed -e 's/^TLS_MODE=.*/TLS_MODE=maybe/' "$ENV_FILE" >"$TMP_DIR/bad-tls.env"
+  { sed -e 's/^APP_HOST=.*/APP_HOST=rechnungen.local/' "$duck_base"; echo "DUCKDNS_TOKEN=$dummy_token"; echo "COMPOSE_FILE=compose.yml:compose.duckdns.yml"; } >"$TMP_DIR/duck-wrong-host.env"
+  caddy_before="$(compose ps -q caddy)"
+  for bad_name in duck-no-token:'needs DUCKDNS_TOKEN' duck-bad-token:'does not look like a DuckDNS token' duck-no-compose-file:'COMPOSE_FILE=compose.yml:compose.duckdns.yml' \
+    duck-wrong-case:"TLS_MODE must be 'internal' or 'duckdns'" bad-tls:"TLS_MODE must be 'internal' or 'duckdns'" duck-wrong-host:'DuckDNS name'; do
+    err="$(ENV_FILE="$TMP_DIR/${bad_name%%:*}.env" bash "$SCRIPTS_DIR/setup" 2>&1 </dev/null || true)"
+    check "(du) setup refuses an existing .env '${bad_name%%:*}' (${bad_name#*:})" grep -qF -- "${bad_name#*:}" <<<"$err"
+    update_out="$(ENV_FILE="$TMP_DIR/${bad_name%%:*}.env" bash "$SCRIPTS_DIR/update" --no-pull 2>&1 </dev/null || true)"
+    check "(du2) update refuses '${bad_name%%:*}' with a clear message" grep -qF -- "${bad_name#*:}" <<<"$update_out"
+    check "(du2) update refuses '${bad_name%%:*}' before backup, pull and build, and prints no token" \
+      bash -c "! grep -qE 'Backing up|Backups are off|Skipping the backup|Fetching|Building|migrations' <<<\"\$1\" && ! grep -qF 'bad token' <<<\"\$1\" && ! grep -qF '$dummy_token' <<<\"\$1\"" _ "$update_out"
+  done
+  check "(du2) the running stack was left alone (same Caddy container)" test "$(compose ps -q caddy)" = "$caddy_before"
+  : >"$TMP_DIR/not-a-backup.tar"
+  err="$(TLS_MODE=sometimes bash "$SCRIPTS_DIR/restore" --yes "$TMP_DIR/not-a-backup.tar" 2>&1 </dev/null || true)"
+  check "(du) restore validates a TLS_MODE override before touching anything" grep -q "TLS_MODE must be 'internal' or 'duckdns'" <<<"$err"
+  { cat "$duck_base"; echo "DUCKDNS_TOKEN=$dummy_token"; echo "COMPOSE_FILE=compose.yml:compose.duckdns.yml"; } >"$TMP_DIR/duck-ok.env"
+  duckdns_mode_checks "$TMP_DIR/duck-ok.env" "$dummy_token"
+  check "(dx) COMPOSE_FILE form compose.yml:compose.duckdns.yml is accepted" compose_file_form_accepted compose.yml:compose.duckdns.yml
+  check "(dx) COMPOSE_FILE form ./compose.duckdns.yml is accepted" compose_file_form_accepted ./compose.yml:./compose.duckdns.yml
+  check "(dx) COMPOSE_FILE with an absolute path to compose.duckdns.yml is accepted" compose_file_form_accepted /srv/x/compose.yml:/srv/x/compose.duckdns.yml
+  check "(dx) COMPOSE_FILE=compose.yml alone is refused" compose_file_form_refused compose.yml
+  check "(dx) a file merely named like it (compose.duckdns.yml.bak) is refused" compose_file_form_refused compose.duckdns.yml.bak
+
   echo "== backups are off by default"
   check "(al) a new install has BACKUPS=off and an empty AGE_RECIPIENT, and setup did not ask for a key" \
     bash -c "grep -qx 'BACKUPS=off' '$ENV_FILE' && grep -qx 'AGE_RECIPIENT=' '$ENV_FILE'"
@@ -324,6 +470,9 @@ cmd_setup() {
   check "(ar) the database stays out of the way on shutdown and keeps warnings in its log" bash -c "
     cfg=\$(docker compose --project-directory '$DEPLOY_DIR' --env-file '$ENV_FILE' -p '$TEST_PROJECT' config) &&
     grep -q 'stop_grace_period: 1m0s' <<<\"\$cfg\" && grep -q 'log_min_messages=warning' <<<\"\$cfg\" && grep -q 'log_min_error_statement=fatal' <<<\"\$cfg\""
+
+  echo "== first switch to duckdns with backups on, and back"
+  duckdns_switch_checks 'a1b2c3d4-0000-4000-8000-123456789abc'
 }
 
 # ---- backup / restore / update ----
@@ -835,7 +984,7 @@ SQL
   printf 'services:\n  caddy:\n    volumes:\n      - %s:/etc/caddy:ro\n' "$caddy_dir" >"$caddy_override"
   COMPOSE_FILE="$DEPLOY_DIR/compose.yml:$caddy_override" compose up -d caddy >/dev/null 2>&1
   wait_for_login_page || true
-  awk '{ print } /^\ttls internal$/ { print "\trespond /stack-test-marker \"marker\" 200" }' "$caddy_dir/Caddyfile" >"$caddy_dir/Caddyfile.new"
+  awk '{ print } /^\timport tls_/ { print "\trespond /stack-test-marker \"marker\" 200" }' "$caddy_dir/Caddyfile" >"$caddy_dir/Caddyfile.new"
   mv "$caddy_dir/Caddyfile.new" "$caddy_dir/Caddyfile"
   touch "$caddy_marker"
   check "(as) before the update Caddy still serves the old configuration" test "$(https_get /stack-test-marker -w '%{http_code}')" != 200

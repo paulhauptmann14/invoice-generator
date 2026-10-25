@@ -1,0 +1,13 @@
+# Switched on by COMPOSE_FILE=compose.yml:compose.duckdns.yml in .env (README, "Trusted certificate with DuckDNS"): Caddy then comes
+# from caddy.Dockerfile (official Caddy plus the DuckDNS DNS provider, a one-time build) instead of the plain official image,
+# and gets the TLS settings. The image name is set explicitly, otherwise Compose would tag the build as caddy:2.11.7-alpine.
+# The token goes to the caddy container only.
+services:
+  caddy:
+    image: ${COMPOSE_PROJECT_NAME:?}-caddy
+    build:
+      context: .
+      dockerfile: caddy.Dockerfile
+    environment:
+      TLS_MODE: ${TLS_MODE:-internal}
+      DUCKDNS_TOKEN: ${DUCKDNS_TOKEN:?}

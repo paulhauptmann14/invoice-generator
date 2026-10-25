@@ -1,6 +1,19 @@
-# Public site: the invoice app over HTTPS with Caddy's internal CA (install the root certificate once per device: scripts/cert).
-{$APP_HOST} {
+# TLS of the public site, chosen by TLS_MODE in .env (missing = internal); import tls_<mode> below picks the snippet:
+#   internal  Caddy's own CA (install the root certificate once per device: scripts/cert)
+#   duckdns   Let's Encrypt certificate for the DuckDNS name in APP_HOST via the DNS challenge (README, "Trusted certificate with
+#             DuckDNS"). {env.DUCKDNS_TOKEN} is resolved at run time, so the token is neither logged nor stored in Caddy's saved config.
+(tls_internal) {
 	tls internal
+}
+(tls_duckdns) {
+	tls {
+		dns duckdns {env.DUCKDNS_TOKEN}
+	}
+}
+
+# Public site: the invoice app over HTTPS.
+{$APP_HOST} {
+	import tls_{$TLS_MODE:internal}
 	encode zstd gzip
 	reverse_proxy app:3000
 }

@@ -1,0 +1,2 @@
+# The Caddy image is built from caddy.Dockerfile and needs no files from this directory (.env and backups must not go to the Docker daemon).
+*

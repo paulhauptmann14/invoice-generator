@@ -22,8 +22,24 @@ info() {
   echo "$*"
 }
 
+# Compose resolves a relative COMPOSE_FILE (the .env line that switches on compose.duckdns.yml) against the current directory, not
+# the project directory, and the scripts run from anywhere: so a COMPOSE_FILE from the .env becomes absolute here. One already set
+# in the environment (tests) wins, as it does with plain Compose.
 compose() {
-  docker compose --project-directory "$DEPLOY_DIR" --env-file "$ENV_FILE" "$@"
+  local files="${COMPOSE_FILE:-}" file absolute="" IFS=:
+  [ -n "$files" ] || files="$(env_get COMPOSE_FILE)"
+  for file in $files; do
+    case "$file" in
+      /*) ;;
+      *) file="$DEPLOY_DIR/$file" ;;
+    esac
+    absolute="${absolute:+$absolute:}$file"
+  done
+  if [ -n "$absolute" ]; then
+    COMPOSE_FILE="$absolute" docker compose --project-directory "$DEPLOY_DIR" --env-file "$ENV_FILE" "$@"
+  else
+    docker compose --project-directory "$DEPLOY_DIR" --env-file "$ENV_FILE" "$@"
+  fi
 }
 
 # Reads a value from the env file without sourcing it.
@@ -50,11 +66,40 @@ check_env_value() { # check_env_value <KEY> <value>
     HTTP_PORT | HTTPS_PORT) [[ "$value" =~ ^[0-9]+$ ]] || die "$key must be a number" ;;
     BACKUPS) [[ "$value" = on || "$value" = off ]] || die "BACKUPS must be 'on' or 'off'" ;;
     REGISTRATION) [[ "$value" = on || "$value" = off ]] || die "REGISTRATION must be 'on' or 'off'" ;;
+    TLS_MODE) [[ "$value" = internal || "$value" = duckdns ]] || die "TLS_MODE must be 'internal' or 'duckdns'" ;;
+    # A DuckDNS token is a 36-character UUID. Anything else is refused before Caddy starts: libdns/duckdns writes the token into
+    # Caddy's log when a request fails, and a mis-pasted value would only produce such errors. The value is never printed here.
+    DUCKDNS_TOKEN) [[ "$value" =~ ^[0-9A-Fa-f]{8}(-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}$ ]] || die "DUCKDNS_TOKEN does not look like a DuckDNS token (36 characters like 01234567-89ab-cdef-0123-456789abcdef; copy it from the top of your DuckDNS page)" ;;
     AGE_RECIPIENT)
       [ -z "$value" ] || [[ "$value" =~ ^age1[a-z0-9]+$ ]] || die "AGE_RECIPIENT must be an age public key starting with age1 (or empty for unencrypted backups)"
       ;;
     BACKUP_DIR) [[ "$value" != *$'\n'* ]] || die "BACKUP_DIR must be a single line" ;;
   esac
+}
+
+# The certificate settings that must fit together (setup, update and restore all check them before anything is changed).
+# TLS_MODE internal (or empty/missing) needs nothing. duckdns needs the token, a DuckDNS name as APP_HOST and compose.duckdns.yml
+# in COMPOSE_FILE (as compose.duckdns.yml, ./compose.duckdns.yml or an absolute path; otherwise Compose would start the plain Caddy image, which cannot get the certificate and would quietly fall
+# back to the wrong mode). Nothing here prints the token.
+check_tls_settings() { # check_tls_settings <TLS_MODE> <DUCKDNS_TOKEN> <APP_HOST> <COMPOSE_FILE>
+  local mode=${1:-internal} token=${2:-} host=${3:-} compose_file=${4:-}
+  check_env_value TLS_MODE "$mode"
+  [ "$mode" = duckdns ] || return 0
+  [ -n "$token" ] || die "TLS_MODE=duckdns needs DUCKDNS_TOKEN (the token from the top of your DuckDNS page)"
+  check_env_value DUCKDNS_TOKEN "$token"
+  [[ "$host" =~ ^[A-Za-z0-9-]+\.duckdns\.org$ ]] || die "TLS_MODE=duckdns needs APP_HOST to be a DuckDNS name like myhome.duckdns.org (found '$host')"
+  local entry found=0 IFS=:
+  for entry in $compose_file; do
+    case "$entry" in
+      compose.duckdns.yml | ./compose.duckdns.yml | /*/compose.duckdns.yml) found=1 ;;
+    esac
+  done
+  [ "$found" = 1 ] || die "TLS_MODE=duckdns needs the line COMPOSE_FILE=compose.yml:compose.duckdns.yml in $ENV_FILE (it makes Compose build Caddy with the DuckDNS module)"
+}
+
+# check_tls_settings with the values of the env file.
+validate_tls_env() {
+  check_tls_settings "$(env_get TLS_MODE internal)" "$(env_get DUCKDNS_TOKEN)" "$(env_get APP_HOST)" "$(env_get COMPOSE_FILE)"
 }
 
 # Sets KEY=value in an env file (replaces the line or appends it). The file keeps its mode.
@@ -126,11 +171,16 @@ volume_name() { # volume_name <logical name>
   echo "$name"
 }
 
-# The small image used to read and write volumes: the Caddy image the stack already uses (no extra download).
+# The small image used to read and write volumes (it only needs sh and tar): always the plain official Caddy image, whose tag is the one
+# pin in compose.yml. Independent of TLS_MODE, so a backup works before the DuckDNS image has ever been built (the first switch
+# runs the backup first). Pulled if this machine does not have it.
 tools_image() {
   local image
-  image="$(compose config --images | grep '^caddy:' | head -n 1)"
+  image="$(sed -n 's/^    image: \(caddy:[A-Za-z0-9._-]*\)$/\1/p' "$DEPLOY_DIR/compose.yml" | head -n 1)"
   [ -n "$image" ] || die "could not determine the Caddy image from compose.yml"
+  if ! docker image inspect "$image" >/dev/null 2>&1; then
+    docker pull -q "$image" >/dev/null || die "the image '$image' is needed to read and write volumes but is not on this machine and could not be downloaded (internet?)"
+  fi
   echo "$image"
 }
 

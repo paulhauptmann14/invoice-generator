@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Updates the app: backup first, then new code, a new app image, database migrations and a restart of the app.
+# Updates the app: backup first, then new code, a new app image (and Caddy image with TLS_MODE=duckdns), database migrations and a restart of the app.
 #
 #   update              git pull (fast-forward only), then as above
 #   update --no-pull    skip git pull (tests, or code you updated yourself)
@@ -10,7 +10,7 @@
 # nightly timer stays off). If the backup fails, nothing is changed. To go back after a bad update see the README, "Update went
 # wrong".
 #
-# The running app keeps serving until the new image is built. The build comes before the migrations, so a failed backup, pull
+# The running app keeps serving until the new images are built. The .env certificate settings are checked first. The build comes before the migrations, so a failed backup, pull
 # or build changes neither the running app nor the database. A failed migration is rolled back (one transaction per file) and
 # the old app keeps running: do not restore the backup, fix the cause and run update again. At the end, Caddy reloads its
 # Caddyfile and old images and build cache are removed.
@@ -29,6 +29,9 @@ main() {
     esac
   done
 
+  # Before anything is changed (backup, pull, build): a .env with inconsistent certificate settings stops here.
+  validate_tls_env
+
   if [ "$backup" = 0 ]; then
     info "Skipping the backup (--no-backup)."
   elif backups_enabled; then
@@ -44,8 +47,15 @@ main() {
     git -C "$REPO_DIR" pull --ff-only
   fi
 
-  info "Building the new app image (the old app keeps running meanwhile) ..."
-  compose build app
+  # Caddy is built only with TLS_MODE=duckdns (its image then comes from caddy.Dockerfile, see compose.duckdns.yml); otherwise it is
+  # the plain official image, which needs no build. Docker's layer cache makes the build a quick no-op unless the Dockerfile changed.
+  if [ "$(env_get TLS_MODE internal)" = duckdns ]; then
+    info "Building the new app and Caddy images (the old app keeps running meanwhile) ..."
+    compose build app caddy
+  else
+    info "Building the new app image (the old app keeps running meanwhile) ..."
+    compose build app
+  fi
 
   info "Applying database migrations ..."
   "$scripts/migrate"
