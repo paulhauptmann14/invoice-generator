@@ -3,7 +3,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest'
 import type { Database, Json } from '@/lib/supabase/database.types'
 import { SEED } from '@/test-support/seed-ids'
 import { loadMissingRecipientAddress } from './recipient-address'
-import { getInvoice, listArticleChoices, listInvoiceNumbers, listInvoices, listNumberRanges } from './queries'
+import { findInvoiceWithCustomerSeq, getInvoice, listArticleChoices, listInvoiceNumbers, listInvoices, listNumberRanges } from './queries'
 
 const supabase = createClient<Database>(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!, {
   auth: { persistSession: false, autoRefreshToken: false },
@@ -126,6 +126,75 @@ describe('invoice queries (local Supabase)', () => {
     const copy = (await getInvoice(supabase, SEED.gasthaus, copyId))!
     expect(copy).toMatchObject({ discount_kind: 'percent', discount_value: 5 })
     expect(copy.invoice_items.map((i) => [i.discount_kind, i.discount_value])).toEqual([['percent', 10], [null, null]])
+  })
+  test('per-customer counter: assigned on insert in order, kept on update, copies count on', async () => {
+    const seqOf = async (id: string) => (await getInvoice(supabase, SEED.gasthaus, id))?.customer_seq
+    expect([await seqOf(invoiceId), await seqOf(discountedId), await seqOf(copyId)]).toEqual([1, 2, 3])
+    const { error } = await supabase.rpc('save_invoice', {
+      p_tenant_id: SEED.gasthaus,
+      p_id: invoiceId,
+      p_invoice: {
+        number: `${tag}-1`,
+        customer_id: null,
+        recipient: { name: `Anderer ${tag}` },
+        issue_date: '2026-10-07',
+        service_date_from: '2026-10-07',
+        payment_days: 14,
+      },
+      p_items: [{ description: 'A', quantity: 1, unit: '', unit_price_gross: 10, vat_rate: 7 }],
+    })
+    expect(error).toBeNull()
+    expect(await seqOf(invoiceId)).toBe(1)
+  })
+  test('manual counter on insert and update, and the duplicate lookup', async () => {
+    const name = `Zähler ${tag}`
+    const save = async (id: string | null, number: string, customerSeq: number | null, recipientName = name) => {
+      const { data, error } = await supabase.rpc('save_invoice', {
+        p_tenant_id: SEED.gasthaus,
+        p_id: id as unknown as string,
+        p_invoice: {
+          number,
+          customer_id: null,
+          recipient: { name: recipientName },
+          issue_date: '2026-10-07',
+          service_date_from: '2026-10-07',
+          payment_days: 14,
+          ...(customerSeq === null ? {} : { customer_seq: customerSeq }),
+        },
+        p_items: [{ description: 'A', quantity: 1, unit: '', unit_price_gross: 10, vat_rate: 7 }],
+      })
+      expect(error).toBeNull()
+      return data as string
+    }
+    const seqOf = async (id: string) => (await getInvoice(supabase, SEED.gasthaus, id))?.customer_seq
+    const first = await save(null, `${tag}-Z1`, 5)
+    const second = await save(null, `${tag}-Z2`, null)
+    try {
+      expect([await seqOf(first), await seqOf(second)]).toEqual([5, 6])
+      // The same free-text customer (case and spacing ignored) already has 5 -> the other invoice is reported.
+      const lookup = (customerSeq: number, over: Partial<Parameters<typeof findInvoiceWithCustomerSeq>[2]> = {}) =>
+        findInvoiceWithCustomerSeq(supabase, SEED.gasthaus, {
+          customerId: null, recipientName: name, numberRangeId: null, customerSeq, excludeInvoiceId: null, ...over,
+        })
+      expect(await lookup(5)).toBe(`${tag}-Z1`)
+      expect(await lookup(5, { recipientName: `  ZÄHLER   ${tag.toLowerCase()} ` })).toBe(`${tag}-Z1`)
+      expect(await lookup(5, { excludeInvoiceId: first })).toBeNull()
+      expect(await lookup(7)).toBeNull()
+      expect(await lookup(5, { recipientName: `Anderer ${tag}` })).toBeNull()
+      // Other number range / other tenant: a different group.
+      const rangeId = (await listNumberRanges(supabase, SEED.gasthaus))[0].id
+      expect(await lookup(5, { numberRangeId: rangeId })).toBeNull()
+      expect(
+        await findInvoiceWithCustomerSeq(supabase, SEED.metzgerei, { customerId: null, recipientName: name, numberRangeId: null, customerSeq: 5, excludeInvoiceId: null }),
+      ).toBeNull()
+      // Update: a given value replaces the stored one, none keeps it.
+      await save(first, `${tag}-Z1`, 9)
+      expect(await seqOf(first)).toBe(9)
+      await save(first, `${tag}-Z1`, null)
+      expect(await seqOf(first)).toBe(9)
+    } finally {
+      await supabase.from('invoices').delete().in('id', [first, second])
+    }
   })
   test('numbers and article choices', async () => {
     expect(await listInvoiceNumbers(supabase, SEED.gasthaus)).toContain(`${tag}-1`)

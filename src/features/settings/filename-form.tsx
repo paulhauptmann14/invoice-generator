@@ -8,7 +8,7 @@ import { filenameFormSchema } from './schemas'
 import { useSettingsForm } from './use-settings-form'
 
 /** File name pattern for exports, with a live example based on a sample invoice. */
-export function FilenameForm({ initial, example }: { initial: string; example: { number: string; issueDate: string } }) {
+export function FilenameForm({ initial, example }: { initial: string; example: { number: string; issueDate: string; rangeName: string; customerSeq: number } }) {
   const { tenant } = useTenant()
   const form = useSettingsForm({ initial: { filenameTemplate: initial }, schema: filenameFormSchema, action: saveFilenameSettings.bind(null, tenant.id) })
   const preview = buildFilename(form.draft.filenameTemplate, { customer: 'Musterkunde GmbH', ...example }, 'pdf')
@@ -31,7 +31,9 @@ export function FilenameForm({ initial, example }: { initial: string; example: {
         className="max-w-xl [&_input]:font-mono"
         hint={
           <>
-            Platzhalter: {'{Kunde}'}, {'{Nr}'}, {'{Datum}'}, {'{JJJJ}'}. Beispiel: <span className="font-mono break-all text-foreground">{preview}</span>
+            Platzhalter: {'{Kunde}'}, {'{Nr}'} (Schrägstriche werden zu „-“), {'{Kreis}'} (Name des Nummernkreises), {'{Zaehler}'} (laufende Nummer dieses Kunden im
+            Nummernkreis), {'{Datum}'}, {'{JJJJ}'}. Leerzeichen und Umlaute bleiben erhalten. Beispiel:{' '}
+            <span className="font-mono break-all text-foreground">{preview}</span>
           </>
         }
       />

@@ -61,7 +61,7 @@ export async function getInvoice(
   const { data, error } = await supabase
     .from('invoices')
     .select(
-      'id, updated_at, number, number_range_id, customer_id, recipient, issue_date, service_date_from, service_date_to, payment_days, intro_text, closing_text, discount_kind, discount_value, invoice_items(id, position, description, quantity, unit, unit_price_gross, vat_rate, article_id, discount_kind, discount_value)',
+      'id, updated_at, number, number_range_id, customer_id, customer_seq, recipient, issue_date, service_date_from, service_date_to, payment_days, intro_text, closing_text, discount_kind, discount_value, invoice_items(id, position, description, quantity, unit, unit_price_gross, vat_rate, article_id, discount_kind, discount_value)',
     )
     .eq('id', id)
     .eq('tenant_id', tenantId)
@@ -153,4 +153,41 @@ export async function listArticleChoices(supabase: Client, tenantId: string): Pr
     unitPriceGross: a.unit_price_gross,
     vatRate: a.vat_rate,
   }))
+}
+
+/** Same normalization as private.customer_key for free-text recipients: trimmed, whitespace collapsed, lower case. */
+export function normalizeRecipientName(name: string): string {
+  return name.trim().replace(/\s+/g, ' ').toLowerCase()
+}
+
+/**
+ * Number of another invoice of the same business, number range (null = none) and customer that already uses the
+ * given counter; null when the counter is free. The customer is the customer record, or without one the recipient
+ * name (only compared with invoices that have no customer record either).
+ */
+export async function findInvoiceWithCustomerSeq(
+  supabase: Client,
+  tenantId: string,
+  opts: { customerId: string | null; recipientName: string; numberRangeId: string | null; customerSeq: number; excludeInvoiceId: string | null },
+): Promise<string | null> {
+  let query = supabase
+    .from('invoices')
+    .select('number, recipient')
+    .eq('tenant_id', tenantId)
+    .eq('customer_seq', opts.customerSeq)
+    .order('number')
+    .limit(100)
+  query = opts.numberRangeId === null ? query.is('number_range_id', null) : query.eq('number_range_id', opts.numberRangeId)
+  query = opts.customerId === null ? query.is('customer_id', null) : query.eq('customer_id', opts.customerId)
+  if (opts.excludeInvoiceId !== null) query = query.neq('id', opts.excludeInvoiceId)
+
+  const { data, error } = await query
+  if (error) throw new Error(`Checking the customer counter failed: ${error.message}`)
+  if (opts.customerId !== null) return data[0]?.number ?? null
+  const wanted = normalizeRecipientName(opts.recipientName)
+  const match = data.find((row) => {
+    const name = (row.recipient as { name?: unknown } | null)?.name
+    return typeof name === 'string' && normalizeRecipientName(name) === wanted
+  })
+  return match?.number ?? null
 }

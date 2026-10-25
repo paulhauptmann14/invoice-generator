@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { NativeSelect } from '@/components/ui/native-select'
 import { Textarea } from '@/components/ui/textarea'
 import { RequiredMark } from '@/components/form/required-mark'
+import { UnitSelect } from '@/components/form/unit-select'
 import { VAT_RATES } from '@/lib/domain/input-schemas'
 import { formatEuro, toCents } from '@/lib/domain/money'
 import { DiscountControl } from './discount-control'
@@ -16,7 +17,7 @@ import type { DraftAction, DraftItem, PickerArticle } from './draft'
 import { FormSection } from '@/components/form/form-section'
 
 // Row layout needs ~830px: rows from @4xl (56rem) of the *form* width (container query), cards below.
-const GRID = '@4xl:grid @4xl:grid-cols-[minmax(0,1fr)_5.5rem_5.5rem_7.5rem_6rem_7rem_auto] @4xl:items-start @4xl:gap-3'
+const GRID = '@4xl:grid @4xl:grid-cols-[minmax(0,1fr)_5.5rem_8.5rem_7.5rem_6rem_7rem_auto] @4xl:items-start @4xl:gap-3'
 
 export function ItemsEditor({
   items,
@@ -152,7 +153,13 @@ export function ItemsEditor({
                   <label htmlFor={field('unit')} className="text-sm font-medium @4xl:sr-only">
                     Einheit<span className="sr-only"> Position {n}</span>
                   </label>
-                  <Input id={field('unit')} list="unit-suggestions" value={item.unit} onChange={(e) => update('unit', e.target.value)} className="bg-card" />
+                  <UnitSelect
+                    id={field('unit')}
+                    value={item.unit}
+                    onChange={(value) => update('unit', value)}
+                    customLabelSuffix={`Position ${n}`}
+                    customLabelClassName="text-sm font-medium @4xl:sr-only"
+                  />
                 </div>
                 <div className="space-y-1">
                   <label htmlFor={field('unitPriceGross')} className="text-sm font-medium @4xl:sr-only">
@@ -235,12 +242,6 @@ export function ItemsEditor({
           </p>
         )}
       </div>
-
-      <datalist id="unit-suggestions">
-        {['Stk.', 'kg', 'g', 'Pers.', 'Portion', 'Std.', 'Pauschale', 'l', 'Fl.'].map((u) => (
-          <option key={u} value={u} />
-        ))}
-      </datalist>
 
       <div className="flex flex-col gap-2 @lg:flex-row">
         <div className="@lg:w-72">

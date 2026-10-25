@@ -357,6 +357,18 @@ describe('recipientNotice', () => {
   })
 })
 
+describe('customer counter in the draft', () => {
+  test('a new draft starts with an empty counter (automatic)', () => {
+    expect(base().customerSeq).toBe('')
+    expect(toPayload(base()).customerSeq).toBe('')
+  })
+  test('the counter is a plain text field', () => {
+    const d = reduce(base(), { type: 'setField', field: 'customerSeq', value: '7' })
+    expect(d.customerSeq).toBe('7')
+    expect(toPayload(d).customerSeq).toBe('7')
+  })
+})
+
 describe('toPayload', () => {
   test('drops client-only fields', () => {
     const p = toPayload(base())
@@ -386,6 +398,11 @@ describe('draftFromInvoice', () => {
   })
   test('stored payment days are shown as text', () => {
     expect(draftFromInvoice({ ...stored, payment_days: 30 }).paymentDays).toBe('30')
+  })
+  test('shows the stored customer counter, empty when there is none', () => {
+    expect(draftFromInvoice({ ...stored, customer_seq: 12 }).customerSeq).toBe('12')
+    expect(draftFromInvoice({ ...stored, customer_seq: null }).customerSeq).toBe('')
+    expect(draftFromInvoice(stored).customerSeq).toBe('')
   })
   test('keeps the stored number range', () => {
     expect(draftFromInvoice(stored).numberRangeId).toBe('r-gutscheine')

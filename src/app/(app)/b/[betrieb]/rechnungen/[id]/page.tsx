@@ -6,6 +6,7 @@ import { InvoiceNumber } from '@/components/invoice-number'
 import { PageHeader } from '@/components/page-header'
 import { StatusBanner } from '@/components/status-banner'
 import { SubmitButton } from '@/components/submit-button'
+import { filenameContextOf } from '@/features/documents/filename-context'
 import { loadDocumentSettings } from '@/features/documents/load-document-data'
 import { copyInvoice } from '@/features/invoices/actions'
 import { ArchiveList } from '@/features/invoices/archive-list'
@@ -41,7 +42,7 @@ export default async function EditInvoicePage({ params, searchParams }: { params
   if (!invoice) notFound()
 
   const recipientName = invoice.recipient && typeof (invoice.recipient as { name?: unknown }).name === 'string' ? (invoice.recipient as { name: string }).name : ''
-  const filenameContext = { customer: recipientName, number: invoice.number, issueDate: invoice.issue_date }
+  const filenameContext = filenameContextOf(invoice, ranges.find((r) => r.id === invoice.number_range_id)?.name ?? null)
   const defaultFilenames = {
     pdf: buildFilename(documentSettings.filenameTemplate, filenameContext, 'pdf'),
     docx: buildFilename(documentSettings.filenameTemplate, filenameContext, 'docx'),

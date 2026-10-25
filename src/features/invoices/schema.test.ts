@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest'
 import { pathErrorsFrom } from '@/lib/form'
-import { invoiceSchema } from './schema'
+import { customerSeqCheckSchema, invoiceSchema } from './schema'
 
 const item = { description: 'Buffet', quantity: '2', unit: 'Pers.', unitPriceGross: '24,90', vatRate: '7', articleId: null, saveAsArticle: false }
 const base = {
@@ -60,6 +60,39 @@ describe('invoiceSchema', () => {
     expect(invoiceSchema.parse({ ...base, paymentDays: '  ' }).paymentDays).toBeNull()
     expect(invoiceSchema.parse({ ...base, paymentDays: '0' }).paymentDays).toBe(0)
     expect(pathErrorsFrom(invoiceSchema.safeParse({ ...base, paymentDays: 'x' }).error!)).toEqual({ paymentDays: 'Bitte 0 bis 365 Tage eingeben.' })
+  })
+})
+
+describe('invoiceSchema customerSeq', () => {
+  const seqOf = (customerSeq: unknown) => invoiceSchema.parse({ ...base, customerSeq }).customerSeq
+  const errorOf = (customerSeq: unknown) => pathErrorsFrom(invoiceSchema.safeParse({ ...base, customerSeq }).error!)
+  const MESSAGE = 'Bitte eine ganze Zahl von 1 bis 99999 eingeben oder das Feld leer lassen.'
+
+  test('empty or missing means automatic (null)', () => {
+    expect(seqOf('')).toBeNull()
+    expect(seqOf('   ')).toBeNull()
+    expect(invoiceSchema.parse(base).customerSeq).toBeNull()
+  })
+  test('integers from 1 to 99999 are parsed to numbers', () => {
+    expect(seqOf('1')).toBe(1)
+    expect(seqOf(' 42 ')).toBe(42)
+    expect(seqOf('99999')).toBe(99999)
+  })
+  test.each(['0', '00', '100000', '-1', '1,5', '1.5', 'x', '1e3', '+3'])('%s is rejected with a German message', (value) => {
+    expect(errorOf(value)).toEqual({ customerSeq: MESSAGE })
+  })
+})
+
+describe('customerSeqCheckSchema', () => {
+  const ok = { customerId: null, saveAsCustomer: false, recipientName: 'Müller', numberRangeId: null, customerSeq: '5', excludeInvoiceId: null }
+  test('parses a valid request', () => {
+    expect(customerSeqCheckSchema.parse(ok)).toEqual({ ...ok, customerSeq: 5 })
+  })
+  test('rejects ids that are not UUIDs and values out of range', () => {
+    expect(customerSeqCheckSchema.safeParse({ ...ok, customerId: 'x' }).success).toBe(false)
+    expect(customerSeqCheckSchema.safeParse({ ...ok, numberRangeId: '1' }).success).toBe(false)
+    expect(customerSeqCheckSchema.safeParse({ ...ok, excludeInvoiceId: 'y' }).success).toBe(false)
+    expect(customerSeqCheckSchema.safeParse({ ...ok, customerSeq: '0' }).success).toBe(false)
   })
 })
 

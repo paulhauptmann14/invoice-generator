@@ -81,6 +81,34 @@ export function invoiceDiscountIssue(lines: LineInput[], discount: Discount): st
   return null
 }
 
+export const CUSTOMER_SEQ_MAX = 99999
+
+// The optional counter in the file name: empty = automatic (null), otherwise an integer from 1 to 99999.
+const customerSeqSchema = z
+  .string()
+  .trim()
+  .transform((v, ctx) => {
+    if (v === '') return null
+    if (/^\d{1,5}$/.test(v)) {
+      const n = Number(v)
+      if (n >= 1 && n <= CUSTOMER_SEQ_MAX) return n
+    }
+    ctx.addIssue({ code: 'custom', message: `Bitte eine ganze Zahl von 1 bis ${CUSTOMER_SEQ_MAX} eingeben oder das Feld leer lassen.` })
+    return z.NEVER
+  })
+  .optional()
+  .transform((v) => v ?? null)
+
+/** Input of the duplicate lookup for the counter field (nothing is stored). */
+export const customerSeqCheckSchema = z.object({
+  customerId: z.uuid().nullable(),
+  saveAsCustomer: z.boolean(),
+  recipientName: z.string().max(200),
+  numberRangeId: z.uuid().nullable(),
+  customerSeq: customerSeqSchema,
+  excludeInvoiceId: z.uuid().nullable(),
+})
+
 export const invoiceItemSchema = z.object({
   description: z.string().trim().min(1, 'Bitte eine Beschreibung eingeben.').max(1000, 'Höchstens 1000 Zeichen.'),
   quantity: quantitySchema,
@@ -98,6 +126,7 @@ export const invoiceSchema = z
     numberRangeId: z.uuid().nullable().default(null),
     number: z.string().trim().min(1, 'Bitte eine Rechnungsnummer eingeben.').max(50, 'Höchstens 50 Zeichen.'),
     customerId: z.uuid().nullable(),
+    customerSeq: customerSeqSchema,
     saveAsCustomer: z.boolean(),
     recipient: recipientSchema,
     issueDate: isoDate('Bitte ein gültiges Rechnungsdatum wählen.'),

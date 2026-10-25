@@ -132,7 +132,7 @@ async function createArticle(page: Page, a: { name: string; price: string; vat?:
   await page.goto(`${BASE}/artikel/neu`)
   await page.getByLabel(/^Bezeichnung/).fill(a.name)
   await page.getByLabel(/^Einzelpreis brutto/).fill(a.price)
-  if (a.unit) await page.getByLabel(/^Einheit/).fill(a.unit)
+  if (a.unit) await page.getByLabel(/^Einheit/).selectOption(a.unit)
   if (a.vat) await page.getByLabel(/^MwSt\.-Satz/).selectOption(a.vat)
   await page.getByRole('button', { name: 'Artikel anlegen' }).click()
   await page.waitForURL(/artikel\?gespeichert=1/)
@@ -478,7 +478,7 @@ test.describe('articles', () => {
     await settleAfterRejectedSubmit(page)
 
     await page.getByLabel(/^Einzelpreis brutto/).fill('24,00')
-    await page.getByLabel(/^Einheit/).fill('Portion')
+    await page.getByLabel(/^Einheit/).selectOption('Portion')
     await page.getByRole('button', { name: 'Artikel anlegen' }).click()
     await page.waitForURL(/artikel\?gespeichert=1/)
     await expect(page.getByText('Artikel gespeichert.')).toBeVisible()
@@ -495,10 +495,20 @@ test.describe('articles', () => {
     await page.waitForURL(/artikel\/[0-9a-f-]{36}$/)
     await expect(page.getByLabel(/^Einzelpreis brutto/)).toHaveValue('24,00')
     await page.getByLabel(/^Einzelpreis brutto/).fill('25,50')
+    await expect(page.getByLabel(/^Einheit/)).toHaveValue('Portion')
+    // A unit outside the list goes through "Andere …".
+    await page.getByLabel(/^Einheit/).selectOption({ label: 'Andere …' })
+    await expect(page.getByLabel('Eigene Einheit')).toBeFocused()
+    await page.getByLabel('Eigene Einheit').fill('Gutschein')
     await page.getByRole('button', { name: 'Änderungen speichern' }).click()
     await page.waitForURL(/artikel\?gespeichert=1/)
     await searchList(page, 'artikel', name)
     await expect(page.getByRole('row').filter({ hasText: name })).toContainText(eur(2550))
+    await expect(page.getByRole('row').filter({ hasText: name })).toContainText('Gutschein')
+    await page.getByRole('link', { name }).click()
+    await page.waitForURL(/artikel\/[0-9a-f-]{36}$/)
+    await expect(page.getByLabel(/^Einheit/)).toHaveValue('__other__')
+    await expect(page.getByLabel('Eigene Einheit')).toHaveValue('Gutschein')
 
     // Active: offered in the invoice article picker with its price.
     await page.goto(`${BASE}/rechnungen/neu`)
@@ -555,6 +565,7 @@ test.describe('invoice', () => {
     await page.getByRole('option', { name: article }).click()
     await expect(page.getByLabel('Beschreibung Position 1')).toHaveValue(article)
     await expect(page.getByLabel('Einzelpreis brutto Position 1')).toHaveValue('24,00')
+    await expect(page.getByLabel('Einheit Position 1', { exact: true })).toHaveValue('Portion')
     await page.getByLabel('Menge Position 1').fill('2')
     // Position 2: free position, 1 x 100,00 EUR at 19 %.
     await page.getByRole('button', { name: 'Leere Position' }).click()
@@ -562,6 +573,15 @@ test.describe('invoice', () => {
     await page.getByLabel('Menge Position 2').fill('1')
     await page.getByLabel('Einzelpreis brutto Position 2').fill('100,00')
     await page.getByLabel('MwSt.-Satz Position 2').selectOption('19')
+    // Unit outside the list: "Andere …" reveals the text input; switching back to a list unit clears it.
+    await page.getByLabel('Einheit Position 2', { exact: true }).selectOption({ label: 'Andere …' })
+    await expect(page.getByLabel('Eigene Einheit Position 2')).toBeFocused()
+    await page.getByLabel('Eigene Einheit Position 2').fill('Gutschein')
+    await page.getByLabel('Einheit Position 2', { exact: true }).selectOption('kg')
+    await expect(page.getByLabel('Eigene Einheit Position 2')).toHaveCount(0)
+    await page.getByLabel('Einheit Position 2', { exact: true }).selectOption({ label: 'Andere …' })
+    await expect(page.getByLabel('Eigene Einheit Position 2')).toHaveValue('')
+    await page.getByLabel('Eigene Einheit Position 2').fill('Gutschein')
 
     const totals = page.locator('dl').filter({ hasText: 'Gesamtbetrag brutto' })
     const dd = (label: string) => totals.locator('dt', { hasText: label }).locator('xpath=following-sibling::dd[1]')
@@ -626,6 +646,7 @@ test.describe('invoice', () => {
     await expect(page.getByLabel('Beschreibung Position 2')).toHaveValue('Beratung')
     await expect(page.getByLabel('Einzelpreis brutto Position 2')).toHaveValue('100,00')
     await expect(page.getByLabel('MwSt.-Satz Position 2')).toHaveValue('19')
+    await expect(page.getByLabel('Eigene Einheit Position 2')).toHaveValue('Gutschein')
     await expectText(dd('Gesamtbetrag brutto'), eur(gross))
 
     // Save.
@@ -636,6 +657,7 @@ test.describe('invoice', () => {
     await expect(page.locator('#inv-number')).toHaveValue(number)
     await expectText(dd('Gesamtbetrag brutto'), eur(gross))
     await expect(page.getByLabel('Menge Position 1')).toHaveValue('2')
+    await expect(page.getByLabel('Eigene Einheit Position 2')).toHaveValue('Gutschein')
     await expect(page.getByRole('group', { name: 'Rabatt Position 1' }).getByLabel('Rabatt', { exact: true })).toHaveValue('10')
     await expect(page.locator('#inv-discount')).toHaveValue('5')
 

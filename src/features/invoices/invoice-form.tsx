@@ -13,7 +13,7 @@ import { NativeSelect } from '@/components/ui/native-select'
 import { Textarea } from '@/components/ui/textarea'
 import { RequiredMark } from '@/components/form/required-mark'
 import { addDays, formatDateDe } from '@/lib/domain/dates'
-import { type InvoiceFormState, saveInvoice } from './actions'
+import { checkCustomerSeq, type InvoiceFormState, saveInvoice } from './actions'
 import { createDraftReducer, draftTotals, type InvoiceDraft, type NumberContext, type PickerArticle, type PickerCustomer, recipientNotice, toPayload } from './draft'
 import { DiscountControl } from './discount-control'
 import { useReportDirty } from './editor-context'
@@ -76,6 +76,31 @@ export function InvoiceForm({
     return () => window.removeEventListener('beforeunload', handler)
   }, [dirty, pending])
 
+  // Non-blocking duplicate hint for the counter: looked up (debounced) on the server for the typed value.
+  const [seqDuplicate, setSeqDuplicate] = useState<{ seq: string; number: string } | null>(null)
+  const seqText = draft.customerSeq.trim()
+  const { customerId, saveAsCustomer, numberRangeId } = draft
+  const recipientName = draft.recipient.name
+  useEffect(() => {
+    if (!/^\d{1,5}$/.test(seqText)) return
+    let cancelled = false
+    const timer = setTimeout(() => {
+      checkCustomerSeq(tenant.id, { customerId, saveAsCustomer, recipientName, numberRangeId, customerSeq: seqText, excludeInvoiceId: id })
+        .then((found) => {
+          if (!cancelled) setSeqDuplicate(found ? { seq: seqText, number: found.number } : null)
+        })
+        .catch(() => {
+          if (!cancelled) setSeqDuplicate(null)
+        })
+    }, 500)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [tenant.id, id, seqText, customerId, saveAsCustomer, recipientName, numberRangeId])
+  // A result only counts for the value it was looked up for.
+  const duplicateOfSeq = seqDuplicate && seqDuplicate.seq === seqText ? seqDuplicate : null
+
   const err = state.errors
   const days = draft.paymentDays.trim()
   const dueDate = /^\d{1,3}$/.test(days) && /^\d{4}-\d{2}-\d{2}$/.test(draft.issueDate) ? formatDateDe(addDays(draft.issueDate, Number(days))) : null
@@ -134,6 +159,32 @@ export function InvoiceForm({
             </Label>
             <Input id="inv-number" value={draft.number} onChange={(e) => dispatch({ type: 'setField', field: 'number', value: e.target.value })} aria-invalid={Boolean(err.number)} aria-required className="font-mono" />
             {err.number && <FieldError id="inv-number-error">{err.number}</FieldError>}
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="inv-customerSeq">Zähler im Dateinamen</Label>
+            <Input
+              id="inv-customerSeq"
+              inputMode="numeric"
+              value={draft.customerSeq}
+              onChange={(e) => dispatch({ type: 'setField', field: 'customerSeq', value: e.target.value })}
+              aria-invalid={Boolean(err.customerSeq)}
+              aria-describedby={['inv-customerSeq-hint', duplicateOfSeq ? 'inv-customerSeq-dup' : null, err.customerSeq ? 'inv-customerSeq-error' : null].filter(Boolean).join(' ')}
+              className="font-mono md:max-w-40"
+            />
+            <p id="inv-customerSeq-hint" className="text-sm text-muted-foreground">
+              {id === null
+                ? 'Leer = automatisch (nächste freie Zahl für diesen Kunden in diesem Nummernkreis).'
+                : 'Leer lassen = bisheriger Wert bleibt.'}
+            </p>
+            {duplicateOfSeq && (
+              <p id="inv-customerSeq-dup" role="status" className="flex items-start gap-1.5 text-sm">
+                <CircleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />
+                <span>
+                  Zähler {duplicateOfSeq.seq} gibt es für diesen Kunden schon (Rechnung {duplicateOfSeq.number}).
+                </span>
+              </p>
+            )}
+            {err.customerSeq && <FieldError id="inv-customerSeq-error">{err.customerSeq}</FieldError>}
           </div>
           <div className="grid gap-5 @lg:grid-cols-2">
             <div className="space-y-1.5">

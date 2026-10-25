@@ -24,7 +24,7 @@ export default async function NumberSettingsPage({ params, searchParams }: Props
       {query.gespeichert && <StatusBanner>Gespeichert.</StatusBanner>}
       <div className="mt-8 max-w-3xl space-y-12">
         <NumberRanges ranges={ranges} year={year} />
-        <FilenameForm key={`filename-${settings.updatedAt}`} initial={settings.filenameTemplate} example={{ number: exampleNumberText, issueDate: today }} />
+        <FilenameForm key={`filename-${settings.updatedAt}`} initial={settings.filenameTemplate} example={{ number: exampleNumberText, issueDate: today, rangeName: defaultRange(ranges)?.name ?? 'Rechnungen', customerSeq: 1 }} />
       </div>
     </>
   )

@@ -36,6 +36,8 @@ export type InvoiceDraft = {
   number: string
   numberEdited: boolean
   customerId: string | null
+  /** Counter in the file name as typed; '' = automatic (new invoice) or keep the stored value (existing one). */
+  customerSeq: string
   saveAsCustomer: boolean
   recipient: DraftRecipient
   issueDate: string
@@ -85,7 +87,7 @@ export function suggestForRange(ctx: NumberContext, rangeId: string | null, isoD
   return suggestNextNumber(format, yearOf(isoDate), ctx.existing)
 }
 
-type TextField = 'number' | 'issueDate' | 'serviceDateFrom' | 'paymentDays' | 'introText' | 'closingText'
+type TextField = 'number' | 'customerSeq' | 'issueDate' | 'serviceDateFrom' | 'paymentDays' | 'introText' | 'closingText'
 type ItemField = 'description' | 'quantity' | 'unit' | 'unitPriceGross' | 'vatRate'
 
 export type DraftAction =
@@ -140,6 +142,7 @@ export function newDraft(opts: {
     number: suggestForRange(opts.numberContext, rangeId, opts.today),
     numberEdited: false,
     customerId: null,
+    customerSeq: '',
     saveAsCustomer: false,
     recipient: emptyRecipient(),
     issueDate: opts.today,
@@ -158,6 +161,8 @@ export type InvoiceRecordWithItems = {
   number: string
   number_range_id: string | null
   customer_id: string | null
+  /** Per-customer counter for file names; assigned on insert (or typed by the owner) and kept when saving without a value. */
+  customer_seq?: number | null
   recipient: unknown
   issue_date: string
   service_date_from: string
@@ -203,6 +208,7 @@ export function draftFromInvoice(invoice: InvoiceRecordWithItems): InvoiceDraft 
     number: invoice.number,
     numberEdited: true,
     customerId: invoice.customer_id,
+    customerSeq: invoice.customer_seq == null ? '' : String(invoice.customer_seq),
     saveAsCustomer: false,
     recipient: {
       name: str(r.name),
@@ -359,6 +365,7 @@ export function toPayload(draft: InvoiceDraft) {
     numberRangeId: draft.numberRangeId,
     number: draft.number,
     customerId: draft.customerId,
+    customerSeq: draft.customerSeq,
     saveAsCustomer: draft.saveAsCustomer,
     recipient: draft.recipient,
     issueDate: draft.issueDate,

@@ -5,7 +5,7 @@ import { pdfResponse } from '@/features/documents/document-response'
 import { renderInvoicePdf } from '@/features/documents/render-invoice-pdf'
 import { loadMissingRecipientAddress, recipientAddressMessage } from '@/features/invoices/recipient-address'
 import { requireTenantForRoute } from '@/lib/auth/require-tenant'
-import { normalizeUserFilename } from '@/lib/domain/filename'
+import { normalizeUserFilename, storageSafeName } from '@/lib/domain/filename'
 
 type Params = { params: Promise<{ betrieb: string; id: string }> }
 
@@ -58,7 +58,8 @@ export async function POST(request: Request, { params }: Params) {
 
   const filename = parsedBody.data.filename.trim() ? normalizeUserFilename(parsedBody.data.filename, 'pdf') : doc.filenames.pdf
   const pdf = await renderInvoicePdf(doc.vm, doc.theme, { logo: doc.logo })
-  const storagePath = `${auth.tenant.id}/${id}/${new Date().toISOString().replace(/[:.]/g, '-')}_${filename}`
+  // Object keys stay ASCII-safe; the readable name lives in invoice_exports.filename.
+  const storagePath = `${auth.tenant.id}/${id}/${new Date().toISOString().replace(/[:.]/g, '-')}_${storageSafeName(filename)}`
   const bucket = auth.supabase.storage.from('invoice-pdfs')
 
   const { error: uploadError } = await bucket.upload(storagePath, pdf, { contentType: 'application/pdf', upsert: false })

@@ -16,5 +16,11 @@ test('DOCX responses are always downloads with the Word media type', () => {
   expect(r.headers.get('Content-Type')).toBe('application/vnd.openxmlformats-officedocument.wordprocessingml.document')
   expect(r.headers.get('Cache-Control')).toBe('private, no-store')
   expect(r.headers.get('X-Content-Type-Options')).toBe('nosniff')
-  expect(r.headers.get('Content-Disposition')).toBe(`attachment; filename="Rechnung_M_ller.docx"; filename*=UTF-8''Rechnung_M%C3%BCller.docx`)
+  expect(r.headers.get('Content-Disposition')).toBe(`attachment; filename="Rechnung_Mueller.docx"; filename*=UTF-8''Rechnung_M%C3%BCller.docx`)
+})
+test('readable names keep spaces in the UTF-8 part', () => {
+  const r = pdfResponse(Buffer.from('%PDF-'), { type: 'attachment', filename: 'Rechnung Metzgerei Müller 2.pdf' })
+  expect(r.headers.get('Content-Disposition')).toBe(
+    `attachment; filename="Rechnung Metzgerei Mueller 2.pdf"; filename*=UTF-8''Rechnung%20Metzgerei%20M%C3%BCller%202.pdf`,
+  )
 })

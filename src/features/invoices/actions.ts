@@ -8,8 +8,8 @@ import { pathErrorsFrom } from '@/lib/form'
 import type { Json } from '@/lib/supabase/database.types'
 import { tenantPath } from '@/lib/tenant-paths'
 import { defaultRange, suggestForRange } from './draft'
-import { getInvoice, listInvoiceNumbers, listNumberRanges } from './queries'
-import { type InvoiceSubmission, invoiceSchema } from './schema'
+import { findInvoiceWithCustomerSeq, getInvoice, listInvoiceNumbers, listNumberRanges } from './queries'
+import { customerSeqCheckSchema, type InvoiceSubmission, invoiceSchema } from './schema'
 
 export type InvoiceFormState = { message: string | null; errors: Record<string, string>; suggestedNumber: string | null }
 
@@ -21,6 +21,8 @@ function rpcArgs(s: InvoiceSubmission) {
       number: s.number,
       number_range_id: s.numberRangeId,
       customer_id: s.customerId,
+      // null = automatic on insert, keep the stored value on update.
+      customer_seq: s.customerSeq,
       save_as_customer: s.saveAsCustomer,
       recipient: s.recipient,
       issue_date: s.issueDate,
@@ -85,6 +87,22 @@ export async function saveInvoice(
     return { message: 'Die Rechnung konnte nicht gespeichert werden. Bitte erneut versuchen.', errors: {}, suggestedNumber: null }
   }
   redirect(tenantPath(tenant.id, `rechnungen/${savedId}?gespeichert=1`))
+}
+
+/**
+ * Non-blocking hint for the counter field: the number of another invoice of this business that already uses the
+ * entered counter for the same customer and number range, or null (free, invalid input, or a customer that does not
+ * exist yet).
+ */
+export async function checkCustomerSeq(tenantId: string, input: unknown): Promise<{ number: string } | null> {
+  const { supabase, tenant } = await requireTenant(tenantId)
+  const parsed = customerSeqCheckSchema.safeParse(input)
+  if (!parsed.success || parsed.data.customerSeq === null) return null
+  const { customerId, saveAsCustomer, recipientName, numberRangeId, customerSeq, excludeInvoiceId } = parsed.data
+  // A customer record that is created with this invoice has no other invoices yet; without any name there is no group.
+  if (customerId === null && (saveAsCustomer || recipientName.trim() === '')) return null
+  const number = await findInvoiceWithCustomerSeq(supabase, tenant.id, { customerId, recipientName, numberRangeId, customerSeq, excludeInvoiceId })
+  return number === null ? null : { number }
 }
 
 export async function copyInvoice(tenantId: string, id: string): Promise<void> {

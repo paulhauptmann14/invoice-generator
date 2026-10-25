@@ -15,8 +15,7 @@ import { emptyFormState, type FormState } from '@/lib/form'
 import { saveArticle } from './actions'
 import { ARTICLE_FIELDS, type ArticleField, articleSchema, VAT_RATES } from './schema'
 import { FormSection } from '@/components/form/form-section'
-
-const UNIT_SUGGESTIONS = ['Stk.', 'kg', 'g', 'Pers.', 'Portion', 'Std.', 'Pauschale', 'l', 'Fl.']
+import { UnitSelect } from '@/components/form/unit-select'
 
 export function ArticleForm({ id, initial }: { id: string | null; initial: Partial<Record<ArticleField, string>> }) {
   const { tenant, path } = useTenant()
@@ -58,8 +57,8 @@ export function ArticleForm({ id, initial }: { id: string | null; initial: Parti
           >
             {(p) => <Input {...p} inputMode="decimal" defaultValue={v.unitPriceGross} className="text-right tabular-nums" />}
           </Field>
-          <Field name="unit" label="Einheit" hint="z. B. kg, Stk., Pers." error={errors.unit}>
-            {(p) => <Input {...p} list="unit-suggestions" defaultValue={v.unit} />}
+          <Field name="unit" label="Einheit" error={errors.unit}>
+            {(p) => <UnitSelect {...p} defaultValue={v.unit} />}
           </Field>
           <Field name="vatRate" label="MwSt.-Satz" required error={errors.vatRate}>
             {(p) => (
@@ -73,11 +72,6 @@ export function ArticleForm({ id, initial }: { id: string | null; initial: Parti
             )}
           </Field>
         </div>
-        <datalist id="unit-suggestions">
-          {UNIT_SUGGESTIONS.map((u) => (
-            <option key={u} value={u} />
-          ))}
-        </datalist>
       </FormSection>
 
       <div className="flex flex-wrap items-center gap-3 border-t border-border pt-6">

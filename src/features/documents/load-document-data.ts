@@ -6,6 +6,7 @@ import { buildFilename } from '@/lib/domain/filename'
 import { parseTheme, type Theme } from '@/lib/domain/theme'
 import { buildInvoiceViewModel, type InvoiceViewModel } from '@/lib/domain/view-model'
 import type { Database } from '@/lib/supabase/database.types'
+import { filenameContextOf } from './filename-context'
 import { inputFromInvoice } from './invoice-input'
 import { type DocumentLogo, loadLogo } from './logo'
 
@@ -28,12 +29,20 @@ export async function loadDocumentSettings(supabase: Client, tenantId: string): 
   return { company, theme, logo: await loadLogo(supabase, tenantId, theme), filenameTemplate: data.filename_template, missing: missingCompanyFields(company) }
 }
 
+/** Name of an invoice's number range for the {Kreis} placeholder; null without a range. */
+async function loadRangeName(supabase: Client, tenantId: string, rangeId: string | null): Promise<string | null> {
+  if (!rangeId) return null
+  const { data, error } = await supabase.from('number_ranges').select('name').eq('id', rangeId).eq('tenant_id', tenantId).maybeSingle()
+  if (error) throw new Error(`Loading number range failed: ${error.message}`)
+  return data?.name ?? null
+}
+
 /** Saved invoice + settings -> everything a renderer and the download need. Null if the invoice does not exist. */
 export async function loadInvoiceDocument(supabase: Client, tenantId: string, id: string): Promise<InvoiceDocument | null> {
   const [invoice, settings] = await Promise.all([getInvoice(supabase, tenantId, id), loadDocumentSettings(supabase, tenantId)])
   if (!invoice) return null
   const input = inputFromInvoice(invoice)
-  const ctx = { customer: input.recipient.name, number: input.number, issueDate: input.issueDate }
+  const ctx = filenameContextOf(invoice, await loadRangeName(supabase, tenantId, invoice.number_range_id))
   return {
     vm: buildInvoiceViewModel(input, settings.company, settings.theme),
     theme: settings.theme,
