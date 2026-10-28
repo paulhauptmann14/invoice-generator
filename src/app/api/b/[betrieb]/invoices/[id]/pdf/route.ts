@@ -3,6 +3,8 @@ import { forLetterhead } from '@/features/documents/letterhead'
 import { loadInvoiceDocument } from '@/features/documents/load-document-data'
 import { pdfResponse } from '@/features/documents/document-response'
 import { renderInvoicePdf } from '@/features/documents/render-invoice-pdf'
+import { renderZugferdInvoicePdf } from '@/features/documents/zugferd-pdf'
+import { eInvoiceProblems } from '@/features/documents/zugferd-xml'
 import { loadMissingRecipientAddress, recipientAddressMessage } from '@/features/invoices/recipient-address'
 import { requireTenantForRoute } from '@/lib/auth/require-tenant'
 import { normalizeUserFilename, storageSafeName } from '@/lib/domain/filename'
@@ -35,7 +37,8 @@ export async function GET(request: Request, { params }: Params) {
 }
 
 // letterhead: for printing on letterhead paper that already carries the logo and the sender line.
-const exportBody = z.object({ filename: z.string().max(200), letterhead: z.boolean().optional() })
+// zugferd: an electronic invoice (ZUGFeRD / Factur-X, EN 16931): PDF/A-3 with the invoice data as embedded XML.
+const exportBody = z.object({ filename: z.string().max(200), letterhead: z.boolean().optional(), zugferd: z.boolean().optional() })
 
 /** Export: render, archive in storage + invoice_exports, then download. No download without archive. */
 export async function POST(request: Request, { params }: Params) {
@@ -55,9 +58,12 @@ export async function POST(request: Request, { params }: Params) {
     return Response.json({ error: 'company data incomplete', missing: doc.missing, recipientMissing }, { status: 409 })
   }
   if (recipientMissing.length > 0) return recipientIncomplete(recipientMissing)
+  const zugferd = parsedBody.data.zugferd === true
+  const eInvoiceMissing = zugferd ? eInvoiceProblems(doc.input, doc.company, doc.logo) : []
+  if (eInvoiceMissing.length > 0) return Response.json({ error: 'e-invoice data incomplete', eInvoiceMissing }, { status: 409 })
 
   const filename = parsedBody.data.filename.trim() ? normalizeUserFilename(parsedBody.data.filename, 'pdf') : doc.filenames.pdf
-  const pdf = await renderInvoicePdf(doc.vm, doc.theme, { logo: doc.logo })
+  const pdf = zugferd ? await renderZugferdInvoicePdf(doc) : await renderInvoicePdf(doc.vm, doc.theme, { logo: doc.logo })
   // Object keys stay ASCII-safe; the readable name lives in invoice_exports.filename.
   const storagePath = `${auth.tenant.id}/${id}/${new Date().toISOString().replace(/[:.]/g, '-')}_${storageSafeName(filename)}`
   const bucket = auth.supabase.storage.from('invoice-pdfs')

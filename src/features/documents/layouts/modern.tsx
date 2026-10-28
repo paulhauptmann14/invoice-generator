@@ -1,18 +1,18 @@
-import { Document, Image, Page, StyleSheet, Text, View } from '@react-pdf/renderer'
+import { Document, Image, Page, StyleSheet, Text, View, type DocumentProps } from '@react-pdf/renderer'
 import { DOCUMENT_COLORS, readableTextOn, type Theme } from '@/lib/domain/theme'
 import type { InvoiceViewModel } from '@/lib/domain/view-model'
 import { din5008, mm } from '../din5008'
 import type { DocumentLogo } from '../logo'
 import { modernHead } from './modern-metrics'
 
-type Props = { vm: InvoiceViewModel; theme: Theme; fontFamily: string | string[]; logo?: DocumentLogo | null }
+type Props = { vm: InvoiceViewModel; theme: Theme; fontFamily: string | string[]; logo?: DocumentLogo | null; conformance?: DocumentProps['conformance'] }
 
 /**
  * Layout "Modern" (spec 3d): large company name in the primary color, an accent rule, DIN 5008 address field,
  * info as label/value pairs, plain rows, the gross total in an accent band, a small muted footer.
  * Displays view-model strings only, no calculations.
  */
-export function ModernInvoice({ vm, theme, fontFamily, logo }: Props) {
+export function ModernInvoice({ vm, theme, fontFamily, logo, conformance }: Props) {
   const din = din5008(theme.page.din5008)
   const { page } = theme
   const c = theme.colors
@@ -134,7 +134,7 @@ export function ModernInvoice({ vm, theme, fontFamily, logo }: Props) {
   ]
 
   return (
-    <Document title={`${vm.title} ${vm.number}`.trim()} author={vm.companyName} language="de">
+    <Document title={`${vm.title} ${vm.number}`.trim()} author={vm.companyName} language="de" conformance={conformance}>
       <Page size="A4" style={s.page}>
         {/* Fold and punch marks (DIN 5008) */}
         <View fixed style={[s.mark, { top: mm(din.foldMarksMm[0]) }]} />

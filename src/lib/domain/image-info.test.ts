@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import { imageInfo } from './image-info'
+import { imageInfo, isCmykJpeg } from './image-info'
 
 const png = (w: number, h: number) => {
   const b = Buffer.alloc(24)
@@ -10,8 +10,8 @@ const png = (w: number, h: number) => {
   b.writeUInt32BE(h, 20)
   return b
 }
-const jpeg = (w: number, h: number) =>
-  Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x04, 0x00, 0x00, 0xff, 0xc0, 0x00, 0x11, 0x08, h >> 8, h & 255, w >> 8, w & 255, 0x03])
+const jpeg = (w: number, h: number, components = 3) =>
+  Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x04, 0x00, 0x00, 0xff, 0xc0, 0x00, 0x11, 0x08, h >> 8, h & 255, w >> 8, w & 255, components])
 
 test('PNG size from the IHDR chunk', () => expect(imageInfo(png(800, 200))).toEqual({ type: 'png', width: 800, height: 200 }))
 test('JPEG size from the SOF marker', () => expect(imageInfo(jpeg(640, 480))).toEqual({ type: 'jpg', width: 640, height: 480 }))
@@ -19,4 +19,11 @@ test('anything else is rejected', () => {
   expect(imageInfo(Buffer.from('GIF89a'))).toBeNull()
   expect(imageInfo(Buffer.alloc(0))).toBeNull()
   expect(imageInfo(Buffer.from([0xff, 0xd8, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]))).toBeNull()
+})
+
+test('CMYK JPEGs are recognized by their four color components', () => {
+  expect(isCmykJpeg(jpeg(640, 480, 4))).toBe(true)
+  expect(isCmykJpeg(jpeg(640, 480))).toBe(false)
+  expect(isCmykJpeg(jpeg(640, 480, 1))).toBe(false)
+  expect(isCmykJpeg(png(800, 200))).toBe(false)
 })

@@ -11,12 +11,17 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } fr
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { normalizeUserFilename } from '@/lib/domain/filename'
+import { useStoredFlag } from '@/lib/use-stored-flag'
 import { useEditorDirty } from './editor-context'
 import { recipientAddressMessage } from './recipient-address-message'
 import { canPrintDirectly, printPdf } from './print-pdf'
 import { chooseLocation, savePicker, writeFile } from './save-file'
 
-type ExportError = { kind: 'missing'; fields: string[]; recipient: string[] } | { kind: 'failed' } | { kind: 'expired' } | { kind: 'write' }
+type ExportError =
+  | { kind: 'missing'; fields: string[]; recipient: string[]; eInvoice: string[] }
+  | { kind: 'failed' }
+  | { kind: 'expired' }
+  | { kind: 'write' }
 type Format = 'pdf' | 'docx'
 type Action = Format | 'print'
 
@@ -98,6 +103,8 @@ export function ExportPanel({
   const [name, setName] = useState(withoutExtension(defaultFilenames.pdf))
   // Letterhead paper already carries the logo and the business address: leave both out.
   const [letterhead, setLetterhead] = useState(false)
+  // E-invoice (ZUGFeRD): remembered per browser, since a business mostly invoices either companies or consumers.
+  const [zugferd, setZugferd] = useStoredFlag('export-zugferd', false)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<ExportError | null>(null)
   const [done, setDone] = useState<string | null>(null)
@@ -115,6 +122,7 @@ export function ExportPanel({
   useEffect(() => () => printFrame.current?.(), [])
   const inputId = useId()
   const hintId = useId()
+  const zugferdHintId = useId()
 
   const blocked = missing.length > 0 || recipientMissing.length > 0 || dirty
   const format: Format = action === 'docx' ? 'docx' : 'pdf'
@@ -146,7 +154,7 @@ export function ExportPanel({
       if (response.status === 401) return setError({ kind: 'expired' })
       if (response.status === 409) {
         const body = (await response.json().catch(() => ({}))) as { recipientMissing?: string[] }
-        return setError({ kind: 'missing', fields: [], recipient: body.recipientMissing ?? recipientMissing })
+        return setError({ kind: 'missing', fields: [], recipient: body.recipientMissing ?? recipientMissing, eInvoice: [] })
       }
       if (!response.ok) throw new Error(`Print version failed with ${response.status}`)
       printFrame.current?.()
@@ -175,12 +183,17 @@ export function ExportPanel({
       const response = await fetch(api(`invoices/${invoiceId}/${format}`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: name, letterhead }),
+        body: JSON.stringify({ filename: name, letterhead, ...(format === 'pdf' && { zugferd }) }),
       })
       if (response.status === 401) return setError({ kind: 'expired' })
       if (response.status === 409) {
-        const body = (await response.json().catch(() => ({}))) as { missing?: string[]; recipientMissing?: string[] }
-        return setError({ kind: 'missing', fields: body.missing ?? missing, recipient: body.recipientMissing ?? recipientMissing })
+        const body = (await response.json().catch(() => ({}))) as { missing?: string[]; recipientMissing?: string[]; eInvoiceMissing?: string[] }
+        return setError({
+          kind: 'missing',
+          fields: body.missing ?? missing,
+          recipient: body.recipientMissing ?? recipientMissing,
+          eInvoice: body.eInvoiceMissing ?? [],
+        })
       }
       if (!response.ok) throw new Error(`Export failed with ${response.status}`)
       const filename = filenameFrom(response.headers.get('Content-Disposition'), finalName)
@@ -331,6 +344,7 @@ export function ExportPanel({
                     )}
                     {error.fields.length > 0 && error.recipient.length > 0 && ' '}
                     {error.recipient.length > 0 && recipientAddressMessage(error.recipient)}
+                    {error.eInvoice.length > 0 && <>Für die E-Rechnung fehlt: {fieldList(error.eInvoice)}</>}
                   </>
                 ) : error.kind === 'expired' ? (
                   'Sitzung abgelaufen – bitte neu anmelden.'
@@ -357,6 +371,23 @@ export function ExportPanel({
               <input type="checkbox" checked={letterhead} onChange={(e) => setLetterhead(e.target.checked)} className="size-4 accent-[var(--color-tinte)]" />
               Für Briefpapier (ohne Logo und Absenderzeile)
             </label>
+            {action === 'pdf' && (
+              <div>
+                <label className="flex min-h-11 items-center gap-3 text-sm md:min-h-9">
+                  <input
+                    type="checkbox"
+                    checked={zugferd}
+                    onChange={(e) => setZugferd(e.target.checked)}
+                    aria-describedby={zugferdHintId}
+                    className="size-4 accent-[var(--color-tinte)]"
+                  />
+                  Als E-Rechnung (ZUGFeRD)
+                </label>
+                <p id={zugferdHintId} className="pl-7 text-sm text-muted-foreground">
+                  Das PDF enthält die Rechnungsdaten zusätzlich maschinenlesbar (EN 16931), für Rechnungen an Unternehmen.
+                </p>
+              </div>
+            )}
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
               <DialogClose asChild>
                 <Button type="button" variant="ghost" disabled={pending}>

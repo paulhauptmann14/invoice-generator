@@ -27,6 +27,9 @@ internet. The repository is called `invoice-generator`; inside the app it is "Re
   a service date or period and an optional due date.
 - **Export** as PDF (archived with the invoice) or as an editable Word file. Browsers that support it (Chrome, Edge) ask
   where to save the file.
+- **E-invoice (ZUGFeRD):** optionally, the exported PDF is a ZUGFeRD / Factur-X invoice in the profile EN 16931: a
+  PDF/A-3 with the invoice data as embedded XML, for invoices to businesses. 0 % lines are reported as zero rated (VAT
+  category Z); exemptions such as § 19 UStG or reverse charge are not supported yet.
 - **Layouts:** "Briefpapier" (like your own letterhead, default), "Klassisch", "Kompakt" and "Modern", with logo, fonts,
   colors, margins and a DIN 5008 address field for window envelopes.
 - **Numbering** with several number ranges per business (for example `G1/26` for invoices, `GU1/26` for vouchers).

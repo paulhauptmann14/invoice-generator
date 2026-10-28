@@ -1,13 +1,13 @@
-import { Document, Page, StyleSheet, Text, View } from '@react-pdf/renderer'
+import { Document, Page, StyleSheet, Text, View, type DocumentProps } from '@react-pdf/renderer'
 import { DOCUMENT_COLORS, type Theme } from '@/lib/domain/theme'
 import type { InvoiceViewModel } from '@/lib/domain/view-model'
 import { din5008, mm } from '../din5008'
 import { type Density, FOOTER_ROOM_MM, oneLine } from './density'
 
-type Props = { vm: InvoiceViewModel; theme: Theme; fontFamily: string | string[]; density?: Density }
+type Props = { vm: InvoiceViewModel; theme: Theme; fontFamily: string | string[]; density?: Density; conformance?: DocumentProps['conformance'] }
 
 /** Layout "Klassisch" (and "Kompakt"): DIN 5008 letter (form A/B). Displays view-model strings only, no calculations. */
-export function KlassischInvoice({ vm, theme, fontFamily, density = 'normal' }: Props) {
+export function KlassischInvoice({ vm, theme, fontFamily, density = 'normal', conformance }: Props) {
   const compact = density === 'compact'
   const din = din5008(theme.page.din5008)
   const { page } = theme
@@ -131,7 +131,7 @@ export function KlassischInvoice({ vm, theme, fontFamily, density = 'normal' }: 
   ]
 
   return (
-    <Document title={`${vm.title} ${vm.number}`.trim()} author={vm.companyName} language="de">
+    <Document title={`${vm.title} ${vm.number}`.trim()} author={vm.companyName} language="de" conformance={conformance}>
       <Page size="A4" style={s.page}>
         {/* Fold and punch marks (DIN 5008) */}
         <View fixed style={[s.mark, { top: mm(din.foldMarksMm[0]) }]} />

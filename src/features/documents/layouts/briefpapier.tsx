@@ -1,10 +1,10 @@
-import { Document, Image, Page, StyleSheet, Text, View } from '@react-pdf/renderer'
+import { Document, Image, Page, StyleSheet, Text, View, type DocumentProps } from '@react-pdf/renderer'
 import { DOCUMENT_COLORS, type Theme } from '@/lib/domain/theme'
 import type { InvoiceViewModel } from '@/lib/domain/view-model'
 import { din5008, mm } from '../din5008'
 import type { DocumentLogo } from '../logo'
 
-type Props = { vm: InvoiceViewModel; theme: Theme; fontFamily: string | string[]; logo?: DocumentLogo | null }
+type Props = { vm: InvoiceViewModel; theme: Theme; fontFamily: string | string[]; logo?: DocumentLogo | null; conformance?: DocumentProps['conformance'] }
 
 const PAGE_WIDTH_MM = 210
 
@@ -12,7 +12,7 @@ const PAGE_WIDTH_MM = 210
  * Layout "Briefpapier": modelled on the business's own Word invoice (spec 9a). The head carries only the logo,
  * no footer, items as single lines. Displays view-model strings only, no calculations.
  */
-export function BriefpapierInvoice({ vm, theme, fontFamily, logo }: Props) {
+export function BriefpapierInvoice({ vm, theme, fontFamily, logo, conformance }: Props) {
   const din = din5008(theme.page.din5008)
   const { page } = theme
   const c = theme.colors
@@ -81,7 +81,7 @@ export function BriefpapierInvoice({ vm, theme, fontFamily, logo }: Props) {
   })
 
   return (
-    <Document title={`${vm.title} ${vm.number}`.trim()} author={vm.companyName} language="de">
+    <Document title={`${vm.title} ${vm.number}`.trim()} author={vm.companyName} language="de" conformance={conformance}>
       <Page size="A4" style={s.page}>
         {/* Head: only the logo, on page 1 only (not `fixed`): continuation pages start at the normal top margin. */}
         {/* react-pdf's Image draws into the PDF and has no alt attribute (not an HTML <img>). */}

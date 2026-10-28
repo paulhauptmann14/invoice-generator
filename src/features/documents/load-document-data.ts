@@ -4,7 +4,7 @@ import { getInvoice } from '@/features/invoices/queries'
 import { type Company, missingCompanyFields, parseCompany } from '@/lib/domain/company'
 import { buildFilename } from '@/lib/domain/filename'
 import { parseTheme, type Theme } from '@/lib/domain/theme'
-import { buildInvoiceViewModel, type InvoiceViewModel } from '@/lib/domain/view-model'
+import { buildInvoiceViewModel, type InvoiceInput, type InvoiceViewModel } from '@/lib/domain/view-model'
 import type { Database } from '@/lib/supabase/database.types'
 import { filenameContextOf } from './filename-context'
 import { inputFromInvoice } from './invoice-input'
@@ -15,6 +15,9 @@ type Client = SupabaseClient<Database>
 export type DocumentSettings = { company: Company; theme: Theme; logo: DocumentLogo | null; filenameTemplate: string; missing: string[] }
 export type InvoiceDocument = {
   vm: InvoiceViewModel
+  /** The data behind `vm`, for the ZUGFeRD XML. */
+  input: InvoiceInput
+  company: Company
   theme: Theme
   logo: DocumentLogo | null
   filenames: { pdf: string; docx: string }
@@ -45,6 +48,8 @@ export async function loadInvoiceDocument(supabase: Client, tenantId: string, id
   const ctx = filenameContextOf(invoice, await loadRangeName(supabase, tenantId, invoice.number_range_id))
   return {
     vm: buildInvoiceViewModel(input, settings.company, settings.theme),
+    input,
+    company: settings.company,
     theme: settings.theme,
     logo: settings.logo,
     filenames: {
