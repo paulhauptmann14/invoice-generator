@@ -28,8 +28,9 @@ internet. The repository is called `invoice-generator`; inside the app it is "Re
 - **Export** as PDF (archived with the invoice) or as an editable Word file. Browsers that support it (Chrome, Edge) ask
   where to save the file.
 - **E-invoice (ZUGFeRD):** optionally, the exported PDF is a ZUGFeRD / Factur-X invoice in the profile EN 16931: a
-  PDF/A-3 with the invoice data as embedded XML, for invoices to businesses. 0 % lines are reported as zero rated (VAT
-  category Z); exemptions such as § 19 UStG or reverse charge are not supported yet.
+  PDF/A-3 with the invoice data as embedded XML, for invoices to businesses. An invoice with only 0 % lines (vouchers) is
+  reported as not subject to VAT (VAT category O, without VAT IDs); 0 % lines next to other rates as zero rated
+  (category Z). Exemptions such as § 19 UStG or reverse charge are not supported yet.
 - **Layouts:** "Briefpapier" (like your own letterhead, default), "Klassisch", "Kompakt" and "Modern", with logo, fonts,
   colors, margins and a DIN 5008 address field for window envelopes.
 - **Numbering** with several number ranges per business (for example `G1/26` for invoices, `GU1/26` for vouchers).
@@ -152,6 +153,11 @@ migrations and keeps the data.
 
 GitHub Actions runs all of them, plus `npm audit --omit=dev` and ShellCheck for the deployment scripts, on every push to
 `main` and every pull request ([`ci.yml`](.github/workflows/ci.yml)).
+
+The e-invoice XML is checked against the official schema of the profile EN 16931 (ZUGFeRD 2.5 / Factur-X 1.09, in
+`src/features/documents/factur-x-schema/`) in `npm test`. The full check, PDF/A-3 plus the business rules of EN 16931, needs
+Java and the [Mustang](https://github.com/ZUGFeRD/mustangproject) validator and only runs on request:
+`MUSTANG_JAR=/path/to/Mustang-CLI-2.26.0.jar npm run test:integration`.
 
 Packages are pinned to exact versions (`.npmrc`). Dependabot opens one grouped pull request per month for minor and patch
 updates of npm packages and GitHub Actions ([`dependabot.yml`](.github/dependabot.yml)); major versions are updated by hand.

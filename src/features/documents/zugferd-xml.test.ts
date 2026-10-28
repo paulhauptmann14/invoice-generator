@@ -78,10 +78,12 @@ describe('buildZugferdXml', () => {
     expect(value(xml, 'ram:Description')).toBeTruthy()
   })
 
-  test('a single service day is the delivery date, a period the billing period', () => {
+  test('a single service day is the delivery date; a period is the billing period, its last day the delivery date', () => {
     expect(xmlFor(input)).toMatch(/<ram:ActualDeliverySupplyChainEvent>\s*<ram:OccurrenceDateTime>\s*<udt:DateTimeString format="102">20261007</)
     const period = xmlFor({ ...input, serviceDateFrom: '2026-10-01', serviceDateTo: '2026-10-05' })
-    expect(period).toContain('<ram:ApplicableHeaderTradeDelivery/>')
+    // An empty delivery element is flagged (PEPPOL-EN16931-R008); a service over a period is complete on its last day.
+    expect(period).not.toContain('<ram:ApplicableHeaderTradeDelivery/>')
+    expect(period).toMatch(/<ram:ActualDeliverySupplyChainEvent>\s*<ram:OccurrenceDateTime>\s*<udt:DateTimeString format="102">20261005</)
     expect(period).toMatch(/<ram:StartDateTime>\s*<udt:DateTimeString format="102">20261001</)
     expect(period).toMatch(/<ram:EndDateTime>\s*<udt:DateTimeString format="102">20261005</)
   })
@@ -96,6 +98,32 @@ describe('buildZugferdXml', () => {
 
     expect(xmlFor(input)).toMatch(/<ram:SellerTradeParty>\s*<ram:ID>12\/345\/67890<\/ram:ID>/)
     expect(xmlFor(input)).toContain('<ram:ID schemeID="FC">12/345/67890</ram:ID>')
+  })
+
+  test('only 0 % lines (vouchers): not subject to VAT, without rates and VAT IDs (BR-O-02 to BR-O-10)', () => {
+    const vouchers: InvoiceInput = {
+      ...input,
+      recipient: { ...input.recipient, vatId: 'DE987654321' },
+      discount: { kind: 'percent', value: 10 },
+      items: [{ description: 'Gutschein', quantity: 2, unit: 'Stk.', unitPriceGross: 50, vatRate: 0 }],
+    }
+    const xml = xmlFor(vouchers, { ...company, vatId: 'DE123456789' })
+    expect(xml).not.toContain('<ram:CategoryCode>Z</ram:CategoryCode>')
+    expect(xml.match(/<ram:CategoryCode>O<\/ram:CategoryCode>/g)).toHaveLength(3) // line, document allowance, breakdown
+    expect(xml).not.toContain('RateApplicablePercent')
+    expect(xml).not.toContain('schemeID="VA"')
+    expect(value(xml, 'ram:ExemptionReason')).toBe('Nicht steuerbar')
+    expect(value(xml, 'ram:ExemptionReasonCode')).toBe('VATEX-EU-O')
+    // Without the VAT ID, the tax number identifies the seller (BR-CO-26).
+    expect(xml).toMatch(/<ram:SellerTradeParty>\s*<ram:ID>12\/345\/67890<\/ram:ID>/)
+    expect(value(xml, 'ram:TaxTotalAmount')).toBe('0.00')
+    expect(value(xml, 'ram:GrandTotalAmount')).toBe('90.00')
+  })
+
+  test('0 % lines next to other rates stay zero rated', () => {
+    const xml = xmlFor({ ...input, items: [...input.items, { description: 'Gutschein', quantity: 1, unit: 'Stk.', unitPriceGross: 50, vatRate: 0 }] })
+    expect(xml).toContain('<ram:CategoryCode>Z</ram:CategoryCode>')
+    expect(xml).not.toContain('<ram:CategoryCode>O</ram:CategoryCode>')
   })
 
   test('discounts: line allowance and one document allowance per rate', () => {

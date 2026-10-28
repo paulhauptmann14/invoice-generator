@@ -6,8 +6,8 @@ import { calcTotals, type Discount, type LineInput } from './totals'
  * everything here is derived from `calcTotals`, so the totals of the e-invoice equal the printed ones to the cent.
  */
 
-/** UNTDID 5305 VAT category: S = standard rate, Z = zero rated. */
-export type VatCategory = 'S' | 'Z'
+/** UNTDID 5305 VAT category: S = standard rate, Z = zero rated, O = not subject to VAT. */
+export type VatCategory = 'S' | 'Z' | 'O'
 
 export type EInvoiceLine = {
   /** Quantity in thousandths; negative for a credit line (the net price must not be negative, BR-27). */
@@ -41,10 +41,17 @@ export type EInvoiceAmounts = {
   taxTotalCents: number
   /** BT-112, equals the printed gross total. */
   grandTotalCents: number
+  /** Only 0 % lines: the invoice is not subject to VAT (category O, e.g. vouchers). */
+  notSubjectToVat: boolean
 }
 
-export function vatCategoryOf(rateBp: number): VatCategory {
-  return rateBp === 0 ? 'Z' : 'S'
+/**
+ * 0 % is "not subject to VAT" when the whole invoice is at 0 % (in Germany typically a voucher, which may not share
+ * an invoice with other rates, BR-O-11), otherwise "zero rated".
+ */
+export function vatCategoryOf(rateBp: number, notSubjectToVat: boolean): VatCategory {
+  if (rateBp !== 0) return 'S'
+  return notSubjectToVat ? 'O' : 'Z'
 }
 
 const toNet = (grossCents: number, rateBp: number) => divRound(grossCents * 10000, 10000 + rateBp)
@@ -81,6 +88,8 @@ export function calcEInvoiceAmounts(lines: LineInput[], invoiceDiscount?: Discou
   const rates = lines.map((line) => toRateBp(line.vatRate))
   const netByLine = new Array<number>(lines.length).fill(0)
   const allowances: EInvoiceAllowance[] = []
+  const notSubjectToVat = rates.length > 0 && rates.every((rate) => rate === 0)
+  const categoryOf = (rateBp: number) => vatCategoryOf(rateBp, notSubjectToVat)
 
   for (const group of totals.taxGroups) {
     const indexes = rates.flatMap((rate, i) => (rate === group.rateBp ? [i] : []))
@@ -88,7 +97,7 @@ export function calcEInvoiceAmounts(lines: LineInput[], invoiceDiscount?: Discou
     const lineNetSum = toNet(groupGross.reduce((acc, c) => acc + c, 0), group.rateBp)
     apportionNet(groupGross, group.rateBp, lineNetSum).forEach((net, k) => (netByLine[indexes[k]] = net))
     const allowance = lineNetSum - group.netCents
-    if (allowance !== 0) allowances.push({ category: vatCategoryOf(group.rateBp), rateBp: group.rateBp, amountCents: allowance })
+    if (allowance !== 0) allowances.push({ category: categoryOf(group.rateBp), rateBp: group.rateBp, amountCents: allowance })
   }
 
   const eLines = lines.map((line, i): EInvoiceLine => {
@@ -106,7 +115,7 @@ export function calcEInvoiceAmounts(lines: LineInput[], invoiceDiscount?: Discou
       netPriceTenThousandths: netPrice,
       allowanceCents: allowance,
       netCents: netByLine[i],
-      category: vatCategoryOf(rateBp),
+      category: categoryOf(rateBp),
       rateBp,
     }
   })
@@ -116,12 +125,13 @@ export function calcEInvoiceAmounts(lines: LineInput[], invoiceDiscount?: Discou
   return {
     lines: eLines,
     allowances,
-    taxGroups: totals.taxGroups.map((g) => ({ category: vatCategoryOf(g.rateBp), rateBp: g.rateBp, basisCents: g.netCents, taxCents: g.vatCents })),
+    taxGroups: totals.taxGroups.map((g) => ({ category: categoryOf(g.rateBp), rateBp: g.rateBp, basisCents: g.netCents, taxCents: g.vatCents })),
     lineTotalCents,
     allowanceTotalCents,
     taxBasisCents: lineTotalCents - allowanceTotalCents,
     taxTotalCents: totals.vatCents,
     grandTotalCents: totals.grossCents,
+    notSubjectToVat,
   }
 }
 

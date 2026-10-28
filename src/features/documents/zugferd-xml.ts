@@ -69,8 +69,11 @@ export function eInvoiceProblems(input: InvoiceInput, company: Company, logo: { 
 
 const hasServicePeriod = (input: InvoiceInput) => input.serviceDateTo !== null && input.serviceDateTo !== input.serviceDateFrom
 
+// "Not subject to VAT" carries no rate (BR-O-05, BR-O-06, BR-48).
+const rateNode = (category: VatCategory, rateBp: number) => category !== 'O' && el('ram:RateApplicablePercent', percent(rateBp))
+
 function vatNode(category: VatCategory, rateBp: number): Child[] {
-  return [el('ram:TypeCode', 'VAT'), el('ram:CategoryCode', category), el('ram:RateApplicablePercent', percent(rateBp))]
+  return [el('ram:TypeCode', 'VAT'), el('ram:CategoryCode', category), rateNode(category, rateBp)]
 }
 
 function allowanceNode(amountCents: number, tax?: { category: VatCategory; rateBp: number }): Node | null {
@@ -103,10 +106,12 @@ function lineNodes(input: InvoiceInput, amounts: EInvoiceAmounts): Child[] {
   })
 }
 
-function sellerNode(company: Company): Node | null {
+/** `notSubjectToVat`: the VAT ID is left out (BR-O-02). */
+function sellerNode(company: Company, notSubjectToVat: boolean): Node | null {
+  const vatId = notSubjectToVat ? '' : company.vatId
   // BR-CO-26 asks for a seller identifier, a legal registration or a VAT ID; the tax number alone is not enough.
   // Without a VAT ID, the commercial register entry is the legal registration, or else the tax number identifies the seller.
-  const withoutVatId = company.vatId === ''
+  const withoutVatId = vatId === ''
   return el('ram:SellerTradeParty', [
     withoutVatId && company.commercialRegister === '' && el('ram:ID', company.taxNumber),
     el('ram:Name', company.name),
@@ -125,11 +130,12 @@ function sellerNode(company: Company): Node | null {
     el('ram:URIUniversalCommunication', [el('ram:URIID', company.email, { schemeID: 'EM' })]),
     // FC = tax number (Steuernummer), VA = VAT identification number
     el('ram:SpecifiedTaxRegistration', [el('ram:ID', company.taxNumber, { schemeID: 'FC' })]),
-    el('ram:SpecifiedTaxRegistration', [el('ram:ID', company.vatId, { schemeID: 'VA' })]),
+    el('ram:SpecifiedTaxRegistration', [el('ram:ID', vatId, { schemeID: 'VA' })]),
   ])
 }
 
-function buyerNode(input: InvoiceInput): Node | null {
+/** `notSubjectToVat`: the VAT ID is left out (BR-O-02). */
+function buyerNode(input: InvoiceInput, notSubjectToVat: boolean): Node | null {
   const r = input.recipient
   return el('ram:BuyerTradeParty', [
     el('ram:Name', r.name),
@@ -140,7 +146,7 @@ function buyerNode(input: InvoiceInput): Node | null {
       el('ram:CityName', r.city),
       el('ram:CountryID', r.countryCode),
     ]),
-    el('ram:SpecifiedTaxRegistration', [el('ram:ID', r.vatId ?? '', { schemeID: 'VA' })]),
+    el('ram:SpecifiedTaxRegistration', [el('ram:ID', notSubjectToVat ? '' : (r.vatId ?? ''), { schemeID: 'VA' })]),
   ])
 }
 
@@ -164,9 +170,12 @@ function settlementNode(input: InvoiceInput, company: Company, vm: InvoiceViewMo
       el('ram:ApplicableTradeTax', [
         el('ram:CalculatedAmount', amount(g.taxCents)),
         el('ram:TypeCode', 'VAT'),
+        // BR-O-10: "not subject to VAT" names the reason, as text and as VATEX code.
+        g.category === 'O' && el('ram:ExemptionReason', 'Nicht steuerbar'),
         el('ram:BasisAmount', amount(g.basisCents)),
         el('ram:CategoryCode', g.category),
-        el('ram:RateApplicablePercent', percent(g.rateBp)),
+        g.category === 'O' && el('ram:ExemptionReasonCode', 'VATEX-EU-O'),
+        rateNode(g.category, g.rateBp),
       ]),
     ),
     period && el('ram:BillingSpecifiedPeriod', [el('ram:StartDateTime', [date102(input.serviceDateFrom)]), el('ram:EndDateTime', [date102(input.serviceDateTo!)])]),
@@ -208,9 +217,13 @@ export function buildZugferdXml(input: InvoiceInput, company: Company, vm: Invoi
       ]),
       el('rsm:SupplyChainTradeTransaction', [
         ...lineNodes(input, amounts),
-        el('ram:ApplicableHeaderTradeAgreement', [sellerNode(company), buyerNode(input)]),
-        // A single service day is the delivery date (BT-72); a period goes to the settlement (BG-14).
-        { name: 'ram:ApplicableHeaderTradeDelivery', children: period ? [] : [el('ram:ActualDeliverySupplyChainEvent', [el('ram:OccurrenceDateTime', [date102(input.serviceDateFrom)])])!] },
+        el('ram:ApplicableHeaderTradeAgreement', [sellerNode(company, amounts.notSubjectToVat), buyerNode(input, amounts.notSubjectToVat)]),
+        // The service day is the delivery date (BT-72). A period also goes to the settlement (BG-14); a service over
+        // a period is complete on its last day, which keeps the mandatory delivery element from being empty
+        // (PEPPOL-EN16931-R008).
+        el('ram:ApplicableHeaderTradeDelivery', [
+          el('ram:ActualDeliverySupplyChainEvent', [el('ram:OccurrenceDateTime', [date102(period ? input.serviceDateTo! : input.serviceDateFrom)])]),
+        ]),
         settlementNode(input, company, vm, amounts),
       ]),
     ],

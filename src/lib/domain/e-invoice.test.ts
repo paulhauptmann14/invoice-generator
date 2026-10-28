@@ -55,6 +55,19 @@ describe('calcEInvoiceAmounts', () => {
     ])
   })
 
+  test('an invoice with only 0 % lines (vouchers) is not subject to VAT', () => {
+    const e = expectConsistent(
+      [
+        { quantity: 1, unitPriceGross: 50, vatRate: 0 },
+        { quantity: 2, unitPriceGross: 25, vatRate: 0 },
+      ],
+      { kind: 'percent', value: 10 },
+    )
+    expect(e.lines.map((l) => l.category)).toEqual(['O', 'O'])
+    expect(e.taxGroups).toEqual([{ category: 'O', rateBp: 0, basisCents: 9000, taxCents: 0 }])
+    expect(e.allowances).toEqual([{ category: 'O', rateBp: 0, amountCents: 1000 }])
+  })
+
   test('an item discount is a net line allowance', () => {
     const e = expectConsistent([{ quantity: 1, unitPriceGross: 119, vatRate: 19, discount: { kind: 'percent', value: 10 } }])
     expect(e.lines[0]).toMatchObject({ netPriceTenThousandths: 1000000, allowanceCents: 1000, netCents: 9000 })
