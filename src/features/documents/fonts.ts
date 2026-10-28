@@ -55,7 +55,11 @@ function registerFonts(theme: Theme): string[] {
 }
 
 // The part of a fontkit font used here (react-pdf does not export fontkit's types).
-type GlyphLookup = { characterSet: number[]; glyphForCodePoint: (codePoint: number) => { codePoints: number[] } }
+type GlyphLookup = {
+  characterSet: number[]
+  glyphForCodePoint: (codePoint: number) => { codePoints: number[] }
+  hasGlyphForCodePoint: (codePoint: number) => boolean
+}
 const primed = new WeakSet<object>()
 
 /**
@@ -74,6 +78,19 @@ function primeGlyphs(font: GlyphLookup) {
   primed.add(font)
 }
 
+const LINE_BREAKS = new Set([0x0a, 0x0d])
+
+/**
+ * react-pdf sets every character its font stack lacks in Helvetica, its built-in fallback, which is never embedded.
+ * Line breaks ("\n" in footer columns and texts) are such characters, although nothing is drawn for them, so every
+ * PDF referenced a non-embedded Helvetica, which PDF/A (the ZUGFeRD invoice) forbids. The theme font takes line
+ * breaks instead; the pages look exactly the same.
+ */
+function claimLineBreaks(font: GlyphLookup) {
+  const has = font.hasGlyphForCodePoint.bind(font)
+  font.hasGlyphForCodePoint = (codePoint) => LINE_BREAKS.has(codePoint) || has(codePoint)
+}
+
 /** Registers and loads the theme's fonts for rendering; returns the font stack (see `registerFonts`). */
 export async function prepareFonts(theme: Theme): Promise<string[]> {
   const stack = registerFonts(theme)
@@ -82,7 +99,10 @@ export async function prepareFonts(theme: Theme): Promise<string[]> {
       ([400, 700] as const).map(async (fontWeight) => {
         await Font.load({ fontFamily, fontWeight })
         const data = Font.getFont({ fontFamily, fontWeight }).data as GlyphLookup | null
-        if (data) primeGlyphs(data)
+        if (data && !primed.has(data)) {
+          primeGlyphs(data)
+          claimLineBreaks(data)
+        }
       }),
     ),
   )

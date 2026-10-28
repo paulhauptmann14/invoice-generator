@@ -49,6 +49,13 @@ describe('renderInvoicePdf', () => {
     expect(text).toMatch(/20,00\s€/)
   })
 
+  test('line breaks do not pull in a non-embedded Helvetica (react-pdf fallback font)', async () => {
+    // Font dictionaries are not compressed, so the PDF text shows every font it references.
+    const vm = buildInvoiceViewModel({ ...input(1), introText: 'Danke für Ihren Auftrag.\nMit freundlichen Grüßen' }, company, defaultTheme)
+    const buffer = await renderInvoicePdf(vm, defaultTheme)
+    expect(buffer.toString('latin1')).not.toContain('/Helvetica')
+  })
+
   test('long invoices break onto several pages with page numbers', async () => {
     const buffer = await renderInvoicePdf(buildInvoiceViewModel(input(60), company, defaultTheme), defaultTheme)
     const { totalPages, text } = await pdfText(buffer)
