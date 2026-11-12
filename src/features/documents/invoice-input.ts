@@ -1,6 +1,7 @@
 import type { InvoiceRecordWithItems } from '@/features/invoices/draft'
 import { storedLineInputs } from '@/features/invoices/stored-items'
 import { parseIsoDate } from '@/lib/domain/dates'
+import { DRAFT_LABEL } from '@/lib/domain/invoice-number'
 import { optionalQuantitySchema, priceSchema, vatRateSchema } from '@/lib/domain/input-schemas'
 import { discountSchema, invoiceDiscountIssue, itemDiscountIssue } from '@/features/invoices/schema'
 import { discountFromColumns } from '@/lib/domain/totals'
@@ -25,7 +26,8 @@ function recipientFrom(raw: unknown): Recipient {
 
 export function inputFromInvoice(invoice: InvoiceRecordWithItems): InvoiceInput {
   return {
-    number: invoice.number,
+    // A draft prints "Entwurf" where the number goes, so a printed draft cannot pass for an invoice.
+    number: invoice.number ?? DRAFT_LABEL,
     issueDate: invoice.issue_date,
     serviceDateFrom: invoice.service_date_from,
     serviceDateTo: invoice.service_date_to,

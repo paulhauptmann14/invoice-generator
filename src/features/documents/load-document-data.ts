@@ -14,6 +14,8 @@ type Client = SupabaseClient<Database>
 
 export type DocumentSettings = { company: Company; theme: Theme; logo: DocumentLogo | null; filenameTemplate: string; missing: string[] }
 export type InvoiceDocument = {
+  /** No number yet: may be viewed and printed (as "Entwurf"), not exported. */
+  draft: boolean
   vm: InvoiceViewModel
   theme: Theme
   logo: DocumentLogo | null
@@ -44,6 +46,7 @@ export async function loadInvoiceDocument(supabase: Client, tenantId: string, id
   const input = inputFromInvoice(invoice)
   const ctx = filenameContextOf(invoice, await loadRangeName(supabase, tenantId, invoice.number_range_id))
   return {
+    draft: invoice.number === null,
     vm: buildInvoiceViewModel(input, settings.company, settings.theme),
     theme: settings.theme,
     logo: settings.logo,

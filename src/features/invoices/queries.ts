@@ -11,7 +11,8 @@ export const LIST_LIMIT = 500
 
 export type InvoiceListRow = {
   id: string
-  number: string
+  /** null = draft: the number is given later. */
+  number: string | null
   issueDate: string
   /** null = invoice without payment terms. */
   dueDate: string | null
@@ -44,6 +45,13 @@ export async function listInvoices(supabase: Client, tenantId: string, opts: { q
       grossCents: totals.grossCents,
     }
   })
+}
+
+/** Number of drafts (invoices without a number yet) of the business. */
+export async function countDrafts(supabase: Client, tenantId: string): Promise<number> {
+  const { count, error } = await supabase.from('invoices').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId).is('number', null)
+  if (error) throw new Error(`Counting drafts failed: ${error.message}`)
+  return count ?? 0
 }
 
 export async function getInvoice(
@@ -82,7 +90,8 @@ export async function listInvoiceNumbers(supabase: Client, tenantId: string, pag
       .order('id')
       .range(from, from + pageSize - 1)
     if (error) throw new Error(`Loading invoice numbers failed: ${error.message}`)
-    numbers.push(...data.map((r) => r.number))
+    // Drafts have no number yet.
+    numbers.push(...data.flatMap((r) => (r.number === null ? [] : [r.number])))
     if (data.length < pageSize) return numbers
   }
 }

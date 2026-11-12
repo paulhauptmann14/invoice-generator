@@ -20,3 +20,6 @@ test('missing recipient name, range and counter', () => {
   expect(filenameContextOf({ ...invoice, recipient: null, customer_seq: undefined }, null)).toMatchObject({ customer: '', rangeName: null, customerSeq: null })
   expect(filenameContextOf({ ...invoice, recipient: { name: 5 } }, null).customer).toBe('')
 })
+test('a draft is named "Entwurf" in place of its number', () => {
+  expect(filenameContextOf({ ...invoice, number: null }, null).number).toBe('Entwurf')
+})

@@ -9,6 +9,24 @@ function item(line: InvoiceLineInput) {
 }
 
 describe('inputFromInvoice', () => {
+  test('a draft prints "Entwurf" in place of its number', () => {
+    const input = inputFromInvoice({
+      number: null,
+      number_range_id: null,
+      customer_id: null,
+      recipient: {},
+      issue_date: '2026-11-12',
+      service_date_from: '2026-11-12',
+      service_date_to: null,
+      payment_days: null,
+      intro_text: null,
+      closing_text: null,
+      discount_kind: null,
+      discount_value: null,
+      invoice_items: [],
+    })
+    expect(input.number).toBe('Entwurf')
+  })
   test('maps the stored record and sorts items', () => {
     const input = inputFromInvoice({
       number: '2026-0001',

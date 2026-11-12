@@ -165,6 +165,19 @@ describe('number ranges', () => {
   })
 })
 
+describe('drafts (number later)', () => {
+  test('"Nummer später vergeben" sends no number, but keeps the range', () => {
+    const d = reduce(base(), { type: 'setNumberLater', value: true })
+    expect(toPayload(d)).toMatchObject({ number: null, numberRangeId: 'r-rechnungen' })
+  })
+  test('back to a number now: the suggestion follows range and year changed meanwhile', () => {
+    let d = reduce(base(), { type: 'setNumberLater', value: true })
+    d = reduce(d, { type: 'setNumberRange', id: 'r-gutscheine' })
+    d = reduce(d, { type: 'setNumberLater', value: false })
+    expect(d).toMatchObject({ numberLater: false, number: 'GU5/26' })
+  })
+})
+
 describe('draftTotals', () => {
   test('uses German decimals and skips invalid lines', () => {
     let d = base()
@@ -432,6 +445,11 @@ describe('draftFromInvoice', () => {
     discount_value: null,
     invoice_items: [],
   }
+  test('a stored draft comes back as one', () => {
+    const d = draftFromInvoice({ ...stored, number: null })
+    expect(d).toMatchObject({ numberLater: true, number: '' })
+    expect(toPayload(d).number).toBeNull()
+  })
   test('an invoice without payment terms gets an empty field', () => {
     expect(draftFromInvoice(stored).paymentDays).toBe('')
   })

@@ -49,6 +49,8 @@ export async function POST(request: Request, { params }: Params) {
 
   const loaded = await loadInvoiceDocument(auth.supabase, auth.tenant.id, id)
   if (!loaded) return notFound()
+  // A draft has no number yet: it is numbered first, then exported.
+  if (loaded.draft) return Response.json({ error: 'draft', message: 'Die Rechnung hat noch keine Nummer.' }, { status: 409 })
   const doc = parsedBody.data.letterhead ? forLetterhead(loaded) : loaded
   const recipientMissing = await loadMissingRecipientAddress(auth.supabase, auth.tenant.id, id)
   if (doc.missing.length > 0) {

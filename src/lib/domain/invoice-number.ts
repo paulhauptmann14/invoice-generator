@@ -1,3 +1,6 @@
+/** Stands in for the number of a draft (an invoice whose number is given later) wherever a number is shown. */
+export const DRAFT_LABEL = 'Entwurf'
+
 // Number format tokens: {JJJJ} = 4-digit year, {JJ} = 2-digit year,
 // {N…} = counter, zero-padded to the number of N's. Exactly one counter is required.
 

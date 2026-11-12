@@ -16,7 +16,7 @@ import { Button } from '@/components/ui/button'
 import { useTenant } from '@/features/tenants/tenant-context'
 import { deleteInvoice } from './actions'
 
-export function DeleteInvoiceButton({ id, number }: { id: string; number: string }) {
+export function DeleteInvoiceButton({ id, number }: { id: string; number: string | null }) {
   const { tenant } = useTenant()
   return (
     <AlertDialog>
@@ -28,7 +28,7 @@ export function DeleteInvoiceButton({ id, number }: { id: string; number: string
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Rechnung {number} löschen?</AlertDialogTitle>
+          <AlertDialogTitle>{number === null ? 'Entwurf löschen?' : `Rechnung ${number} löschen?`}</AlertDialogTitle>
           <AlertDialogDescription>
             Die Rechnung und alle dazu archivierten PDFs werden endgültig gelöscht. Das lässt sich nicht rückgängig machen.
           </AlertDialogDescription>

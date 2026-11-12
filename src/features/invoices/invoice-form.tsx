@@ -153,11 +153,36 @@ export function InvoiceForm({
             </div>
           )}
           <div className="space-y-1.5">
-            <Label htmlFor="inv-number">
-              Rechnungsnummer
-              <RequiredMark />
-            </Label>
-            <Input id="inv-number" value={draft.number} onChange={(e) => dispatch({ type: 'setField', field: 'number', value: e.target.value })} aria-invalid={Boolean(err.number)} aria-required className="font-mono" />
+            {draft.numberLater ? (
+              <>
+                <p className="text-sm font-medium">Rechnungsnummer</p>
+                <p id="inv-number-later" className="text-sm text-muted-foreground">
+                  {id === null
+                    ? 'Wird später vergeben, z. B. am Monatsende für alle Entwürfe auf einmal. Das Rechnungsdatum wird dann der Tag der Vergabe.'
+                    : 'Entwurf: Die Nummer wird mit „Nummer vergeben“ vergeben, das Rechnungsdatum wird dann der Tag der Vergabe.'}
+                </p>
+              </>
+            ) : (
+              <>
+                <Label htmlFor="inv-number">
+                  Rechnungsnummer
+                  <RequiredMark />
+                </Label>
+                <Input id="inv-number" value={draft.number} onChange={(e) => dispatch({ type: 'setField', field: 'number', value: e.target.value })} aria-invalid={Boolean(err.number)} aria-required className="font-mono" />
+              </>
+            )}
+            {/* Only a new invoice can start as a draft; a given number stays. */}
+            {id === null && (
+              <label className="flex min-h-11 items-center gap-3 text-sm md:min-h-9">
+                <input
+                  type="checkbox"
+                  checked={draft.numberLater}
+                  onChange={(e) => dispatch({ type: 'setNumberLater', value: e.target.checked })}
+                  className="size-4 accent-[var(--color-tinte)]"
+                />
+                Nummer später vergeben (Entwurf)
+              </label>
+            )}
             {err.number && <FieldError id="inv-number-error">{err.number}</FieldError>}
           </div>
           <div className="space-y-1.5">

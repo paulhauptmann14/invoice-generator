@@ -8,6 +8,7 @@ import { pathErrorsFrom } from '@/lib/form'
 import type { Json } from '@/lib/supabase/database.types'
 import { tenantPath } from '@/lib/tenant-paths'
 import { defaultRange, suggestForRange } from './draft'
+import { numberDrafts } from './numbering'
 import { findInvoiceWithCustomerSeq, getInvoice, listInvoiceNumbers, listNumberRanges } from './queries'
 import { customerSeqCheckSchema, type InvoiceSubmission, invoiceSchema } from './schema'
 
@@ -79,6 +80,10 @@ export async function saveInvoice(
     ...rpcArgs(parsed.data),
   })
   if (error) {
+    // The database keeps a number once it is given (only a tampered request gets here).
+    if (error.code === '23514' && error.message.includes('cannot be removed')) {
+      return { message: 'Eine vergebene Rechnungsnummer lässt sich nicht wieder entfernen.', errors: {}, suggestedNumber: null }
+    }
     if (error.code === '23505') {
       const [ranges, existing] = await Promise.all([listNumberRanges(supabase, tenant.id), listInvoiceNumbers(supabase, tenant.id)])
       const suggestion = suggestForRange({ ranges, existing }, parsed.data.numberRangeId, parsed.data.issueDate) || null
@@ -123,10 +128,12 @@ export async function copyInvoice(tenantId: string, id: string): Promise<void> {
     // The copy keeps the range of the original; an archived (or missing) range falls back to the default.
     const sourceRange = ranges.find((r) => r.id === source.number_range_id && !r.archived)
     const rangeId = sourceRange?.id ?? defaultRange(ranges)?.id ?? null
+    // The copy of a draft is a draft again.
+    if (source.number === null) return { rangeId, number: null }
     return { rangeId, number: suggestForRange({ ranges, existing }, rangeId, today) || `${source.number}-Kopie` }
   }
 
-  const save = (target: { rangeId: string | null; number: string }) =>
+  const save = (target: { rangeId: string | null; number: string | null }) =>
     supabase.rpc('save_invoice', {
       p_tenant_id: tenant.id,
       p_id: null as unknown as string,
@@ -186,4 +193,19 @@ export async function deleteInvoice(tenantId: string, id: string): Promise<void>
     if (removeError) console.error('Removing files of a deleted invoice failed', { invoiceId: id, error: removeError })
   }
   redirect(tenantPath(tenant.id, 'rechnungen?geloescht=1'))
+}
+
+/** "Nummer vergeben" on one draft. */
+export async function assignInvoiceNumber(tenantId: string, id: string): Promise<void> {
+  const { supabase, tenant } = await requireTenant(tenantId)
+  if (!idSchema.safeParse(id).success) throw new Error('Invalid invoice id')
+  const { numbered } = await numberDrafts(supabase, tenant.id, [id], todayIso())
+  redirect(tenantPath(tenant.id, `rechnungen/${id}?${numbered > 0 ? 'nummeriert=1' : 'nicht-nummeriert=1'}`))
+}
+
+/** "Nummern vergeben" for all drafts of the business. */
+export async function assignAllInvoiceNumbers(tenantId: string): Promise<void> {
+  const { supabase, tenant } = await requireTenant(tenantId)
+  const { numbered, skipped } = await numberDrafts(supabase, tenant.id, null, todayIso())
+  redirect(tenantPath(tenant.id, `rechnungen?nummeriert=${numbered}${skipped > 0 ? `&ohne-kreis=${skipped}` : ''}`))
 }

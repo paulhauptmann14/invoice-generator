@@ -11,6 +11,7 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } fr
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { normalizeUserFilename } from '@/lib/domain/filename'
+import { AssignNumberButton } from './assign-number-button'
 import { useEditorDirty } from './editor-context'
 import { recipientAddressMessage } from './recipient-address-message'
 import { canPrintDirectly, printPdf } from './print-pdf'
@@ -80,6 +81,7 @@ export function ExportPanel({
   defaultFilenames,
   missing,
   recipientMissing = [],
+  draft = false,
   leading,
 }: {
   invoiceId: string
@@ -87,6 +89,8 @@ export function ExportPanel({
   missing: string[]
   /** Empty address fields of the recipient on an invoice above 250 EUR (§ 14 UStG); export is blocked while any are missing. */
   recipientMissing?: string[]
+  /** No number yet: may be viewed and printed (as "Entwurf"), but not exported until it is numbered. */
+  draft?: boolean
   /** Shown left of the PDF actions (the invoice number). */
   leading?: React.ReactNode
 }) {
@@ -117,6 +121,7 @@ export function ExportPanel({
   const hintId = useId()
 
   const blocked = missing.length > 0 || recipientMissing.length > 0 || dirty
+  const exportBlocked = blocked || draft
   const format: Format = action === 'docx' ? 'docx' : 'pdf'
   const finalName = normalizeUserFilename(name, format)
   const copy = COPY[format]
@@ -251,23 +256,33 @@ export function ExportPanel({
             type="button"
             variant="outline"
             className="gap-2"
-            disabled={blocked}
-            aria-describedby={blocked ? 'pdf-blocked' : undefined}
+            disabled={exportBlocked}
+            aria-describedby={exportBlocked ? 'pdf-blocked' : undefined}
             onClick={() => openDialog('docx')}
           >
             <FileText aria-hidden className="size-4" />
             Word-Datei exportieren
           </Button>
-          {/* The archived PDF is the main action (one primary button per screen). */}
-          <Button ref={pdfButtonRef} type="button" className="gap-2" disabled={blocked} aria-describedby={blocked ? 'pdf-blocked' : undefined} onClick={() => openDialog('pdf')}>
-            <Download aria-hidden className="size-4" />
-            PDF exportieren
-          </Button>
+          {/* The archived PDF is the main action (one primary button per screen); a draft is numbered first. */}
+          {draft ? (
+            <AssignNumberButton invoiceId={invoiceId} disabled={dirty} primary />
+          ) : (
+            <Button ref={pdfButtonRef} type="button" className="gap-2" disabled={blocked} aria-describedby={blocked ? 'pdf-blocked' : undefined} onClick={() => openDialog('pdf')}>
+              <Download aria-hidden className="size-4" />
+              PDF exportieren
+            </Button>
+          )}
         </div>
       </div>
 
-      {blocked && (
+      {exportBlocked && (
         <div id="pdf-blocked" className="mt-3 space-y-1.5 text-sm text-muted-foreground">
+          {draft && (
+            <p className="flex items-start gap-2 sm:justify-end sm:text-right">
+              <Info aria-hidden className="mt-0.5 size-4 shrink-0" />
+              <span>Entwurf ohne Rechnungsnummer: exportieren lässt er sich erst nach „Nummer vergeben“. Ansehen und Drucken zeigen „Entwurf“.</span>
+            </p>
+          )}
           {missing.length > 0 && (
             <p className="flex items-start gap-2 sm:justify-end sm:text-right">
               <Info aria-hidden className="mt-0.5 size-4 shrink-0" />

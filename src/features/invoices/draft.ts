@@ -38,6 +38,8 @@ export type InvoiceDraft = {
   numberRangeId: string | null
   number: string
   numberEdited: boolean
+  /** Draft ("Entwurf"): saved without a number, which is given later from the number range. */
+  numberLater: boolean
   customerId: string | null
   /** Counter in the file name as typed; '' = automatic (new invoice) or keep the stored value (existing one). */
   customerSeq: string
@@ -98,6 +100,7 @@ type ItemField = 'description' | 'quantity' | 'unit' | 'unitPriceGross' | 'vatRa
 export type DraftAction =
   | { type: 'setField'; field: TextField; value: string }
   | { type: 'setNumberRange'; id: string | null }
+  | { type: 'setNumberLater'; value: boolean }
   | { type: 'setServiceDateTo'; value: string | null }
   | { type: 'setRecipient'; field: keyof DraftRecipient; value: string }
   | { type: 'selectCustomer'; customer: PickerCustomer }
@@ -148,6 +151,7 @@ export function newDraft(opts: {
     numberRangeId: rangeId,
     number: suggestForRange(opts.numberContext, rangeId, opts.today),
     numberEdited: false,
+    numberLater: false,
     customerId: null,
     customerSeq: '',
     saveAsCustomer: false,
@@ -165,7 +169,8 @@ export function newDraft(opts: {
 }
 
 export type InvoiceRecordWithItems = {
-  number: string
+  /** null = draft: the number is given later. */
+  number: string | null
   number_range_id: string | null
   customer_id: string | null
   /** Per-customer counter for file names; assigned on insert (or typed by the owner) and kept when saving without a value. */
@@ -214,8 +219,9 @@ export function draftFromInvoice(invoice: InvoiceRecordWithItems): InvoiceDraft 
   const r = (invoice.recipient ?? {}) as Record<string, unknown>
   return {
     numberRangeId: invoice.number_range_id,
-    number: invoice.number,
-    numberEdited: true,
+    number: invoice.number ?? '',
+    numberEdited: invoice.number !== null,
+    numberLater: invoice.number === null,
     customerId: invoice.customer_id,
     customerSeq: invoice.customer_seq == null ? '' : String(invoice.customer_seq),
     saveAsCustomer: false,
@@ -288,6 +294,13 @@ export function createDraftReducer(ctx: NumberContext) {
           ...state,
           numberRangeId: action.id,
           number: state.numberEdited || action.id === null ? state.number : suggestForRange(ctx, action.id, state.issueDate),
+        }
+      case 'setNumberLater':
+        // Back to a number now: suggest one unless one was typed by hand.
+        return {
+          ...state,
+          numberLater: action.value,
+          number: action.value || state.numberEdited ? state.number : suggestForRange(ctx, state.numberRangeId, state.issueDate),
         }
       case 'setServiceDateTo':
         return { ...state, serviceDateTo: action.value }
@@ -383,11 +396,11 @@ export function createDraftReducer(ctx: NumberContext) {
   }
 }
 
-/** What the server receives: the draft without client-only fields (numberEdited, item keys). */
+/** What the server receives: the draft without client-only fields (numberEdited, item keys). null number = draft. */
 export function toPayload(draft: InvoiceDraft) {
   return {
     numberRangeId: draft.numberRangeId,
-    number: draft.number,
+    number: draft.numberLater ? null : draft.number,
     customerId: draft.customerId,
     customerSeq: draft.customerSeq,
     saveAsCustomer: draft.saveAsCustomer,

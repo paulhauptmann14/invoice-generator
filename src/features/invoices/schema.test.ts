@@ -49,6 +49,12 @@ describe('invoiceSchema', () => {
     })
     expect(pathErrorsFrom(discount.error!)).toEqual({ 'items.1.discount': 'Der Rabatt ist höher als der Betrag der Position.' })
   })
+  test('a draft has no number, but needs a number range for it', () => {
+    const range = '6f1b6d1e-4b5e-4c1a-9b8a-2f6d3c1e9a10'
+    expect(invoiceSchema.parse({ ...base, number: null, numberRangeId: range }).number).toBeNull()
+    const r = invoiceSchema.safeParse({ ...base, number: null, numberRangeId: null })
+    expect(pathErrorsFrom(r.error!)).toEqual({ number: 'Eine Nummer später vergeben geht nur mit einem Nummernkreis (Einstellungen → Nummern & Dateien).' })
+  })
   test('collects nested errors by path', () => {
     const r = invoiceSchema.safeParse({
       ...base,

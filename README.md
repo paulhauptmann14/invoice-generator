@@ -30,7 +30,10 @@ internet. The repository is called `invoice-generator`; inside the app it is "Re
   where to save the file.
 - **Layouts:** "Briefpapier" (like your own letterhead, default), "Klassisch", "Kompakt" and "Modern", with logo, fonts,
   colors, margins and a DIN 5008 address field for window envelopes.
-- **Numbering** with several number ranges per business (for example `G1/26` for invoices, `GU1/26` for vouchers).
+- **Numbering** with several number ranges per business (for example `G1/26` for invoices, `GU1/26` for vouchers). An
+  invoice can be saved as a draft without a number and numbered later, one by one or all drafts at once (e.g. at the end
+  of the month); it then gets the next number of its range and that day as its issue date. Drafts can be viewed and
+  printed (marked "Entwurf"), but not exported.
 - **Customers and articles** to pick from while writing; archived instead of deleted.
 - **Several businesses per account**, each with its own customers, articles, invoices, numbers, settings and files.
 - **Runs at home:** HTTPS with its own certificate authority, scripts for update, backup (optionally encrypted) and restore,

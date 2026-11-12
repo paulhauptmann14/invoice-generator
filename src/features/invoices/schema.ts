@@ -138,7 +138,8 @@ export const invoiceSchema = z
   .object({
     // null = manual number; the database checks that the range belongs to the same business.
     numberRangeId: z.uuid().nullable().default(null),
-    number: z.string().trim().min(1, 'Bitte eine Rechnungsnummer eingeben.').max(50, 'Höchstens 50 Zeichen.'),
+    // null = draft: the number is given later from the number range.
+    number: z.string().trim().min(1, 'Bitte eine Rechnungsnummer eingeben.').max(50, 'Höchstens 50 Zeichen.').nullable(),
     customerId: z.uuid().nullable(),
     customerSeq: customerSeqSchema,
     saveAsCustomer: z.boolean(),
@@ -162,6 +163,10 @@ export const invoiceSchema = z
       .max(200, 'Höchstens 200 Positionen.')
       // A unit means nothing without a quantity (and would not be printed).
       .transform((lines) => lines.map((line) => (line.kind === 'item' && line.quantity === null ? { ...line, unit: '' } : line))),
+  })
+  .refine((d) => d.number !== null || d.numberRangeId !== null, {
+    path: ['number'],
+    message: 'Eine Nummer später vergeben geht nur mit einem Nummernkreis (Einstellungen → Nummern & Dateien).',
   })
   .refine((d) => !d.serviceDateTo || d.serviceDateTo >= d.serviceDateFrom, {
     path: ['serviceDateTo'],

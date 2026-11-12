@@ -75,10 +75,17 @@ export default async function EditInvoicePage({ params, searchParams }: { params
           defaultFilenames={defaultFilenames}
           missing={documentSettings.missing}
           recipientMissing={missingRecipientAddressOf(invoice)}
+          draft={invoice.number === null}
           leading={<InvoiceNumber number={invoice.number} size="lg" />}
         />
-        {query.gespeichert && <StatusBanner>Rechnung gespeichert.</StatusBanner>}
-        {query.kopiert && <StatusBanner>Kopie angelegt – mit neuer Nummer und heutigem Datum.</StatusBanner>}
+        {query.gespeichert && <StatusBanner>{invoice.number === null ? 'Entwurf gespeichert.' : 'Rechnung gespeichert.'}</StatusBanner>}
+        {query.kopiert && (
+          <StatusBanner>{invoice.number === null ? 'Kopie angelegt – als Entwurf mit heutigem Datum.' : 'Kopie angelegt – mit neuer Nummer und heutigem Datum.'}</StatusBanner>
+        )}
+        {query.nummeriert && invoice.number !== null && <StatusBanner>Nummer {invoice.number} vergeben, Rechnungsdatum ist heute.</StatusBanner>}
+        {query['nicht-nummeriert'] && invoice.number === null && (
+          <StatusBanner>Keine Nummer vergeben: Der Nummernkreis hat kein gültiges Format. Bitte unter Einstellungen → Nummern & Dateien prüfen.</StatusBanner>
+        )}
         {/* key: a fresh form (and clean "unsaved changes" state) after every save */}
         <InvoiceForm key={`form-${invoice.updated_at}`} id={invoice.id} initialDraft={draftFromInvoice(invoice)} numberContext={numberContext} customers={customers} articles={articles} />
       </InvoiceEditorProvider>

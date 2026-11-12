@@ -9,7 +9,8 @@ import { listLinkClass, pressableRowClass, rowLinkClass } from '@/components/pre
 import { StatusBanner } from '@/components/status-banner'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { LIST_LIMIT, listInvoices } from '@/features/invoices/queries'
+import { AssignNumberButton } from '@/features/invoices/assign-number-button'
+import { countDrafts, LIST_LIMIT, listInvoices } from '@/features/invoices/queries'
 import { requireTenant } from '@/lib/auth/require-tenant'
 import { formatDateDe } from '@/lib/domain/dates'
 import { formatEuro } from '@/lib/domain/money'
@@ -27,7 +28,9 @@ export default async function InvoicesPage(props: Props) {
   const { supabase, tenant } = await requireTenant(betrieb)
   const params = await props.searchParams
   const q = typeof params.q === 'string' ? params.q : ''
-  const invoices = await listInvoices(supabase, tenant.id, { q })
+  const [invoices, drafts] = await Promise.all([listInvoices(supabase, tenant.id, { q }), countDrafts(supabase, tenant.id)])
+  const numbered = typeof params.nummeriert === 'string' ? Number(params.nummeriert) : null
+  const withoutRange = typeof params['ohne-kreis'] === 'string' ? Number(params['ohne-kreis']) : 0
 
   return (
     <>
@@ -41,6 +44,20 @@ export default async function InvoicesPage(props: Props) {
         }
       />
       {params.geloescht && <StatusBanner>Rechnung gelöscht.</StatusBanner>}
+      {numbered !== null && (
+        <StatusBanner>
+          {numbered === 1 ? 'Ein Entwurf hat seine Nummer.' : `${numbered} Entwürfe haben ihre Nummern.`}
+          {withoutRange > 0 && ` ${withoutRange} ohne gültigen Nummernkreis bleiben Entwurf (Einstellungen → Nummern & Dateien).`}
+        </StatusBanner>
+      )}
+      {drafts > 0 && (
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 surface px-4 py-3 text-sm">
+          <span>
+            {drafts === 1 ? 'Ein Entwurf' : `${drafts} Entwürfe`} ohne Rechnungsnummer. Am Monatsende lassen sich alle auf einmal nummerieren.
+          </span>
+          <AssignNumberButton count={drafts} />
+        </div>
+      )}
       <ListToolbar basePath={tenantPath(tenant.id, 'rechnungen')} q={q} archived={false} showViews={false} searchLabel="Rechnungen durchsuchen" />
 
       {invoices.length === 0 ? (
