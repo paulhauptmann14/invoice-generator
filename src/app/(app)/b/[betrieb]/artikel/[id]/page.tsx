@@ -40,6 +40,7 @@ export default async function EditArticlePage({ params }: { params: Promise<{ be
           unit: article.unit,
           unitPriceGross: formatDecimalInput(article.unit_price_gross),
           vatRate: String(Number(article.vat_rate)),
+          withoutQuantity: article.without_quantity ? 'on' : '',
         }}
       />
     </>

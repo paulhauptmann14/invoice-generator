@@ -196,10 +196,26 @@ describe('invoice queries (local Supabase)', () => {
       await supabase.from('invoices').delete().in('id', [first, second])
     }
   })
+  test('an item without quantity round-trips and counts with its price', async () => {
+    const { data: id, error } = await supabase.rpc('save_invoice', {
+      p_tenant_id: SEED.gasthaus,
+      p_id: null as unknown as string,
+      p_invoice: { number: `${tag}-NQ`, customer_id: null, recipient: { name: `Kunde ${tag}` }, issue_date: '2026-10-07', service_date_from: '2026-10-07', payment_days: 14 },
+      p_items: [{ description: 'lt. Tagesabrechnung Metzgerei', quantity: null, unit: '', unit_price_gross: 312.4, vat_rate: 7 }],
+    })
+    if (error) throw error
+    try {
+      expect((await getInvoice(supabase, SEED.gasthaus, id as string))?.invoice_items[0].quantity).toBeNull()
+      const [row] = await listInvoices(supabase, SEED.gasthaus, { q: `${tag.toLowerCase()}-nq` })
+      expect(row.grossCents).toBe(31240)
+    } finally {
+      await supabase.from('invoices').delete().eq('id', id as string)
+    }
+  })
   test('numbers and article choices', async () => {
     expect(await listInvoiceNumbers(supabase, SEED.gasthaus)).toContain(`${tag}-1`)
     const choice = (await listArticleChoices(supabase, SEED.gasthaus)).find((a) => a.id === articleId)
-    expect(choice).toEqual({ id: articleId, name: `Artikel ${tag}`, description: null, unit: 'kg', unitPriceGross: 54.9, vatRate: 7 })
+    expect(choice).toEqual({ id: articleId, name: `Artikel ${tag}`, description: null, unit: 'kg', unitPriceGross: 54.9, vatRate: 7, withoutQuantity: false })
   })
   test('listInvoiceNumbers returns every row when more than one page exists', async () => {
     const all = await listInvoiceNumbers(supabase, SEED.gasthaus)

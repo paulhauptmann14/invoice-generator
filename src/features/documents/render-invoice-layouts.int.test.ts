@@ -230,3 +230,26 @@ describe.each([
     }
   })
 })
+
+describe.each([
+  ['briefpapier', briefpapier],
+  ['klassisch', klassisch],
+  ['kompakt', kompakt],
+  ['modern', modern],
+] as const)('item without quantity in layout "%s"', (_name, theme) => {
+  test('shows description and amount, no quantity, unit or unit price (PDF and Word)', async () => {
+    const plain: InvoiceInput = {
+      ...input(0),
+      items: [{ description: 'lt. Tagesabrechnung Metzgerei', quantity: null, unit: 'Pauschale', unitPriceGross: 312.4, vatRate: 7 }],
+    }
+    const vm = buildInvoiceViewModel(plain, company, theme)
+    const { text } = await pdfPages(await renderInvoicePdf(vm, theme))
+    const { docText } = await docxParts(await renderInvoiceDocx(vm, theme))
+    for (const t of [text, docText]) {
+      expect(t).toContain('lt. Tagesabrechnung Metzgerei')
+      expect(t).toMatch(/312,40\s€/)
+      expect(t).not.toContain('Pauschale')
+      expect(t).not.toContain(' à ')
+    }
+  })
+})

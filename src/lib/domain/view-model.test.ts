@@ -89,6 +89,16 @@ describe('buildInvoiceViewModel', () => {
     expect(vm.items.map((i) => i.position)).toEqual([1, 2, 3])
   })
 
+  test('an item without quantity shows only description and amount', () => {
+    const plain = buildInvoiceViewModel(
+      { ...input, items: [{ description: 'lt. Tagesabrechnung Metzgerei', quantity: null, unit: '', unitPriceGross: 312.4, vatRate: 7 }] },
+      company,
+      defaultTheme,
+    )
+    expect(plain.items[0]).toMatchObject({ quantity: '', unit: '', unitPrice: '', total: `312,40${NBSP}€`, line: 'lt. Tagesabrechnung Metzgerei' })
+    expect(plain.totals.gross).toBe(`312,40${NBSP}€`)
+  })
+
   test('tax groups and totals', () => {
     expect(vm.taxGroups).toEqual([
       { rate: '7 %', net: `55,89${NBSP}€`, vat: `3,91${NBSP}€`, gross: `59,80${NBSP}€` },

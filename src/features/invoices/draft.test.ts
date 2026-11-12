@@ -57,7 +57,7 @@ describe('draftReducer', () => {
     const d = reduce(base(), {
       type: 'addArticle',
       key: 'k2',
-      article: { id: 'a1', name: 'Rinderfilet', description: 'vom Weiderind', unit: 'kg', unitPriceGross: 54.9, vatRate: 7 },
+      article: { id: 'a1', name: 'Rinderfilet', description: 'vom Weiderind', unit: 'kg', unitPriceGross: 54.9, vatRate: 7, withoutQuantity: false },
     })
     expect(d.items).toHaveLength(1)
     expect(d.items[0]).toEqual({
@@ -73,8 +73,13 @@ describe('draftReducer', () => {
       discountValue: '',
     })
   })
+  test('an article without quantity starts with an empty quantity', () => {
+    const article = { id: 'a2', name: 'lt. Tagesabrechnung Metzgerei', description: null, unit: '', unitPriceGross: 0, vatRate: 7, withoutQuantity: true }
+    const d = reduce(base(), { type: 'addArticle', key: 'k2', article })
+    expect(d.items[0].quantity).toBe('')
+  })
   test('adding an article replaces an untouched empty line, but keeps lines with input', () => {
-    const article = { id: 'a1', name: 'Buffet', description: null, unit: 'Pers.', unitPriceGross: 24.9, vatRate: 7 }
+    const article = { id: 'a1', name: 'Buffet', description: null, unit: 'Pers.', unitPriceGross: 24.9, vatRate: 7, withoutQuantity: false }
     const replaced = reduce(base(), { type: 'addArticle', key: 'k2', article })
     expect(replaced.items.map((i) => i.key)).toEqual(['k2'])
     let kept = reduce(base(), { type: 'updateItem', key: base().items[0].key, field: 'description', value: 'Eigene Zeile' })
@@ -150,6 +155,19 @@ describe('draftTotals', () => {
     const { totals, invalidKeys, lineTotals } = draftTotals(d)
     expect(totals.grossCents).toBe(4980)
     expect(lineTotals.get(key)).toBe(4980)
+    expect(invalidKeys).toEqual(['bad'])
+  })
+
+  test('an empty quantity is a plain amount, an unreadable one is invalid', () => {
+    let d = base()
+    const key = d.items[0].key
+    d = reduce(d, { type: 'updateItem', key, field: 'quantity', value: '' })
+    d = reduce(d, { type: 'updateItem', key, field: 'unitPriceGross', value: '312,40' })
+    d = reduce(d, { type: 'addFreeItem', key: 'bad' })
+    d = reduce(d, { type: 'updateItem', key: 'bad', field: 'quantity', value: 'x' })
+    d = reduce(d, { type: 'updateItem', key: 'bad', field: 'unitPriceGross', value: '10' })
+    const { totals, invalidKeys } = draftTotals(d)
+    expect(totals.grossCents).toBe(31240)
     expect(invalidKeys).toEqual(['bad'])
   })
 })

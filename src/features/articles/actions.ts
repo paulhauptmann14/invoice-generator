@@ -35,6 +35,7 @@ export async function saveArticle(
     unit: a.unit,
     unit_price_gross: a.unitPriceGross,
     vat_rate: a.vatRate,
+    without_quantity: a.withoutQuantity,
   }
   let error
   if (id === null) {

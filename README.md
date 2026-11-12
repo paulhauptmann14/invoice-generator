@@ -24,7 +24,8 @@ internet. The repository is called `invoice-generator`; inside the app it is "Re
 ## Features
 
 - **Invoices** with a live PDF preview while writing, positions from the article list or free text, VAT of 19, 7 or 0 %,
-  a service date or period and an optional due date.
+  a service date or period and an optional due date. A position without a quantity (e.g. "lt. Tagesabrechnung") shows
+  only text and amount; articles can be set to start that way.
 - **Export** as PDF (archived with the invoice) or as an editable Word file. Browsers that support it (Chrome, Edge) ask
   where to save the file.
 - **Layouts:** "Briefpapier" (like your own letterhead, default), "Klassisch", "Kompakt" and "Modern", with logo, fonts,

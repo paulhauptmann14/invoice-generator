@@ -139,7 +139,7 @@ export async function listCustomerChoices(supabase: Client, tenantId: string): P
 export async function listArticleChoices(supabase: Client, tenantId: string): Promise<PickerArticle[]> {
   const { data, error } = await supabase
     .from('articles')
-    .select('id, name, description, unit, unit_price_gross, vat_rate')
+    .select('id, name, description, unit, unit_price_gross, vat_rate, without_quantity')
     .eq('tenant_id', tenantId)
     .is('archived_at', null)
     .order('name')
@@ -152,6 +152,7 @@ export async function listArticleChoices(supabase: Client, tenantId: string): Pr
     unit: a.unit,
     unitPriceGross: a.unit_price_gross,
     vatRate: a.vat_rate,
+    withoutQuantity: a.without_quantity,
   }))
 }
 

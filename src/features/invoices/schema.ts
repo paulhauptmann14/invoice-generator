@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { customerSchema } from '@/features/customers/schema'
 import { parseIsoDate } from '@/lib/domain/dates'
 import { parseGermanDecimal } from '@/lib/domain/decimal'
-import { priceSchema, quantitySchema, vatRateSchema } from '@/lib/domain/input-schemas'
+import { optionalQuantitySchema, priceSchema, vatRateSchema } from '@/lib/domain/input-schemas'
 import { calcLineGrossCents, calcLineTotalCents, calcTotals, type Discount, type LineInput } from '@/lib/domain/totals'
 
 // Messages are shown in the invoice form (German UI).
@@ -109,16 +109,20 @@ export const customerSeqCheckSchema = z.object({
   excludeInvoiceId: z.uuid().nullable(),
 })
 
-export const invoiceItemSchema = z.object({
-  description: z.string().trim().min(1, 'Bitte eine Beschreibung eingeben.').max(1000, 'Höchstens 1000 Zeichen.'),
-  quantity: quantitySchema,
-  unit: z.string().trim().max(20, 'Höchstens 20 Zeichen.'),
-  unitPriceGross: priceSchema,
-  vatRate: vatRateSchema,
-  articleId: z.uuid().nullable(),
-  saveAsArticle: z.boolean(),
-  discount: discountSchema.nullable().default(null),
-})
+export const invoiceItemSchema = z
+  .object({
+    description: z.string().trim().min(1, 'Bitte eine Beschreibung eingeben.').max(1000, 'Höchstens 1000 Zeichen.'),
+    // Empty = no quantity: a plain amount, printed without quantity, unit and unit price.
+    quantity: optionalQuantitySchema,
+    unit: z.string().trim().max(20, 'Höchstens 20 Zeichen.'),
+    unitPriceGross: priceSchema,
+    vatRate: vatRateSchema,
+    articleId: z.uuid().nullable(),
+    saveAsArticle: z.boolean(),
+    discount: discountSchema.nullable().default(null),
+  })
+  // A unit means nothing without a quantity (and would not be printed).
+  .transform((item) => (item.quantity === null ? { ...item, unit: '' } : item))
 
 export const invoiceSchema = z
   .object({

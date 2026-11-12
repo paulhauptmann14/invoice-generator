@@ -7,14 +7,14 @@ export type Database = {
           Tables: {
             "articles": {
                   Row: {
-                    "archived_at": string | null,"created_at": string,"created_by": string | null,"description": string | null,"id": string,"name": string,"search_text": string | null,"tenant_id": string,"unit": string,"unit_price_gross": number,"updated_at": string,"vat_rate": number
+                    "archived_at": string | null,"created_at": string,"created_by": string | null,"description": string | null,"id": string,"name": string,"search_text": string | null,"tenant_id": string,"unit": string,"unit_price_gross": number,"updated_at": string,"vat_rate": number,"without_quantity": boolean
                   }
                   ComputedFields: never
                   Insert: {
-                    "archived_at"?: string | null,"created_at"?: string,"created_by"?: string | null,"description"?: string | null,"id"?: string,"name": string,"search_text"?: never,"tenant_id": string,"unit"?: string,"unit_price_gross": number,"updated_at"?: string,"vat_rate": number
+                    "archived_at"?: string | null,"created_at"?: string,"created_by"?: string | null,"description"?: string | null,"id"?: string,"name": string,"search_text"?: never,"tenant_id": string,"unit"?: string,"unit_price_gross": number,"updated_at"?: string,"vat_rate": number,"without_quantity"?: boolean
                   }
                   Update: {
-                    "archived_at"?: string | null,"created_at"?: string,"created_by"?: string | null,"description"?: string | null,"id"?: string,"name"?: string,"search_text"?: never,"tenant_id"?: string,"unit"?: string,"unit_price_gross"?: number,"updated_at"?: string,"vat_rate"?: number
+                    "archived_at"?: string | null,"created_at"?: string,"created_by"?: string | null,"description"?: string | null,"id"?: string,"name"?: string,"search_text"?: never,"tenant_id"?: string,"unit"?: string,"unit_price_gross"?: number,"updated_at"?: string,"vat_rate"?: number,"without_quantity"?: boolean
                   }
                   Relationships: [
                     {
@@ -73,14 +73,14 @@ isOneToOne: false
                   ]
                 },"invoice_items": {
                   Row: {
-                    "article_id": string | null,"description": string,"discount_kind": string | null,"discount_value": number | null,"id": string,"invoice_id": string,"position": number,"quantity": number,"tenant_id": string,"unit": string,"unit_price_gross": number,"vat_rate": number
+                    "article_id": string | null,"description": string,"discount_kind": string | null,"discount_value": number | null,"id": string,"invoice_id": string,"position": number,"quantity": number | null,"tenant_id": string,"unit": string,"unit_price_gross": number,"vat_rate": number
                   }
                   ComputedFields: never
                   Insert: {
-                    "article_id"?: string | null,"description": string,"discount_kind"?: string | null,"discount_value"?: number | null,"id"?: string,"invoice_id": string,"position": number,"quantity": number,"tenant_id": string,"unit"?: string,"unit_price_gross": number,"vat_rate": number
+                    "article_id"?: string | null,"description": string,"discount_kind"?: string | null,"discount_value"?: number | null,"id"?: string,"invoice_id": string,"position": number,"quantity"?: number | null,"tenant_id": string,"unit"?: string,"unit_price_gross": number,"vat_rate": number
                   }
                   Update: {
-                    "article_id"?: string | null,"description"?: string,"discount_kind"?: string | null,"discount_value"?: number | null,"id"?: string,"invoice_id"?: string,"position"?: number,"quantity"?: number,"tenant_id"?: string,"unit"?: string,"unit_price_gross"?: number,"vat_rate"?: number
+                    "article_id"?: string | null,"description"?: string,"discount_kind"?: string | null,"discount_value"?: number | null,"id"?: string,"invoice_id"?: string,"position"?: number,"quantity"?: number | null,"tenant_id"?: string,"unit"?: string,"unit_price_gross"?: number,"vat_rate"?: number
                   }
                   Relationships: [
                     {

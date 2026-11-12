@@ -3,7 +3,7 @@ import { priceSchema, vatRateSchema } from '@/lib/domain/input-schemas'
 
 export { VAT_RATES } from '@/lib/domain/input-schemas'
 
-export const ARTICLE_FIELDS = ['name', 'description', 'unit', 'unitPriceGross', 'vatRate'] as const
+export const ARTICLE_FIELDS = ['name', 'description', 'unit', 'unitPriceGross', 'vatRate', 'withoutQuantity'] as const
 export type ArticleField = (typeof ARTICLE_FIELDS)[number]
 
 // Messages are shown next to form fields (German UI).
@@ -17,6 +17,11 @@ export const articleSchema = z.object({
   unit: z.string().trim().max(20, 'Höchstens 20 Zeichen.'),
   unitPriceGross: priceSchema,
   vatRate: vatRateSchema,
+  // Checkbox: "on" when ticked, absent otherwise.
+  withoutQuantity: z
+    .string()
+    .optional()
+    .transform((v) => v === 'on'),
 })
 
 export type ArticleInput = z.output<typeof articleSchema>

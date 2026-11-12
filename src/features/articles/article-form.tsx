@@ -72,6 +72,22 @@ export function ArticleForm({ id, initial }: { id: string | null; initial: Parti
             )}
           </Field>
         </div>
+        <div className="space-y-1">
+          {/* The whole row is the click target (44px on mobile). */}
+          <label className="flex min-h-11 items-center gap-3 text-sm md:min-h-9">
+            <input
+              type="checkbox"
+              name="withoutQuantity"
+              defaultChecked={v.withoutQuantity === 'on'}
+              aria-describedby="withoutQuantity-hint"
+              className="size-4 accent-[var(--color-tinte)]"
+            />
+            Ohne Menge in die Rechnung übernehmen
+          </label>
+          <p id="withoutQuantity-hint" className="pl-7 text-sm text-muted-foreground">
+            Für Beträge wie „lt. Tagesabrechnung“: Die Rechnung zeigt dann nur Text und Betrag.
+          </p>
+        </div>
       </FormSection>
 
       <div className="flex flex-wrap items-center gap-3 border-t border-border pt-6">

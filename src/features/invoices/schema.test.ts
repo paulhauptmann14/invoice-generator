@@ -25,6 +25,10 @@ describe('invoiceSchema', () => {
     expect(r.recipient).toMatchObject({ contactPerson: null, vatId: null })
     expect(r.introText).toBeNull()
   })
+  test('an empty quantity is a plain amount: quantity null, unit cleared', () => {
+    const r = invoiceSchema.parse({ ...base, items: [{ ...item, quantity: ' ', unit: 'Stk.' }] })
+    expect(r.items[0]).toMatchObject({ quantity: null, unit: '', unitPriceGross: 24.9 })
+  })
   test('collects nested errors by path', () => {
     const r = invoiceSchema.safeParse({
       ...base,

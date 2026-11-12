@@ -1,6 +1,6 @@
 import type { InvoiceRecordWithItems } from '@/features/invoices/draft'
 import { parseIsoDate } from '@/lib/domain/dates'
-import { priceSchema, quantitySchema, vatRateSchema } from '@/lib/domain/input-schemas'
+import { optionalQuantitySchema, priceSchema, vatRateSchema } from '@/lib/domain/input-schemas'
 import { discountSchema, invoiceDiscountIssue, itemDiscountIssue } from '@/features/invoices/schema'
 import { discountFromColumns } from '@/lib/domain/totals'
 import type { InvoiceInput, Recipient } from '@/lib/domain/view-model'
@@ -37,7 +37,7 @@ export function inputFromInvoice(invoice: InvoiceRecordWithItems): InvoiceInput 
       .sort((a, b) => a.position - b.position)
       .map((i) => ({
         description: i.description,
-        quantity: Number(i.quantity),
+        quantity: i.quantity === null ? null : Number(i.quantity),
         unit: i.unit,
         unitPriceGross: Number(i.unit_price_gross),
         vatRate: Number(i.vat_rate),
@@ -69,7 +69,7 @@ export function inputFromPayload(payload: unknown, today: string): InvoiceInput 
   const rawItems = Array.isArray(p.items) ? p.items : []
   const items = rawItems.flatMap((raw) => {
     const i = record(raw)
-    const quantity = quantitySchema.safeParse(str(i.quantity))
+    const quantity = optionalQuantitySchema.safeParse(str(i.quantity))
     const price = priceSchema.safeParse(str(i.unitPriceGross))
     const rate = vatRateSchema.safeParse(str(i.vatRate))
     if (!quantity.success || !price.success || !rate.success) return []

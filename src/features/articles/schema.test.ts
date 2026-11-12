@@ -5,7 +5,7 @@ const base = { name: 'Rinderfilet', description: '', unit: 'kg', unitPriceGross:
 
 describe('articleSchema', () => {
   test('parses German prices and the VAT rate', () => {
-    expect(articleSchema.parse(base)).toEqual({ name: 'Rinderfilet', description: null, unit: 'kg', unitPriceGross: 54.9, vatRate: 7 })
+    expect(articleSchema.parse(base)).toEqual({ name: 'Rinderfilet', description: null, unit: 'kg', unitPriceGross: 54.9, vatRate: 7, withoutQuantity: false })
     expect(articleSchema.parse({ ...base, unitPriceGross: '1.234,50' }).unitPriceGross).toBe(1234.5)
   })
   test('allows negative prices (e.g. deposit refunds)', () => {
@@ -23,6 +23,10 @@ describe('articleSchema', () => {
   test('rejects unknown VAT rates', () => {
     const r = articleSchema.safeParse({ ...base, vatRate: '16' })
     expect(r.error?.issues[0]).toMatchObject({ path: ['vatRate'], message: 'Bitte einen Steuersatz auswählen.' })
+  })
+  test('the checkbox "without quantity" is on only when ticked', () => {
+    expect(articleSchema.parse({ ...base, withoutQuantity: 'on' }).withoutQuantity).toBe(true)
+    expect(articleSchema.parse({ ...base, withoutQuantity: '' }).withoutQuantity).toBe(false)
   })
   test('requires a name', () => {
     const r = articleSchema.safeParse({ ...base, name: '' })

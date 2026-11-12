@@ -17,13 +17,15 @@ describe('inputFromInvoice', () => {
       discount_kind: null,
       discount_value: null,
       invoice_items: [
-        { id: 'b', position: 1, description: 'B', quantity: 1, unit: '', unit_price_gross: 2, vat_rate: 19, article_id: null, discount_kind: null, discount_value: null },
+        { id: 'b', position: 1, description: 'B', quantity: null, unit: '', unit_price_gross: 2, vat_rate: 19, article_id: null, discount_kind: null, discount_value: null },
         { id: 'a', position: 0, description: 'A', quantity: 2, unit: 'kg', unit_price_gross: 1.5, vat_rate: 7, article_id: null, discount_kind: null, discount_value: null },
       ],
     })
     expect(input.recipient).toEqual({ name: 'Müller', contactPerson: 'Max', street: 'Weg 1', postalCode: '1', city: 'Ort', countryCode: 'DE', vatId: 'DE1' })
     expect(input.items.map((i) => i.description)).toEqual(['A', 'B'])
     expect(input.items[0]).toEqual({ description: 'A', quantity: 2, unit: 'kg', unitPriceGross: 1.5, vatRate: 7, discount: null })
+    // A stored item without quantity stays without one.
+    expect(input.items[1].quantity).toBeNull()
     expect(input.discount).toBeNull()
   })
   test('maps the discount columns of items and invoice', () => {
@@ -68,13 +70,17 @@ describe('inputFromPayload (live preview, lenient)', () => {
       { description: 'Zu genau', quantity: '1,2345', unit: '', unitPriceGross: '1,00', vatRate: '7' },
       { description: 'Null', quantity: '0', unit: '', unitPriceGross: '1,00', vatRate: '19' },
       { description: 'Steuer', quantity: '1', unit: '', unitPriceGross: '1,00', vatRate: '16' },
+      { description: 'Pauschal', quantity: '', unit: '', unitPriceGross: '30,00', vatRate: '7' },
     ],
   }
   test('keeps valid parts, drops unreadable lines, fills defaults', () => {
     const input = inputFromPayload(payload, '2026-10-08')
     expect(input).toMatchObject({ number: '2026-0002', issueDate: '2026-10-07', serviceDateFrom: '2026-10-08', paymentDays: null })
     expect(input.recipient).toMatchObject({ name: 'Laufkunde', contactPerson: null, vatId: null })
-    expect(input.items).toEqual([{ description: 'Gut', quantity: 1.5, unit: 'kg', unitPriceGross: 54.9, vatRate: 7, discount: null }])
+    expect(input.items).toEqual([
+      { description: 'Gut', quantity: 1.5, unit: 'kg', unitPriceGross: 54.9, vatRate: 7, discount: null },
+      { description: 'Pauschal', quantity: null, unit: '', unitPriceGross: 30, vatRate: 7, discount: null },
+    ])
     expect(input.discount).toBeNull()
   })
   test('preview: valid item and invoice discounts are used, unusable ones are dropped', () => {

@@ -78,10 +78,7 @@ export function ItemsEditor({
           Beschreibung
           <RequiredMark />
         </span>
-        <span className="text-right">
-          Menge
-          <RequiredMark />
-        </span>
+        <span className="text-right">Menge</span>
         <span>Einheit</span>
         <span className="text-right">
           Einzelpreis
@@ -100,6 +97,8 @@ export function ItemsEditor({
           const update = (f: 'description' | 'quantity' | 'unit' | 'unitPriceGross' | 'vatRate', value: string) =>
             dispatch({ type: 'updateItem', key: item.key, field: f, value })
           const total = lineTotals.get(item.key)
+          // An empty quantity makes the line a plain amount: no unit (and none printed).
+          const withoutQuantity = item.quantity.trim() === ''
           return (
             <li key={item.key} className={`rounded-lg border border-border p-4 @4xl:rounded-none @4xl:border-0 @4xl:p-0 ${GRID}`}>
               {/* Cards need the number to tell positions apart; the desktop rows read as a table, so there it only serves screen readers. */}
@@ -136,17 +135,19 @@ export function ItemsEditor({
                 <div className="space-y-1">
                   <label htmlFor={field('quantity')} className="text-sm font-medium @4xl:sr-only">
                     Menge<span className="sr-only"> Position {n}</span>
-                    <RequiredMark />
                   </label>
                   <Input
                     id={field('quantity')}
-                    aria-required
                     inputMode="decimal"
                     value={item.quantity}
                     onChange={(e) => update('quantity', e.target.value)}
                     aria-invalid={Boolean(err('quantity'))}
+                    aria-describedby={`${field('quantity')}-hint`}
                     className="bg-card text-right tabular-nums"
                   />
+                  <p id={`${field('quantity')}-hint`} className="text-xs text-muted-foreground @4xl:sr-only">
+                    Leer = nur Betrag
+                  </p>
                   {err('quantity') && <FieldError id={`${field('quantity')}-error`}>{err('quantity')}</FieldError>}
                 </div>
                 <div className="space-y-1">
@@ -155,7 +156,8 @@ export function ItemsEditor({
                   </label>
                   <UnitSelect
                     id={field('unit')}
-                    value={item.unit}
+                    value={withoutQuantity ? '' : item.unit}
+                    disabled={withoutQuantity}
                     onChange={(value) => update('unit', value)}
                     customLabelSuffix={`Position ${n}`}
                     customLabelClassName="text-sm font-medium @4xl:sr-only"

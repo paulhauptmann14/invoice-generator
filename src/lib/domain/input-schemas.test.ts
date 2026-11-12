@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { priceSchema, quantitySchema, vatRateSchema } from './input-schemas'
+import { optionalQuantitySchema, priceSchema, quantitySchema, vatRateSchema } from './input-schemas'
 
 const msg = (r: { error?: { issues: { message: string }[] } }) => r.error?.issues[0]?.message
 
@@ -30,5 +30,16 @@ describe('priceSchema / vatRateSchema', () => {
   test('vat rate', () => {
     expect(vatRateSchema.parse('19')).toBe(19)
     expect(msg(vatRateSchema.safeParse('16'))).toBe('Bitte einen Steuersatz auswählen.')
+  })
+})
+
+describe('optionalQuantitySchema', () => {
+  test('empty means no quantity', () => {
+    expect(optionalQuantitySchema.parse('')).toBeNull()
+    expect(optionalQuantitySchema.parse('  ')).toBeNull()
+  })
+  test('anything else follows the quantity rules', () => {
+    expect(optionalQuantitySchema.parse('1,5')).toBe(1.5)
+    expect(optionalQuantitySchema.safeParse('0').error?.issues[0].message).toBe('Die Menge darf nicht 0 sein.')
   })
 })

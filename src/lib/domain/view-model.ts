@@ -17,7 +17,8 @@ export type Recipient = {
 
 export type InvoiceItemInput = {
   description: string
-  quantity: number | string
+  /** null = no quantity: the documents show only the description and the amount. */
+  quantity: number | string | null
   unit: string
   unitPriceGross: number | string
   vatRate: number | string
@@ -172,17 +173,25 @@ function buildRawViewModel(input: InvoiceInput, company: Company, theme: Theme):
     intro: fill(input.introText),
     closing: fill(input.closingText),
     paymentNote: fill(dueIso ? theme.texts.paymentNote : theme.texts.paymentNoteWithoutDueDate),
-    items: input.items.map((item, i) => ({
-      position: i + 1,
-      description: item.description,
-      quantity: formatQuantity(item.quantity),
-      unit: item.unit,
-      unitPrice: formatEuro(toCents(item.unitPriceGross)),
-      vatRate: formatVatRate(item.vatRate),
-      total: formatEuro(totals.lineTotalsCents[i]),
-      discount: item.discount ? `${discountLabel(item.discount)} (${MINUS}${formatEuro(totals.lineDiscountsCents[i])})` : null,
-      line: `${[formatQuantity(item.quantity), item.unit, item.description].filter((part) => part !== '').join(' ')} à ${formatEuro(toCents(item.unitPriceGross))}`,
-    })),
+    items: input.items.map((item, i) => {
+      // Without a quantity the line is a plain amount: no quantity, unit or unit price, only the total.
+      const quantity = item.quantity === null ? null : formatQuantity(item.quantity)
+      const unitPrice = formatEuro(toCents(item.unitPriceGross))
+      return {
+        position: i + 1,
+        description: item.description,
+        quantity: quantity ?? '',
+        unit: quantity === null ? '' : item.unit,
+        unitPrice: quantity === null ? '' : unitPrice,
+        vatRate: formatVatRate(item.vatRate),
+        total: formatEuro(totals.lineTotalsCents[i]),
+        discount: item.discount ? `${discountLabel(item.discount)} (${MINUS}${formatEuro(totals.lineDiscountsCents[i])})` : null,
+        line:
+          quantity === null
+            ? item.description
+            : `${[quantity, item.unit, item.description].filter((part) => part !== '').join(' ')} à ${unitPrice}`,
+      }
+    }),
     taxGroups: totals.taxGroups.map((g) => ({
       rate: formatVatRate(g.rateBp / 100),
       net: formatEuro(g.netCents),

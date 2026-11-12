@@ -9,7 +9,8 @@ export function discountFromColumns(kind: string | null, value: number | string 
 }
 
 export type LineInput = {
-  quantity: number | string
+  /** null = no quantity (a plain amount such as "lt. Tagesabrechnung"): counts as one unit. */
+  quantity: number | string | null
   unitPriceGross: number | string
   vatRate: number | string
   discount?: Discount
@@ -43,7 +44,8 @@ export function calcDiscountCents(baseCents: number, discount: Discount | undefi
 
 /** Line amount before any discount. */
 export function calcLineGrossCents(line: LineInput): number {
-  return divRound(toMilli(line.quantity) * toCents(line.unitPriceGross), 1000)
+  const quantityMilli = line.quantity === null ? 1000 : toMilli(line.quantity)
+  return divRound(quantityMilli * toCents(line.unitPriceGross), 1000)
 }
 
 /** Line amount after the item discount. */

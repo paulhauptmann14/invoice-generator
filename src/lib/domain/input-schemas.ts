@@ -48,6 +48,15 @@ export const quantitySchema = decimalField({
   zero: 'Die Menge darf nicht 0 sein.',
 })
 
+/** Quantity of an invoice item: empty = no quantity (null), a plain amount. */
+export const optionalQuantitySchema = z.string().transform((value, ctx) => {
+  if (value.trim() === '') return null
+  const parsed = quantitySchema.safeParse(value)
+  if (parsed.success) return parsed.data
+  for (const issue of parsed.error.issues) ctx.addIssue({ code: 'custom', message: issue.message })
+  return z.NEVER
+})
+
 export const vatRateSchema = z
   .string()
   .transform(Number)

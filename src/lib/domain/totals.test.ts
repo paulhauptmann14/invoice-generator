@@ -7,6 +7,9 @@ describe('calcLineTotalCents', () => {
     [{ quantity: '1.5', unitPriceGross: '12.99', vatRate: 7 }, 1949], // 19.485 -> 19.49
     [{ quantity: 0.333, unitPriceGross: 10, vatRate: 19 }, 333],
     [{ quantity: -1, unitPriceGross: 5, vatRate: 19 }, -500],
+    // Without a quantity the price is the line amount.
+    [{ quantity: null, unitPriceGross: 312.4, vatRate: 7 }, 31240],
+    [{ quantity: null, unitPriceGross: 100, vatRate: 7, discount: { kind: 'percent' as const, value: 10 } }, 9000],
   ])('%o -> %i', (line, expected) => {
     expect(calcLineTotalCents(line)).toBe(expected)
   })

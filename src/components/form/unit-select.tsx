@@ -19,6 +19,7 @@ export function UnitSelect({
   customLabel = 'Eigene Einheit',
   customLabelSuffix,
   customLabelClassName = 'text-sm font-medium',
+  disabled,
   ...aria
 }: {
   id: string
@@ -30,6 +31,7 @@ export function UnitSelect({
   /** Screen-reader-only addition to the custom label, e.g. the position number. */
   customLabelSuffix?: string
   customLabelClassName?: string
+  disabled?: boolean
   'aria-invalid'?: boolean
   'aria-describedby'?: string
   'aria-required'?: boolean
@@ -75,6 +77,7 @@ export function UnitSelect({
           setCustomMode(next.customMode)
           emit(next.value)
         }}
+        disabled={disabled}
         {...aria}
       >
         <option value="">Ohne Einheit</option>
@@ -98,6 +101,7 @@ export function UnitSelect({
             value={current}
             maxLength={UNIT_MAX_LENGTH}
             onChange={(e) => emit(e.target.value)}
+            disabled={disabled}
             aria-invalid={aria['aria-invalid']}
             aria-describedby={aria['aria-describedby']}
             className="bg-card"

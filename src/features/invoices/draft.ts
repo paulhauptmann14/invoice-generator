@@ -19,6 +19,7 @@ export type DraftRecipient = {
 export type DraftItem = {
   key: string
   description: string
+  /** '' = no quantity (a plain amount). */
   quantity: string
   unit: string
   unitPriceGross: string
@@ -70,6 +71,8 @@ export type PickerArticle = {
   unit: string
   unitPriceGross: number
   vatRate: number
+  /** The article goes into an invoice without a quantity (e.g. "lt. Tagesabrechnung"). */
+  withoutQuantity: boolean
 }
 
 export type NumberRangeChoice = { id: string; name: string; format: string; archived: boolean; isDefault: boolean }
@@ -176,7 +179,7 @@ export type InvoiceRecordWithItems = {
     id: string
     position: number
     description: string
-    quantity: number
+    quantity: number | null
     unit: string
     unit_price_gross: number
     vat_rate: number
@@ -231,7 +234,7 @@ export function draftFromInvoice(invoice: InvoiceRecordWithItems): InvoiceDraft 
       .map((i) => ({
         key: i.id,
         description: i.description,
-        quantity: String(i.quantity).replace('.', ','),
+        quantity: i.quantity === null ? '' : String(i.quantity).replace('.', ','),
         unit: i.unit,
         unitPriceGross: formatDecimalInput(i.unit_price_gross),
         vatRate: String(Number(i.vat_rate)),
@@ -298,7 +301,7 @@ export function createDraftReducer(ctx: NumberContext) {
         const item: DraftItem = {
           key: action.key,
           description: a.description ? `${a.name}\n${a.description}` : a.name,
-          quantity: '1',
+          quantity: a.withoutQuantity ? '' : '1',
           unit: a.unit,
           unitPriceGross: formatDecimalInput(a.unitPriceGross),
           vatRate: String(a.vatRate),
@@ -426,9 +429,10 @@ export function draftTotals(draft: InvoiceDraft): {
   let itemDiscountFailed = false
   for (const item of draft.items) {
     const typed = readDiscount(item.discountKind, item.discountValue)
-    const quantity = parseGermanDecimal(item.quantity)
+    // An empty quantity is a plain amount (counts as one unit); anything else must be readable.
+    const quantity = item.quantity.trim() === '' ? null : parseGermanDecimal(item.quantity)
     const price = parseGermanDecimal(item.unitPriceGross)
-    if (quantity === null || price === null) {
+    if ((quantity === null && item.quantity.trim() !== '') || price === null) {
       if (item.unitPriceGross.trim() !== '') invalidKeys.push(item.key)
       if (typed.message !== null) discountMessages.set(item.key, typed.message)
       continue
