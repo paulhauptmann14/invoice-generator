@@ -764,6 +764,60 @@ test.describe('invoice', () => {
     await archiveArticle(page, article)
   })
 
+  test('"Als Artikel speichern" in the invoice keeps a missing quantity for the new article', async ({ page }) => {
+    const plain = `${PREFIX} Tagesabrechnung ${RUN}`
+    const counted = `${PREFIX} Brot ${RUN}`
+    await signIn(page)
+
+    // Both articles come from the invoice itself, not from the article list.
+    await page.goto(`${BASE}/rechnungen/neu`)
+    await page.getByLabel(/^Name oder Firma/).fill(`${PREFIX} Laufkunde ${RUN}`)
+    await page.getByLabel('Beschreibung Position 1').fill(plain)
+    await page.getByLabel('Menge Position 1').fill('')
+    await page.getByLabel('Einzelpreis brutto Position 1').fill('312,40')
+    await expect(page.getByLabel('Einheit Position 1', { exact: true })).toBeDisabled()
+    await page.getByRole('button', { name: 'Leere Position' }).click()
+    await page.getByLabel('Beschreibung Position 2').fill(counted)
+    await page.getByLabel('Menge Position 2').fill('3')
+    await page.getByLabel('Einheit Position 2', { exact: true }).selectOption('Stk.')
+    await page.getByLabel('Einzelpreis brutto Position 2').fill('2,50')
+    const saveAsArticle = page.getByRole('checkbox', { name: 'Als Artikel speichern' })
+    await saveAsArticle.nth(0).check()
+    await saveAsArticle.nth(1).check()
+    await page.getByRole('button', { name: 'Rechnung speichern' }).click()
+    await page.waitForURL(/\/rechnungen\/[0-9a-f-]{36}\?gespeichert=1/)
+    await expect(page.getByLabel('Menge Position 1')).toHaveValue('')
+    await deleteOpenInvoice(page)
+
+    // The line without quantity became an article without quantity, the other one an ordinary article.
+    for (const [name, withoutQuantity, unit] of [
+      [plain, true, ''],
+      [counted, false, 'Stk.'],
+    ] as const) {
+      await searchList(page, 'artikel', name)
+      await page.getByRole('link', { name }).first().click()
+      await expect(page.getByLabel(/^Einheit/)).toHaveValue(unit)
+      const box = page.getByRole('checkbox', { name: 'Ohne Menge in die Rechnung übernehmen' })
+      await (withoutQuantity ? expect(box).toBeChecked() : expect(box).not.toBeChecked())
+    }
+
+    // In the next invoice the article starts without a quantity again, the other one with 1.
+    await page.goto(`${BASE}/rechnungen/neu`)
+    const picker = page.getByRole('combobox').filter({ hasText: 'Artikel hinzufügen' })
+    await picker.click()
+    await page.getByRole('option', { name: plain }).click()
+    await expect(page.getByLabel('Beschreibung Position 1')).toHaveValue(plain)
+    await expect(page.getByLabel('Menge Position 1')).toHaveValue('')
+    await expect(page.getByLabel('Einheit Position 1', { exact: true })).toBeDisabled()
+    await picker.click()
+    await page.getByRole('option', { name: counted }).click()
+    await expect(page.getByLabel('Menge Position 2')).toHaveValue('1')
+    await expect(page.getByLabel('Einheit Position 2', { exact: true })).toHaveValue('Stk.')
+
+    await archiveArticle(page, plain)
+    await archiveArticle(page, counted)
+  })
+
   test('PDF export asks where to save when the browser supports it', async ({ page }) => {
     const customer = `${PREFIX} Kunde Picker ${RUN}`
     // Stub registered after the default init script (which removes the picker): fake handle collecting the bytes.
