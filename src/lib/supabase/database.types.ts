@@ -73,14 +73,14 @@ isOneToOne: false
                   ]
                 },"invoice_items": {
                   Row: {
-                    "article_id": string | null,"description": string,"discount_kind": string | null,"discount_value": number | null,"id": string,"invoice_id": string,"position": number,"quantity": number | null,"tenant_id": string,"unit": string,"unit_price_gross": number,"vat_rate": number
+                    "article_id": string | null,"description": string,"discount_kind": string | null,"discount_value": number | null,"id": string,"invoice_id": string,"kind": string,"position": number,"quantity": number | null,"tenant_id": string,"unit": string,"unit_price_gross": number | null,"vat_rate": number | null
                   }
                   ComputedFields: never
                   Insert: {
-                    "article_id"?: string | null,"description": string,"discount_kind"?: string | null,"discount_value"?: number | null,"id"?: string,"invoice_id": string,"position": number,"quantity"?: number | null,"tenant_id": string,"unit"?: string,"unit_price_gross": number,"vat_rate": number
+                    "article_id"?: string | null,"description": string,"discount_kind"?: string | null,"discount_value"?: number | null,"id"?: string,"invoice_id": string,"kind"?: string,"position": number,"quantity"?: number | null,"tenant_id": string,"unit"?: string,"unit_price_gross"?: number | null,"vat_rate"?: number | null
                   }
                   Update: {
-                    "article_id"?: string | null,"description"?: string,"discount_kind"?: string | null,"discount_value"?: number | null,"id"?: string,"invoice_id"?: string,"position"?: number,"quantity"?: number | null,"tenant_id"?: string,"unit"?: string,"unit_price_gross"?: number,"vat_rate"?: number
+                    "article_id"?: string | null,"description"?: string,"discount_kind"?: string | null,"discount_value"?: number | null,"id"?: string,"invoice_id"?: string,"kind"?: string,"position"?: number,"quantity"?: number | null,"tenant_id"?: string,"unit"?: string,"unit_price_gross"?: number | null,"vat_rate"?: number | null
                   }
                   Relationships: [
                     {

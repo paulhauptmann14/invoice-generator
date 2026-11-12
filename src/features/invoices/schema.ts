@@ -109,20 +109,30 @@ export const customerSeqCheckSchema = z.object({
   excludeInvoiceId: z.uuid().nullable(),
 })
 
-export const invoiceItemSchema = z
-  .object({
-    description: z.string().trim().min(1, 'Bitte eine Beschreibung eingeben.').max(1000, 'Höchstens 1000 Zeichen.'),
-    // Empty = no quantity: a plain amount, printed without quantity, unit and unit price.
-    quantity: optionalQuantitySchema,
-    unit: z.string().trim().max(20, 'Höchstens 20 Zeichen.'),
-    unitPriceGross: priceSchema,
-    vatRate: vatRateSchema,
-    articleId: z.uuid().nullable(),
-    saveAsArticle: z.boolean(),
-    discount: discountSchema.nullable().default(null),
-  })
-  // A unit means nothing without a quantity (and would not be printed).
-  .transform((item) => (item.quantity === null ? { ...item, unit: '' } : item))
+export const invoiceItemSchema = z.object({
+  kind: z.literal('item'),
+  description: z.string().trim().min(1, 'Bitte eine Beschreibung eingeben.').max(1000, 'Höchstens 1000 Zeichen.'),
+  // Empty = no quantity: a plain amount, printed without quantity, unit and unit price.
+  quantity: optionalQuantitySchema,
+  unit: z.string().trim().max(20, 'Höchstens 20 Zeichen.'),
+  unitPriceGross: priceSchema,
+  vatRate: vatRateSchema,
+  articleId: z.uuid().nullable(),
+  saveAsArticle: z.boolean(),
+  discount: discountSchema.nullable().default(null),
+})
+
+/** A heading between the items (e.g. "KW 41"): text only. */
+export const invoiceHeadingSchema = z.object({
+  kind: z.literal('heading'),
+  description: z.string().trim().min(1, 'Bitte eine Überschrift eingeben oder die Zeile entfernen.').max(200, 'Höchstens 200 Zeichen.'),
+})
+
+// A line without "kind" is an item. Discriminated, so errors keep the path of the field that failed.
+const invoiceLineSchema = z.preprocess(
+  (line) => (line !== null && typeof line === 'object' && !('kind' in line) ? { ...line, kind: 'item' } : line),
+  z.discriminatedUnion('kind', [invoiceItemSchema, invoiceHeadingSchema]),
+)
 
 export const invoiceSchema = z
   .object({
@@ -146,20 +156,34 @@ export const invoiceSchema = z
     introText: optionalText(2000),
     closingText: optionalText(2000),
     discount: discountSchema.nullable().default(null),
-    items: z.array(invoiceItemSchema).min(1, 'Bitte mindestens eine Position hinzufügen.').max(200, 'Höchstens 200 Positionen.'),
+    items: z
+      .array(invoiceLineSchema)
+      .min(1, 'Bitte mindestens eine Position hinzufügen.')
+      .max(200, 'Höchstens 200 Positionen.')
+      // A unit means nothing without a quantity (and would not be printed).
+      .transform((lines) => lines.map((line) => (line.kind === 'item' && line.quantity === null ? { ...line, unit: '' } : line))),
   })
   .refine((d) => !d.serviceDateTo || d.serviceDateTo >= d.serviceDateFrom, {
     path: ['serviceDateTo'],
     message: 'Das Ende darf nicht vor dem Beginn liegen.',
   })
   .superRefine((d, ctx) => {
+    // Headings alone are no invoice.
+    if (!d.items.some((line) => line.kind === 'item')) {
+      ctx.addIssue({ code: 'custom', path: ['items'], message: 'Bitte mindestens eine Position hinzufügen.' })
+      return
+    }
     // Amount limits and the positive-amount rule; all arithmetic lives in the totals module.
-    const lines = d.items.map((i) => ({ quantity: i.quantity, unitPriceGross: i.unitPriceGross, vatRate: i.vatRate, discount: i.discount }))
+    const lines: LineInput[] = []
     let itemDiscountFailed = false
-    lines.forEach((line, index) => {
+    d.items.forEach((item, index) => {
+      if (item.kind !== 'item') return
+      const line = { quantity: item.quantity, unitPriceGross: item.unitPriceGross, vatRate: item.vatRate, discount: item.discount }
+      lines.push(line)
       const message = itemDiscountIssue(line)
       if (message === null) return
       itemDiscountFailed = true
+      // The index into all lines, headings included, so the message shows at the right position.
       ctx.addIssue({ code: 'custom', path: ['items', index, 'discount'], message })
     })
     // The line totals are meaningless while an item discount is rejected: report that one first.

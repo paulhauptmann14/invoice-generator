@@ -29,6 +29,26 @@ describe('invoiceSchema', () => {
     const r = invoiceSchema.parse({ ...base, items: [{ ...item, quantity: ' ', unit: 'Stk.' }] })
     expect(r.items[0]).toMatchObject({ quantity: null, unit: '', unitPriceGross: 24.9 })
   })
+  test('headings are kept in place; text is required, amounts are not', () => {
+    const r = invoiceSchema.parse({ ...base, items: [{ kind: 'heading', description: ' KW 41 ' }, item] })
+    expect(r.items[0]).toEqual({ kind: 'heading', description: 'KW 41' })
+    expect(r.items[1]).toMatchObject({ kind: 'item', quantity: 2 })
+    const empty = invoiceSchema.safeParse({ ...base, items: [{ kind: 'heading', description: '' }, item] })
+    expect(pathErrorsFrom(empty.error!)).toEqual({ 'items.0.description': 'Bitte eine Überschrift eingeben oder die Zeile entfernen.' })
+  })
+  test('headings alone are no invoice', () => {
+    const r = invoiceSchema.safeParse({ ...base, items: [{ kind: 'heading', description: 'KW 41' }] })
+    expect(pathErrorsFrom(r.error!)).toEqual({ items: 'Bitte mindestens eine Position hinzufügen.' })
+  })
+  test('an item error behind a heading keeps its index', () => {
+    const r = invoiceSchema.safeParse({ ...base, items: [{ kind: 'heading', description: 'KW 41' }, { ...item, unitPriceGross: 'x' }] })
+    expect(pathErrorsFrom(r.error!)).toEqual({ 'items.1.unitPriceGross': 'Bitte einen Preis wie 24,90 eingeben.' })
+    const discount = invoiceSchema.safeParse({
+      ...base,
+      items: [{ kind: 'heading', description: 'KW 41' }, { ...item, discount: { kind: 'amount', value: '100' } }],
+    })
+    expect(pathErrorsFrom(discount.error!)).toEqual({ 'items.1.discount': 'Der Rabatt ist höher als der Betrag der Position.' })
+  })
   test('collects nested errors by path', () => {
     const r = invoiceSchema.safeParse({
       ...base,
@@ -111,20 +131,20 @@ describe('invoiceSchema discounts', () => {
   test('no discount (null or missing) passes and parses to null', () => {
     const r = invoiceSchema.parse({ ...base, discount: null, items: [{ ...item, discount: null }] })
     expect(r.discount).toBeNull()
-    expect(r.items[0].discount).toBeNull()
+    expect(r.items.filter((i) => i.kind === 'item')[0].discount).toBeNull()
     const missing = invoiceSchema.parse(base)
     expect(missing.discount).toBeNull()
-    expect(missing.items[0].discount).toBeNull()
+    expect(missing.items.filter((i) => i.kind === 'item')[0].discount).toBeNull()
   })
   test('item percent discount is parsed to a number', () => {
-    expect(invoiceSchema.parse(withItemDiscount({ kind: 'percent', value: '10' })).items[0].discount).toEqual({ kind: 'percent', value: 10 })
-    expect(invoiceSchema.parse(withItemDiscount({ kind: 'percent', value: '12,5' })).items[0].discount).toEqual({ kind: 'percent', value: 12.5 })
-    expect(invoiceSchema.parse(withItemDiscount({ kind: 'percent', value: '100' })).items[0].discount).toEqual({ kind: 'percent', value: 100 })
+    expect(invoiceSchema.parse(withItemDiscount({ kind: 'percent', value: '10' })).items.filter((i) => i.kind === 'item')[0].discount).toEqual({ kind: 'percent', value: 10 })
+    expect(invoiceSchema.parse(withItemDiscount({ kind: 'percent', value: '12,5' })).items.filter((i) => i.kind === 'item')[0].discount).toEqual({ kind: 'percent', value: 12.5 })
+    expect(invoiceSchema.parse(withItemDiscount({ kind: 'percent', value: '100' })).items.filter((i) => i.kind === 'item')[0].discount).toEqual({ kind: 'percent', value: 100 })
   })
   test('item amount discount accepts comma and point', () => {
-    expect(invoiceSchema.parse(withItemDiscount({ kind: 'amount', value: '49,80' })).items[0].discount).toEqual({ kind: 'amount', value: 49.8 })
-    expect(invoiceSchema.parse(withItemDiscount({ kind: 'amount', value: '49.8' })).items[0].discount).toEqual({ kind: 'amount', value: 49.8 })
-    expect(invoiceSchema.parse(withItemDiscount({ kind: 'amount', value: '498' })).items[0].discount).toEqual({ kind: 'amount', value: 498 })
+    expect(invoiceSchema.parse(withItemDiscount({ kind: 'amount', value: '49,80' })).items.filter((i) => i.kind === 'item')[0].discount).toEqual({ kind: 'amount', value: 49.8 })
+    expect(invoiceSchema.parse(withItemDiscount({ kind: 'amount', value: '49.8' })).items.filter((i) => i.kind === 'item')[0].discount).toEqual({ kind: 'amount', value: 49.8 })
+    expect(invoiceSchema.parse(withItemDiscount({ kind: 'amount', value: '498' })).items.filter((i) => i.kind === 'item')[0].discount).toEqual({ kind: 'amount', value: 498 })
   })
   test('percent must be between 0,01 and 100', () => {
     for (const value of ['0', '100,01', '-5', '150']) {

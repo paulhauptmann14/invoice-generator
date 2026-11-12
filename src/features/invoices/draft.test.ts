@@ -62,6 +62,7 @@ describe('draftReducer', () => {
     expect(d.items).toHaveLength(1)
     expect(d.items[0]).toEqual({
       key: 'k2',
+      kind: 'item',
       description: 'Rinderfilet\nvom Weiderind',
       quantity: '1',
       unit: 'kg',
@@ -72,6 +73,26 @@ describe('draftReducer', () => {
       discountKind: null,
       discountValue: '',
     })
+  })
+  test('a heading is added after the items and never replaced by an article', () => {
+    let d = reduce(base(), { type: 'addHeading', key: 'h1' })
+    expect(d.items.map((i) => i.kind)).toEqual(['item', 'heading'])
+    d = reduce(d, { type: 'updateItem', key: 'h1', field: 'description', value: 'KW 41' })
+    const article = { id: 'a1', name: 'Buffet', description: null, unit: 'Pers.', unitPriceGross: 24.9, vatRate: 7, withoutQuantity: false }
+    d = reduce(d, { type: 'addArticle', key: 'k2', article })
+    // The untouched starter line goes, the heading stays.
+    expect(d.items.map((i) => i.key)).toEqual(['h1', 'k2'])
+    expect(toPayload(d).items[0]).toEqual({ kind: 'heading', description: 'KW 41' })
+  })
+  test('headings do not count in the live totals', () => {
+    let d = base()
+    const key = d.items[0].key
+    d = reduce(d, { type: 'updateItem', key, field: 'unitPriceGross', value: '10' })
+    d = reduce(d, { type: 'addHeading', key: 'h1' })
+    d = reduce(d, { type: 'updateItem', key: 'h1', field: 'description', value: 'KW 41' })
+    const { totals, invalidKeys } = draftTotals(d)
+    expect(totals.grossCents).toBe(1000)
+    expect(invalidKeys).toEqual([])
   })
   test('an article without quantity starts with an empty quantity', () => {
     const article = { id: 'a2', name: 'lt. Tagesabrechnung Metzgerei', description: null, unit: '', unitPriceGross: 0, vatRate: 7, withoutQuantity: true }
@@ -425,8 +446,21 @@ describe('draftFromInvoice', () => {
   test('keeps the stored number range', () => {
     expect(draftFromInvoice(stored).numberRangeId).toBe('r-gutscheine')
   })
+  test('stored headings come back as headings', () => {
+    const d = draftFromInvoice({
+      ...stored,
+      invoice_items: [
+        { id: 'h', position: 0, kind: 'heading', description: 'KW 41', quantity: null, unit: '', unit_price_gross: null, vat_rate: null, article_id: null, discount_kind: null, discount_value: null },
+        { id: 'i', position: 1, kind: 'item', description: 'A', quantity: 1, unit: '', unit_price_gross: 10, vat_rate: 7, article_id: null, discount_kind: null, discount_value: null },
+      ],
+    })
+    expect(d.items.map((i) => [i.kind, i.description])).toEqual([
+      ['heading', 'KW 41'],
+      ['item', 'A'],
+    ])
+  })
   test('reads item and invoice discounts back as input text', () => {
-    const item = { id: 'i1', position: 0, description: 'A', quantity: 1, unit: '', unit_price_gross: 10, vat_rate: 7, article_id: null }
+    const item = { id: 'i1', position: 0, kind: 'item', description: 'A', quantity: 1, unit: '', unit_price_gross: 10, vat_rate: 7, article_id: null }
     const d = draftFromInvoice({
       ...stored,
       discount_kind: 'amount',
@@ -441,7 +475,7 @@ describe('draftFromInvoice', () => {
     expect(d.items[1]).toMatchObject({ discountKind: null, discountValue: '' })
   })
   test('percent reads back without trailing zeros, amounts keep two places', () => {
-    const item = { id: 'i1', position: 0, description: 'A', quantity: 1, unit: '', unit_price_gross: 100, vat_rate: 7, article_id: null }
+    const item = { id: 'i1', position: 0, kind: 'item', description: 'A', quantity: 1, unit: '', unit_price_gross: 100, vat_rate: 7, article_id: null }
     const d = draftFromInvoice({
       ...stored,
       discount_kind: 'percent',

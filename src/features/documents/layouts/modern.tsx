@@ -74,6 +74,8 @@ export function ModernInvoice({ vm, theme, fontFamily, logo }: Props) {
     colPos: { width: '7%' },
     colDesc: { flexGrow: 1, flexBasis: 0, paddingRight: 6 },
     itemDiscount: { fontSize: base - 1.5, color: DOCUMENT_COLORS.muted },
+    headingRow: { paddingTop: 8 },
+    headingText: { fontWeight: 700 },
     colQty: { width: '9%', textAlign: 'right' },
     colUnit: { width: '9%', paddingLeft: 8 },
     colPrice: { width: '15%', textAlign: 'right' },
@@ -184,20 +186,28 @@ export function ModernInvoice({ vm, theme, fontFamily, logo }: Props) {
               {t.showVatRate && <Text style={s.colVat}>{L.vatRate}</Text>}
               <Text style={s.colTotal}>{L.total}</Text>
             </View>
-            {vm.items.map((item) => (
-              <View key={item.position} style={s.tr} wrap={false}>
-                {t.showPosition && <Text style={s.colPos}>{item.position}</Text>}
-                <View style={s.colDesc}>
-                  <Text>{item.description}</Text>
-                  {item.discount !== null && <Text style={s.itemDiscount}>{item.discount}</Text>}
+            {vm.items.map((item, i) =>
+              item.kind === 'heading' ? (
+                // Aligned with the descriptions; never the last row of a page.
+                <View key={`h${i}`} style={[s.tr, s.headingRow]} wrap={false} minPresenceAhead={20}>
+                  {t.showPosition && <Text style={s.colPos} />}
+                  <Text style={[s.colDesc, s.headingText]}>{item.text}</Text>
                 </View>
-                <Text style={s.colQty}>{item.quantity}</Text>
-                {t.showUnit && <Text style={s.colUnit}>{item.unit}</Text>}
-                <Text style={s.colPrice}>{item.unitPrice}</Text>
-                {t.showVatRate && <Text style={s.colVat}>{item.vatRate}</Text>}
-                <Text style={s.colTotal}>{item.total}</Text>
-              </View>
-            ))}
+              ) : (
+                <View key={item.position} style={s.tr} wrap={false}>
+                  {t.showPosition && <Text style={s.colPos}>{item.position}</Text>}
+                  <View style={s.colDesc}>
+                    <Text>{item.description}</Text>
+                    {item.discount !== null && <Text style={s.itemDiscount}>{item.discount}</Text>}
+                  </View>
+                  <Text style={s.colQty}>{item.quantity}</Text>
+                  {t.showUnit && <Text style={s.colUnit}>{item.unit}</Text>}
+                  <Text style={s.colPrice}>{item.unitPrice}</Text>
+                  {t.showVatRate && <Text style={s.colVat}>{item.vatRate}</Text>}
+                  <Text style={s.colTotal}>{item.total}</Text>
+                </View>
+              ),
+            )}
           </View>
 
           <View style={s.totals} wrap={false}>

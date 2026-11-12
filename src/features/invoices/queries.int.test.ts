@@ -212,6 +212,29 @@ describe('invoice queries (local Supabase)', () => {
       await supabase.from('invoices').delete().eq('id', id as string)
     }
   })
+  test('headings round-trip in place and do not count in the list total', async () => {
+    const { data: id, error } = await supabase.rpc('save_invoice', {
+      p_tenant_id: SEED.gasthaus,
+      p_id: null as unknown as string,
+      p_invoice: { number: `${tag}-HD`, customer_id: null, recipient: { name: `Kunde ${tag}` }, issue_date: '2026-10-07', service_date_from: '2026-10-07', payment_days: 14 },
+      p_items: [
+        { kind: 'heading', description: 'KW 41' },
+        { kind: 'item', description: 'Mittagessen', quantity: 5, unit: 'Pers.', unit_price_gross: 9.5, vat_rate: 7 },
+      ],
+    })
+    if (error) throw error
+    try {
+      const stored = await getInvoice(supabase, SEED.gasthaus, id as string)
+      expect(stored?.invoice_items.map((i) => [i.kind, i.description, i.unit_price_gross])).toEqual([
+        ['heading', 'KW 41', null],
+        ['item', 'Mittagessen', 9.5],
+      ])
+      const [row] = await listInvoices(supabase, SEED.gasthaus, { q: `${tag.toLowerCase()}-hd` })
+      expect(row.grossCents).toBe(4750)
+    } finally {
+      await supabase.from('invoices').delete().eq('id', id as string)
+    }
+  })
   test('numbers and article choices', async () => {
     expect(await listInvoiceNumbers(supabase, SEED.gasthaus)).toContain(`${tag}-1`)
     const choice = (await listArticleChoices(supabase, SEED.gasthaus)).find((a) => a.id === articleId)

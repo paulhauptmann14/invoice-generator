@@ -3,7 +3,7 @@ import { addDays, formatDateDe } from './dates'
 import { formatEuro, formatQuantity, formatVatRate, toCents } from './money'
 import { fillPlaceholders } from './placeholders'
 import type { Theme } from './theme'
-import { calcTotals, type Discount } from './totals'
+import { calcTotals, type Discount, type Totals } from './totals'
 
 export type Recipient = {
   name: string
@@ -16,6 +16,8 @@ export type Recipient = {
 }
 
 export type InvoiceItemInput = {
+  /** Absent means 'item' (so plain item objects stay valid). */
+  kind?: 'item'
   description: string
   /** null = no quantity: the documents show only the description and the amount. */
   quantity: number | string | null
@@ -24,6 +26,13 @@ export type InvoiceItemInput = {
   vatRate: number | string
   discount?: Discount
 }
+
+/** A heading between the items (e.g. "KW 41"): text only, not numbered, no amounts. */
+export type InvoiceHeadingInput = { kind: 'heading'; description: string }
+
+export type InvoiceLineInput = InvoiceItemInput | InvoiceHeadingInput
+
+export const isItemLine = (line: InvoiceLineInput): line is InvoiceItemInput => line.kind !== 'heading'
 
 export type InvoiceInput = {
   number: string
@@ -35,9 +44,13 @@ export type InvoiceInput = {
   recipient: Recipient
   introText: string | null
   closingText: string | null
-  items: InvoiceItemInput[]
+  /** Items and the headings between them, in print order. */
+  items: InvoiceLineInput[]
   discount?: Discount
 }
+
+/** A printed item (not a heading) of `InvoiceViewModel.items`. */
+export type InvoiceItemRow = Extract<InvoiceViewModel['items'][number], { kind: 'item' }>
 
 /** Fully formatted invoice content. Renderers (PDF, DOCX, form preview) must not calculate anything themselves. */
 export type InvoiceViewModel = {
@@ -53,19 +66,23 @@ export type InvoiceViewModel = {
   intro: string
   closing: string
   paymentNote: string
-  items: {
-    position: number
-    description: string
-    quantity: string
-    unit: string
-    unitPrice: string
-    vatRate: string
-    total: string
-    /** "1 Gutschein à 60,00 €" – one-line form used by the "Briefpapier" layout. */
-    line: string
-    /** "abzüglich 10 % Rabatt (−49,80 €)"; null without an item discount. */
-    discount: string | null
-  }[]
+  items: (
+    | {
+        kind: 'item'
+        position: number
+        description: string
+        quantity: string
+        unit: string
+        unitPrice: string
+        vatRate: string
+        total: string
+        /** "1 Gutschein à 60,00 €" – one-line form used by the "Briefpapier" layout. */
+        line: string
+        /** "abzüglich 10 % Rabatt (−49,80 €)"; null without an item discount. */
+        discount: string | null
+      }
+    | { kind: 'heading'; text: string }
+  )[]
   taxGroups: { rate: string; net: string; vat: string; gross: string }[]
   totals: {
     gross: string
@@ -139,8 +156,36 @@ export function buildInvoiceViewModel(input: InvoiceInput, company: Company, the
   return cleanDeep(buildRawViewModel(input, company, theme))
 }
 
+/** Print rows: headings as they are, items numbered and formatted with their totals (index into the items only). */
+function itemRows(lines: InvoiceLineInput[], totals: Totals): InvoiceViewModel['items'] {
+  let index = -1
+  return lines.map((line) => {
+    if (!isItemLine(line)) return { kind: 'heading', text: line.description }
+    index += 1
+    const i = index
+    // Without a quantity the line is a plain amount: no quantity, unit or unit price, only the total.
+    const quantity = line.quantity === null ? null : formatQuantity(line.quantity)
+    const unitPrice = formatEuro(toCents(line.unitPriceGross))
+    return {
+      kind: 'item',
+      position: i + 1,
+      description: line.description,
+      quantity: quantity ?? '',
+      unit: quantity === null ? '' : line.unit,
+      unitPrice: quantity === null ? '' : unitPrice,
+      vatRate: formatVatRate(line.vatRate),
+      total: formatEuro(totals.lineTotalsCents[i]),
+      discount: line.discount ? `${discountLabel(line.discount)} (${MINUS}${formatEuro(totals.lineDiscountsCents[i])})` : null,
+      line:
+        quantity === null
+          ? line.description
+          : `${[quantity, line.unit, line.description].filter((part) => part !== '').join(' ')} à ${unitPrice}`,
+    }
+  })
+}
+
 function buildRawViewModel(input: InvoiceInput, company: Company, theme: Theme): InvoiceViewModel {
-  const totals = calcTotals(input.items, input.discount)
+  const totals = calcTotals(input.items.filter(isItemLine), input.discount)
   const dueIso = input.paymentDays === null ? null : addDays(input.issueDate, input.paymentDays)
 
   const singleServiceDay = !input.serviceDateTo || input.serviceDateTo === input.serviceDateFrom
@@ -173,25 +218,7 @@ function buildRawViewModel(input: InvoiceInput, company: Company, theme: Theme):
     intro: fill(input.introText),
     closing: fill(input.closingText),
     paymentNote: fill(dueIso ? theme.texts.paymentNote : theme.texts.paymentNoteWithoutDueDate),
-    items: input.items.map((item, i) => {
-      // Without a quantity the line is a plain amount: no quantity, unit or unit price, only the total.
-      const quantity = item.quantity === null ? null : formatQuantity(item.quantity)
-      const unitPrice = formatEuro(toCents(item.unitPriceGross))
-      return {
-        position: i + 1,
-        description: item.description,
-        quantity: quantity ?? '',
-        unit: quantity === null ? '' : item.unit,
-        unitPrice: quantity === null ? '' : unitPrice,
-        vatRate: formatVatRate(item.vatRate),
-        total: formatEuro(totals.lineTotalsCents[i]),
-        discount: item.discount ? `${discountLabel(item.discount)} (${MINUS}${formatEuro(totals.lineDiscountsCents[i])})` : null,
-        line:
-          quantity === null
-            ? item.description
-            : `${[quantity, item.unit, item.description].filter((part) => part !== '').join(' ')} à ${unitPrice}`,
-      }
-    }),
+    items: itemRows(input.items, totals),
     taxGroups: totals.taxGroups.map((g) => ({
       rate: formatVatRate(g.rateBp / 100),
       net: formatEuro(g.netCents),

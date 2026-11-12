@@ -3,7 +3,7 @@ import { extractText, getDocumentProxy } from 'unpdf'
 import { describe, expect, test, vi } from 'vitest'
 import { parseCompany } from '@/lib/domain/company'
 import { themeSchema } from '@/lib/domain/theme'
-import { buildInvoiceViewModel, type InvoiceInput } from '@/lib/domain/view-model'
+import { buildInvoiceViewModel, type InvoiceInput, type InvoiceItemInput } from '@/lib/domain/view-model'
 
 vi.mock('server-only', () => ({}))
 const { renderInvoicePdf } = await import('./render-invoice-pdf')
@@ -208,7 +208,7 @@ describe.each([
   test('amount discounts read "abzüglich Rabatt"', async () => {
     const amount: InvoiceInput = {
       ...discounted(),
-      items: [{ ...discounted().items[0], discount: { kind: 'amount', value: 50 } }, discounted().items[1]],
+      items: [{ ...(discounted().items[0] as InvoiceItemInput), discount: { kind: 'amount', value: 50 } }, discounted().items[1]],
       discount: { kind: 'amount', value: 30 },
     }
     const vm = buildInvoiceViewModel(amount, company, theme)
@@ -250,6 +250,34 @@ describe.each([
       expect(t).toMatch(/312,40\s€/)
       expect(t).not.toContain('Pauschale')
       expect(t).not.toContain(' à ')
+    }
+  })
+})
+
+describe.each([
+  ['briefpapier', briefpapier],
+  ['klassisch', klassisch],
+  ['kompakt', kompakt],
+  ['modern', modern],
+] as const)('headings between items in layout "%s"', (_name, theme) => {
+  test('print in place, before their items, with the same totals (PDF and Word)', async () => {
+    const withHeadings: InvoiceInput = {
+      ...input(0),
+      items: [
+        { kind: 'heading', description: 'KW 41' },
+        { description: 'Mittagessen Montag', quantity: 5, unit: 'Pers.', unitPriceGross: 9.5, vatRate: 7 },
+        { kind: 'heading', description: 'KW 42' },
+        { description: 'Mittagessen Dienstag', quantity: 4, unit: 'Pers.', unitPriceGross: 9.5, vatRate: 7 },
+      ],
+    }
+    const vm = buildInvoiceViewModel(withHeadings, company, theme)
+    const { text } = await pdfPages(await renderInvoicePdf(vm, theme))
+    const { docText } = await docxParts(await renderInvoiceDocx(vm, theme))
+    for (const t of [text, docText]) {
+      const order = ['KW 41', 'Mittagessen Montag', 'KW 42', 'Mittagessen Dienstag'].map((s) => t.indexOf(s))
+      expect(order.every((at) => at >= 0)).toBe(true)
+      expect([...order].sort((a, b) => a - b)).toEqual(order)
+      expect(t).toMatch(/85,50\s€/)
     }
   })
 })

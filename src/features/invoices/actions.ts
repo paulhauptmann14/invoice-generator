@@ -34,17 +34,22 @@ function rpcArgs(s: InvoiceSubmission) {
       discount_kind: s.discount?.kind ?? null,
       discount_value: s.discount?.value ?? null,
     },
-    p_items: s.items.map((i) => ({
-      description: i.description,
-      quantity: i.quantity,
-      unit: i.unit,
-      unit_price_gross: i.unitPriceGross,
-      vat_rate: i.vatRate,
-      article_id: i.articleId,
-      save_as_article: i.saveAsArticle,
-      discount_kind: i.discount?.kind ?? null,
-      discount_value: i.discount?.value ?? null,
-    })),
+    p_items: s.items.map((i) =>
+      i.kind === 'heading'
+        ? { kind: 'heading', description: i.description }
+        : {
+            kind: 'item',
+            description: i.description,
+            quantity: i.quantity,
+            unit: i.unit,
+            unit_price_gross: i.unitPriceGross,
+            vat_rate: i.vatRate,
+            article_id: i.articleId,
+            save_as_article: i.saveAsArticle,
+            discount_kind: i.discount?.kind ?? null,
+            discount_value: i.discount?.value ?? null,
+          },
+    ),
   }
 }
 
@@ -141,6 +146,7 @@ export async function copyInvoice(tenantId: string, id: string): Promise<void> {
         discount_value: source.discount_value,
       },
       p_items: source.invoice_items.map((i) => ({
+        kind: i.kind,
         description: i.description,
         quantity: i.quantity,
         unit: i.unit,

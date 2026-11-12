@@ -10,7 +10,7 @@ import {
   TextRun,
 } from 'docx'
 import type { Theme } from '@/lib/domain/theme'
-import type { InvoiceViewModel } from '@/lib/domain/view-model'
+import type { InvoiceItemRow } from '@/lib/domain/view-model'
 
 // Shared building blocks for the Word layouts (findings from the M8 spike, see roadmap).
 export const PAGE = { widthMm: 210, heightMm: 297 }
@@ -48,9 +48,17 @@ export type Column = {
   label: string
   pct: number
   align: (typeof AlignmentType)[keyof typeof AlignmentType]
-  value: (item: InvoiceViewModel['items'][number]) => string
+  value: (item: InvoiceItemRow) => string
   /** Optional second, smaller line below the value (item discount in the description column). */
-  detail?: (item: InvoiceViewModel['items'][number]) => string | null
+  detail?: (item: InvoiceItemRow) => string | null
+}
+
+/**
+ * Where a heading row puts its text: one cell over every column from the description on (the position column, when
+ * shown, stays empty), so the heading lines up with the descriptions like in the PDF.
+ */
+export function headingSpan(columns: Column[], showPosition: boolean): { lead: Column[]; span: Column[] } {
+  return showPosition ? { lead: columns.slice(0, 1), span: columns.slice(1) } : { lead: [], span: columns }
 }
 
 /** Columns of the items table (Klassisch, Kompakt, Modern) in the same order and widths as the PDF. */

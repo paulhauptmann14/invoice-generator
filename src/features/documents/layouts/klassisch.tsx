@@ -69,6 +69,8 @@ export function KlassischInvoice({ vm, theme, fontFamily, density = 'normal' }: 
     colDesc: { flexGrow: 1, flexBasis: 0, paddingRight: 6 },
     // Floor keeps the discount line legible in the compact layout.
     itemDiscount: { fontSize: Math.max(6.5, rowSize - 1.5), color: DOCUMENT_COLORS.muted },
+    headingRow: { paddingTop: rowPadding + 4 },
+    headingText: { fontWeight: 700 },
     colQty: { width: '9%', textAlign: 'right' },
     colUnit: { width: '9%', paddingLeft: 8 },
     colPrice: { width: '15%', textAlign: 'right' },
@@ -189,20 +191,29 @@ export function KlassischInvoice({ vm, theme, fontFamily, density = 'normal' }: 
               {t.showVatRate && <Text style={s.colVat}>{L.vatRate}</Text>}
               <Text style={s.colTotal}>{L.total}</Text>
             </View>
-            {vm.items.map((item, i) => (
-              <View key={item.position} style={c.zebra && i % 2 === 1 ? [s.tr, s.zebra] : s.tr} wrap={false}>
-                {t.showPosition && <Text style={s.colPos}>{item.position}</Text>}
-                <View style={s.colDesc}>
-                  <Text>{item.description}</Text>
-                  {item.discount !== null && <Text style={s.itemDiscount}>{item.discount}</Text>}
+            {vm.items.map((item, i) =>
+              item.kind === 'heading' ? (
+                // Aligned with the descriptions; never the last row of a page.
+                <View key={`h${i}`} style={[s.tr, s.headingRow]} wrap={false} minPresenceAhead={20}>
+                  {t.showPosition && <Text style={s.colPos} />}
+                  <Text style={[s.colDesc, s.headingText]}>{item.text}</Text>
                 </View>
-                <Text style={s.colQty}>{item.quantity}</Text>
-                {t.showUnit && <Text style={s.colUnit}>{item.unit}</Text>}
-                <Text style={s.colPrice}>{item.unitPrice}</Text>
-                {t.showVatRate && <Text style={s.colVat}>{item.vatRate}</Text>}
-                <Text style={s.colTotal}>{item.total}</Text>
-              </View>
-            ))}
+              ) : (
+                // Stripes count the items only, so a heading does not shift them.
+                <View key={item.position} style={c.zebra && item.position % 2 === 0 ? [s.tr, s.zebra] : s.tr} wrap={false}>
+                  {t.showPosition && <Text style={s.colPos}>{item.position}</Text>}
+                  <View style={s.colDesc}>
+                    <Text>{item.description}</Text>
+                    {item.discount !== null && <Text style={s.itemDiscount}>{item.discount}</Text>}
+                  </View>
+                  <Text style={s.colQty}>{item.quantity}</Text>
+                  {t.showUnit && <Text style={s.colUnit}>{item.unit}</Text>}
+                  <Text style={s.colPrice}>{item.unitPrice}</Text>
+                  {t.showVatRate && <Text style={s.colVat}>{item.vatRate}</Text>}
+                  <Text style={s.colTotal}>{item.total}</Text>
+                </View>
+              ),
+            )}
           </View>
 
           <View style={s.totals} wrap={false}>

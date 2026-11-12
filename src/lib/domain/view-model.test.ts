@@ -1,7 +1,14 @@
 import { describe, expect, test } from 'vitest'
 import { parseCompany } from './company'
 import { defaultTheme, parseTheme } from './theme'
-import { buildInvoiceViewModel, cleanDocumentText, type InvoiceInput } from './view-model'
+import { buildInvoiceViewModel, cleanDocumentText, type InvoiceInput, type InvoiceItemInput, type InvoiceViewModel } from './view-model'
+
+/** The printed row at index i, which must be an item (not a heading). */
+function row(vm: InvoiceViewModel, i: number) {
+  const r = vm.items[i]
+  if (r.kind !== 'item') throw new Error(`row ${i} is a heading`)
+  return r
+}
 
 const NBSP = ' '
 
@@ -76,6 +83,7 @@ describe('buildInvoiceViewModel', () => {
 
   test('formatted line items', () => {
     expect(vm.items[0]).toEqual({
+      kind: 'item',
       position: 1,
       description: 'Buffet pro Person',
       quantity: '2',
@@ -86,7 +94,21 @@ describe('buildInvoiceViewModel', () => {
       line: `2 Pers. Buffet pro Person à 24,90${NBSP}€`,
       discount: null,
     })
-    expect(vm.items.map((i) => i.position)).toEqual([1, 2, 3])
+    expect(vm.items.map((i) => (i.kind === 'item' ? i.position : null))).toEqual([1, 2, 3])
+  })
+
+  test('headings stay in place, are not numbered and do not count towards the totals', () => {
+    const withHeadings = buildInvoiceViewModel(
+      {
+        ...input,
+        items: [{ kind: 'heading', description: 'KW 41' }, input.items[0], { kind: 'heading', description: 'KW 42' }, input.items[1], input.items[2]],
+      },
+      company,
+      defaultTheme,
+    )
+    expect(withHeadings.items.map((i) => (i.kind === 'heading' ? i.text : i.position))).toEqual(['KW 41', 1, 'KW 42', 2, 3])
+    expect(withHeadings.totals).toEqual(vm.totals)
+    expect(withHeadings.taxGroups).toEqual(vm.taxGroups)
   })
 
   test('an item without quantity shows only description and amount', () => {
@@ -162,9 +184,9 @@ describe('discounts', () => {
   const vm = buildInvoiceViewModel(discounted, company, defaultTheme)
 
   test('percent item discount line and discounted line total', () => {
-    expect(vm.items[0].discount).toBe(`abzüglich 10 % Rabatt (${MINUS}49,80${NBSP}€)`)
-    expect(vm.items[0].total).toBe(`448,20${NBSP}€`)
-    expect(vm.items[1].discount).toBeNull()
+    expect(row(vm, 0).discount).toBe(`abzüglich 10 % Rabatt (${MINUS}49,80${NBSP}€)`)
+    expect(row(vm, 0).total).toBe(`448,20${NBSP}€`)
+    expect(row(vm, 1).discount).toBeNull()
   })
 
   test('invoice discount rows', () => {
@@ -190,13 +212,13 @@ describe('discounts', () => {
     const amount = buildInvoiceViewModel(
       {
         ...discounted,
-        items: [{ ...discounted.items[0], discount: { kind: 'amount', value: 50 } }, discounted.items[1]],
+        items: [{ ...(discounted.items[0] as InvoiceItemInput), discount: { kind: 'amount', value: 50 } }, discounted.items[1]],
         discount: { kind: 'amount', value: 30 },
       },
       company,
       defaultTheme,
     )
-    expect(amount.items[0].discount).toBe(`abzüglich Rabatt (${MINUS}50,00${NBSP}€)`)
+    expect(row(amount, 0).discount).toBe(`abzüglich Rabatt (${MINUS}50,00${NBSP}€)`)
     expect(amount.totals.discount).toEqual({ label: 'abzüglich Rabatt', amount: `${MINUS}30,00${NBSP}€` })
     expect(amount.totals.subtotal).toBe(`608,00${NBSP}€`)
   })
@@ -247,13 +269,13 @@ describe('fields for the "Briefpapier" layout', () => {
   })
 
   test('item line reads like the template', () => {
-    expect(vm.items[0].line).toBe(`2 Pers. Buffet pro Person à 24,90${NBSP}€`)
+    expect(row(vm, 0).line).toBe(`2 Pers. Buffet pro Person à 24,90${NBSP}€`)
     const noUnit = buildInvoiceViewModel(
       { ...input, items: [{ description: 'Gutschein', quantity: 1, unit: '', unitPriceGross: 60, vatRate: 0 }] },
       company,
       defaultTheme,
     )
-    expect(noUnit.items[0].line).toBe(`1 Gutschein à 60,00${NBSP}€`)
+    expect(row(noUnit, 0).line).toBe(`1 Gutschein à 60,00${NBSP}€`)
   })
 
   test('bank accounts with labelled rows', () => {
@@ -290,12 +312,12 @@ describe('buildInvoiceViewModel – text cleaning', () => {
     expect(vm.companyName).toBe('Gasthaus')
     expect(vm.recipientLines[0]).toBe('Müller GmbH')
     expect(vm.closing).toBe('Danke!')
-    expect(vm.items[0].unit).toBe('Stk.')
+    expect(row(vm, 0).unit).toBe('Stk.')
   })
 
   test('turns the Word soft line break and CRLF into a newline', () => {
-    expect(vm.items[0].description).toBe('Zeile eins\nZeile zwei')
-    expect(vm.items[0].line).toBe('1 Stk. Zeile eins\nZeile zwei à 10,00 €')
+    expect(row(vm, 0).description).toBe('Zeile eins\nZeile zwei')
+    expect(row(vm, 0).line).toBe('1 Stk. Zeile eins\nZeile zwei à 10,00 €')
     expect(vm.intro).toBe('Hallo Müller GmbH\nZweite Zeile')
   })
 

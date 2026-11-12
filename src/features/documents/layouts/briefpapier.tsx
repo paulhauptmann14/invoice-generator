@@ -67,6 +67,8 @@ export function BriefpapierInvoice({ vm, theme, fontFamily, logo }: Props) {
     rowText: { flexGrow: 1, flexShrink: 1 },
     amount: { width: mm(30), textAlign: 'right' },
     itemDiscount: { paddingLeft: mm(6), fontSize: base - 1.5, color: DOCUMENT_COLORS.muted },
+    heading: { fontWeight: 700, marginTop: mm(4), marginBottom: mm(1) },
+    firstHeading: { marginTop: 0 },
     grandTotal: { flexDirection: 'row', justifyContent: 'space-between', marginTop: mm(8), fontWeight: 700, color: c.primary },
     subtotals: { marginTop: mm(8) },
     grandTotalAfterDiscount: { marginTop: mm(2) },
@@ -108,15 +110,22 @@ export function BriefpapierInvoice({ vm, theme, fontFamily, logo }: Props) {
           {vm.intro !== '' && <Text style={s.paragraph}>{vm.intro}</Text>}
 
           <View style={s.items}>
-            {vm.items.map((item) => (
-              <View key={item.position} wrap={false}>
-                <View style={s.row}>
-                  <Text style={s.rowText}>{item.line}</Text>
-                  <Text style={s.amount}>{item.total}</Text>
+            {vm.items.map((item, i) =>
+              item.kind === 'heading' ? (
+                // Never the last line of a page: it belongs to the items below it.
+                <Text key={`h${i}`} style={i === 0 ? [s.heading, s.firstHeading] : s.heading} minPresenceAhead={mm(10)}>
+                  {item.text}
+                </Text>
+              ) : (
+                <View key={item.position} wrap={false}>
+                  <View style={s.row}>
+                    <Text style={s.rowText}>{item.line}</Text>
+                    <Text style={s.amount}>{item.total}</Text>
+                  </View>
+                  {item.discount !== null && <Text style={s.itemDiscount}>{item.discount}</Text>}
                 </View>
-                {item.discount !== null && <Text style={s.itemDiscount}>{item.discount}</Text>}
-              </View>
-            ))}
+              ),
+            )}
           </View>
 
           <View wrap={false}>

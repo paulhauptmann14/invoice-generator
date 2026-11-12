@@ -1,6 +1,6 @@
 'use client'
 
-import { ArrowDown, ArrowUp, Plus, Trash2, Undo2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, Heading, Plus, Trash2, Undo2 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Combobox } from '@/components/combobox'
 import { FieldError } from '@/components/field-error'
@@ -69,6 +69,8 @@ export function ItemsEditor({
   }
 
   const removedLabel = removed?.item.description.split('\n')[0].trim()
+  // Positions are numbered without the headings between them (like on the invoice).
+  const itemNumbers = new Map(items.filter((i) => i.kind === 'item').map((item, i) => [item.key, i + 1]))
   return (
     <FormSection title="Positionen">
       {errors.items && <FieldError id="inv-items-error">{errors.items}</FieldError>}
@@ -91,9 +93,46 @@ export function ItemsEditor({
 
       <ol className="space-y-4 @4xl:space-y-2">
         {items.map((item, index) => {
-          const n = index + 1
           const err = (field: string) => errors[`items.${index}.${field}`]
           const field = (name: keyof DraftItem) => `inv-items.${index}.${name}`
+          const moveButtons = (label: string) => (
+            <div className="flex justify-end gap-1">
+              <Button type="button" variant="ghost" size="icon" className="size-11 @4xl:size-8" aria-label={`${label} nach oben`} disabled={index === 0} onClick={() => dispatch({ type: 'moveItem', key: item.key, direction: -1 })}>
+                <ArrowUp aria-hidden />
+              </Button>
+              <Button type="button" variant="ghost" size="icon" className="size-11 @4xl:size-8" aria-label={`${label} nach unten`} disabled={index === items.length - 1} onClick={() => dispatch({ type: 'moveItem', key: item.key, direction: 1 })}>
+                <ArrowDown aria-hidden />
+              </Button>
+              <Button type="button" variant="ghost" size="icon" className="size-11 @4xl:size-8" aria-label={`${label} entfernen`} onClick={() => remove(item, index)}>
+                <Trash2 aria-hidden />
+              </Button>
+            </div>
+          )
+          if (item.kind === 'heading') {
+            const label = item.description.trim() ? `Zwischenüberschrift „${item.description.trim()}“` : 'Zwischenüberschrift'
+            return (
+              <li key={item.key} className={`rounded-lg border border-dashed border-border p-4 @4xl:rounded-none @4xl:border-0 @4xl:p-0 @4xl:pt-2 ${GRID}`}>
+                <div className="space-y-1 @4xl:col-span-6">
+                  <label htmlFor={field('description')} className="text-sm font-medium">
+                    Zwischenüberschrift
+                    <RequiredMark />
+                  </label>
+                  <Input
+                    id={field('description')}
+                    aria-required
+                    value={item.description}
+                    placeholder="z. B. KW 41"
+                    onChange={(e) => dispatch({ type: 'updateItem', key: item.key, field: 'description', value: e.target.value })}
+                    aria-invalid={Boolean(err('description'))}
+                    className="bg-card font-semibold"
+                  />
+                  {err('description') && <FieldError id={`${field('description')}-error`}>{err('description')}</FieldError>}
+                </div>
+                <div className="mt-3 @4xl:mt-6">{moveButtons(label)}</div>
+              </li>
+            )
+          }
+          const n = itemNumbers.get(item.key) ?? 0
           const update = (f: 'description' | 'quantity' | 'unit' | 'unitPriceGross' | 'vatRate', value: string) =>
             dispatch({ type: 'updateItem', key: item.key, field: f, value })
           const total = lineTotals.get(item.key)
@@ -200,17 +239,7 @@ export function ItemsEditor({
                 </span>
               </p>
 
-              <div className="mt-3 flex justify-end gap-1 @4xl:mt-0">
-                <Button type="button" variant="ghost" size="icon" className="size-11 @4xl:size-8" aria-label={`Position ${n} nach oben`} disabled={index === 0} onClick={() => dispatch({ type: 'moveItem', key: item.key, direction: -1 })}>
-                  <ArrowUp aria-hidden />
-                </Button>
-                <Button type="button" variant="ghost" size="icon" className="size-11 @4xl:size-8" aria-label={`Position ${n} nach unten`} disabled={index === items.length - 1} onClick={() => dispatch({ type: 'moveItem', key: item.key, direction: 1 })}>
-                  <ArrowDown aria-hidden />
-                </Button>
-                <Button type="button" variant="ghost" size="icon" className="size-11 @4xl:size-8" aria-label={`Position ${n} entfernen`} onClick={() => remove(item, index)}>
-                  <Trash2 aria-hidden />
-                </Button>
-              </div>
+              <div className="mt-3 @4xl:mt-0">{moveButtons(`Position ${n}`)}</div>
 
               {/* Full-width row under the item fields; starts at the description column in the desktop grid. */}
               <div role="group" aria-label={`Rabatt Position ${n}`} className="mt-3 @4xl:col-span-full @4xl:mt-0">
@@ -272,6 +301,18 @@ export function ItemsEditor({
           }}>
           <Plus aria-hidden className="size-4" />
           Leere Position
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          className="gap-2"
+          onClick={() => {
+            dispatch({ type: 'addHeading', key: newKey() })
+            setRemoved(null)
+          }}
+        >
+          <Heading aria-hidden className="size-4" />
+          Zwischenüberschrift
         </Button>
       </div>
     </FormSection>

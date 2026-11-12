@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest'
 import { calcTotals } from './totals'
 import { sampleInvoice } from './sample-invoice'
+import { isItemLine } from './view-model'
 
 describe('sampleInvoice', () => {
   test('uses the given date, number and payment days', () => {
@@ -11,7 +12,7 @@ describe('sampleInvoice', () => {
     expect(sampleInvoice({ today: '2026-10-09', number: 'X', paymentDays: null }).paymentDays).toBeNull()
   })
   test('has items with two VAT rates so the tax block is visible', () => {
-    const items = sampleInvoice({ today: '2026-10-09', number: 'X', paymentDays: null }).items
+    const items = sampleInvoice({ today: '2026-10-09', number: 'X', paymentDays: null }).items.filter(isItemLine)
     expect(new Set(items.map((i) => Number(i.vatRate)))).toEqual(new Set([7, 19]))
     expect(calcTotals(items).grossCents).toBeGreaterThan(0)
   })

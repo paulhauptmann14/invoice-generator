@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/supabase/database.types'
 import { calcTotals, discountFromColumns } from '@/lib/domain/totals'
+import { storedLines } from './stored-items'
 import { type InvoiceRecordWithItems, SMALL_INVOICE_LIMIT_CENTS } from './draft'
 import { getInvoice } from './queries'
 import { recipientAddressMessage } from './recipient-address-message'
@@ -13,15 +14,7 @@ const FIELDS = [
 
 /** Gross total of a saved invoice (after item and invoice discounts). */
 export function invoiceGrossCents(invoice: InvoiceRecordWithItems): number {
-  return calcTotals(
-    invoice.invoice_items.map((i) => ({
-      quantity: i.quantity,
-      unitPriceGross: i.unit_price_gross,
-      vatRate: i.vat_rate,
-      discount: discountFromColumns(i.discount_kind, i.discount_value),
-    })),
-    discountFromColumns(invoice.discount_kind, invoice.discount_value),
-  ).grossCents
+  return calcTotals(storedLines(invoice.invoice_items), discountFromColumns(invoice.discount_kind, invoice.discount_value)).grossCents
 }
 
 /**

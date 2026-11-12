@@ -1,9 +1,10 @@
 import type { InvoiceRecordWithItems } from '@/features/invoices/draft'
+import { storedLineInputs } from '@/features/invoices/stored-items'
 import { parseIsoDate } from '@/lib/domain/dates'
 import { optionalQuantitySchema, priceSchema, vatRateSchema } from '@/lib/domain/input-schemas'
 import { discountSchema, invoiceDiscountIssue, itemDiscountIssue } from '@/features/invoices/schema'
 import { discountFromColumns } from '@/lib/domain/totals'
-import type { InvoiceInput, Recipient } from '@/lib/domain/view-model'
+import { type InvoiceInput, type InvoiceLineInput, isItemLine, type Recipient } from '@/lib/domain/view-model'
 
 const str = (v: unknown) => (typeof v === 'string' ? v : '')
 const orNull = (v: unknown) => (str(v).trim() === '' ? null : str(v).trim())
@@ -33,16 +34,7 @@ export function inputFromInvoice(invoice: InvoiceRecordWithItems): InvoiceInput 
     introText: invoice.intro_text,
     closingText: invoice.closing_text,
     discount: discountFromColumns(invoice.discount_kind, invoice.discount_value),
-    items: [...invoice.invoice_items]
-      .sort((a, b) => a.position - b.position)
-      .map((i) => ({
-        description: i.description,
-        quantity: i.quantity === null ? null : Number(i.quantity),
-        unit: i.unit,
-        unitPriceGross: Number(i.unit_price_gross),
-        vatRate: Number(i.vat_rate),
-        discount: discountFromColumns(i.discount_kind, i.discount_value),
-      })),
+    items: storedLineInputs([...invoice.invoice_items].sort((a, b) => a.position - b.position)),
   }
 }
 
@@ -67,8 +59,10 @@ export function inputFromPayload(payload: unknown, today: string): InvoiceInput 
   // Empty or not (yet) readable = no payment terms, so the preview never shows a made-up due date.
   const days = /^\d{1,3}$/.test(str(p.paymentDays).trim()) ? Math.min(Number(str(p.paymentDays).trim()), 365) : null
   const rawItems = Array.isArray(p.items) ? p.items : []
-  const items = rawItems.flatMap((raw) => {
+  const items = rawItems.flatMap((raw): InvoiceLineInput[] => {
     const i = record(raw)
+    // A heading shows as soon as it has text.
+    if (i.kind === 'heading') return str(i.description).trim() === '' ? [] : [{ kind: 'heading', description: str(i.description).trim() }]
     const quantity = optionalQuantitySchema.safeParse(str(i.quantity))
     const price = priceSchema.safeParse(str(i.unitPriceGross))
     const rate = vatRateSchema.safeParse(str(i.vatRate))
@@ -81,7 +75,9 @@ export function inputFromPayload(payload: unknown, today: string): InvoiceInput 
   })
   const parsedInvoiceDiscount = discountSchema.safeParse(p.discount)
   const discount =
-    parsedInvoiceDiscount.success && invoiceDiscountIssue(items, parsedInvoiceDiscount.data) === null ? parsedInvoiceDiscount.data : null
+    parsedInvoiceDiscount.success && invoiceDiscountIssue(items.filter(isItemLine), parsedInvoiceDiscount.data) === null
+      ? parsedInvoiceDiscount.data
+      : null
   return {
     number: str(p.number).trim(),
     issueDate,

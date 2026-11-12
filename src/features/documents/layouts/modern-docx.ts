@@ -23,7 +23,7 @@ import { DOCUMENT_COLORS, readableTextOn, type Theme } from '@/lib/domain/theme'
 import type { InvoiceViewModel } from '@/lib/domain/view-model'
 import { din5008 } from '../din5008'
 import type { DocumentLogo } from '../logo'
-import { type Column, emu, frame, halfPoints, hex, itemColumns, lineHeight, lines, NO_BORDERS, NONE, PAGE, spacer } from './docx-helpers'
+import { type Column, emu, frame, halfPoints, headingSpan, hex, itemColumns, lineHeight, lines, NO_BORDERS, NONE, PAGE, spacer } from './docx-helpers'
 import { bankDetails } from './density'
 import { modernHead } from './modern-metrics'
 
@@ -42,9 +42,11 @@ export function buildModernDocx(vm: InvoiceViewModel, theme: Theme, fontFamily: 
   const columns = itemColumns(theme)
   const widthOf = (col: Column) => twip((contentWidthMm * col.pct) / 100)
 
-  const cell = (col: Column, text: string, header: boolean, detail?: string | null) =>
+  // span: the cell covers these columns (a heading row, bold and kept with the next row).
+  const cell = (col: Column, text: string, header: boolean, detail?: string | null, span?: Column[]) =>
     new TableCell({
-      width: { size: widthOf(col), type: WidthType.DXA },
+      width: { size: (span ?? [col]).reduce((sum, c) => sum + widthOf(c), 0), type: WidthType.DXA },
+      columnSpan: span?.length,
       margins: { top: 60, bottom: 60, left: 0, right: 80 },
       borders: {
         top: NONE,
@@ -61,8 +63,9 @@ export function buildModernDocx(vm: InvoiceViewModel, theme: Theme, fontFamily: 
       children: [
         new Paragraph({
           alignment: col.align,
+          keepNext: span !== undefined,
           // Item descriptions may span several lines: one run per line with a break (a raw \n in <w:t> shows as a space in Word).
-          children: lines(text.split('\n'), { bold: header, color: header ? hex(c.primary) : undefined }),
+          children: lines(text.split('\n'), { bold: header || span !== undefined, color: header ? hex(c.primary) : undefined }),
         }),
         ...(detail
           ? [
@@ -87,13 +90,16 @@ export function buildModernDocx(vm: InvoiceViewModel, theme: Theme, fontFamily: 
         cantSplit: true,
         children: columns.map((col) => cell(col, col.label, true)),
       }),
-      ...vm.items.map(
-        (item) =>
-          new TableRow({
-            cantSplit: true,
-            children: columns.map((col) => cell(col, col.value(item), false, col.detail?.(item))),
-          }),
-      ),
+      ...vm.items.map((item) => {
+        if (item.kind === 'heading') {
+          const { lead, span } = headingSpan(columns, theme.table.showPosition)
+          return new TableRow({ cantSplit: true, children: [...lead.map((col) => cell(col, '', false)), cell(span[0], item.text, false, null, span)] })
+        }
+        return new TableRow({
+          cantSplit: true,
+          children: columns.map((col) => cell(col, col.value(item), false, col.detail?.(item))),
+        })
+      }),
     ],
   })
 

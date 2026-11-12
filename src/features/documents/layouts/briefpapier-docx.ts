@@ -163,17 +163,29 @@ export function buildBriefpapierDocx(vm: InvoiceViewModel, theme: Theme, fontFam
           ...(vm.recipientVatId ? [new Paragraph({ spacing: { before: twip(1) }, children: [new TextRun(`Ihre USt-IdNr.: ${vm.recipientVatId}`)] })] : []),
           ...(vm.serviceDateNote !== '' ? [new Paragraph({ spacing: { before: twip(1) }, children: [new TextRun(vm.serviceDateNote)] })] : []),
           ...(vm.intro !== '' ? [new Paragraph({ spacing: { before: twip(6) }, children: lines(vm.intro.split('\n')) })] : []),
-          ...vm.items.flatMap((item, i) => [
-            amountRow(item.line, item.total, { at: contentWidthMm, before: i === 0 ? 14 : 0, keepNext: item.discount !== null || undefined }),
-            ...(item.discount !== null
-              ? [
+          ...vm.items.flatMap((item, i) =>
+            item.kind === 'heading'
+              ? // Bold, kept with the items below it (same spacing as the PDF).
+                [
                   new Paragraph({
-                    indent: { left: twip(6) },
-                    children: [new TextRun({ text: item.discount, size: halfPoints(base - 1.5), color: hex(DOCUMENT_COLORS.muted) })],
+                    keepLines: true,
+                    keepNext: true,
+                    spacing: { before: twip(i === 0 ? 14 : 4), after: twip(1) },
+                    children: lines(item.text.split('\n'), { bold: true }),
                   }),
                 ]
-              : []),
-          ]),
+              : [
+                  amountRow(item.line, item.total, { at: contentWidthMm, before: i === 0 ? 14 : 0, keepNext: item.discount !== null || undefined }),
+                  ...(item.discount !== null
+                    ? [
+                        new Paragraph({
+                          indent: { left: twip(6) },
+                          children: [new TextRun({ text: item.discount, size: halfPoints(base - 1.5), color: hex(DOCUMENT_COLORS.muted) })],
+                        }),
+                      ]
+                    : []),
+                ],
+          ),
           ...(vm.totals.subtotal !== null && vm.totals.discount !== null
             ? [
                 amountRow('Zwischensumme', vm.totals.subtotal, { at: contentWidthMm, before: 8 }),

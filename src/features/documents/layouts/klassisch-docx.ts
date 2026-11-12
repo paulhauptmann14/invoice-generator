@@ -21,7 +21,7 @@ import { DOCUMENT_COLORS, type Theme } from '@/lib/domain/theme'
 import type { InvoiceViewModel } from '@/lib/domain/view-model'
 import { din5008 } from '../din5008'
 
-import { type Column, frame, halfPoints, hex, itemColumns, lineHeight, lines, NO_BORDERS, NONE, PAGE } from './docx-helpers'
+import { type Column, frame, halfPoints, headingSpan, hex, itemColumns, lineHeight, lines, NO_BORDERS, NONE, PAGE } from './docx-helpers'
 import { bankDetails, type Density, FOOTER_ROOM_MM, oneLine } from './density'
 
 
@@ -42,9 +42,11 @@ export function buildKlassischDocx(vm: InvoiceViewModel, theme: Theme, fontFamil
   const columns = itemColumns(theme)
   const widthOf = (col: Column) => twip((contentWidthMm * col.pct) / 100)
 
-  const cell = (col: Column, text: string, opts: { header?: boolean; zebra?: boolean; detail?: string | null }) =>
+  // span: the cell covers these columns (a heading row); keepNext keeps its row with the next one.
+  const cell = (col: Column, text: string, opts: { header?: boolean; zebra?: boolean; detail?: string | null; span?: Column[]; keepNext?: boolean }) =>
     new TableCell({
-      width: { size: widthOf(col), type: WidthType.DXA },
+      width: { size: (opts.span ?? [col]).reduce((sum, c) => sum + widthOf(c), 0), type: WidthType.DXA },
+      columnSpan: opts.span?.length,
       margins: compact ? { top: 20, bottom: 20, left: 80, right: 80 } : { top: 60, bottom: 60, left: 80, right: 80 },
       shading: opts.header
         ? compact
@@ -66,9 +68,14 @@ export function buildKlassischDocx(vm: InvoiceViewModel, theme: Theme, fontFamil
       children: [
         new Paragraph({
           alignment: col.align,
+          keepNext: opts.keepNext,
           spacing: compact ? { ...lineHeight(rowSize, 1.25), after: 0 } : undefined,
           // Item descriptions may span several lines: one run per line with a break (a raw \n in <w:t> shows as a space in Word).
-          children: lines(text.split('\n'), { bold: opts.header, size: compact ? halfPoints(rowSize) : undefined, color: opts.header ? hex(c.primary) : undefined }),
+          children: lines(text.split('\n'), {
+            bold: opts.header || opts.span !== undefined,
+            size: compact ? halfPoints(rowSize) : undefined,
+            color: opts.header ? hex(c.primary) : undefined,
+          }),
         }),
         ...(opts.detail
           ? [
@@ -89,10 +96,15 @@ export function buildKlassischDocx(vm: InvoiceViewModel, theme: Theme, fontFamil
     borders: NO_BORDERS,
     rows: [
       new TableRow({ tableHeader: true, cantSplit: true, children: columns.map((col) => cell(col, col.label, { header: true })) }),
-      ...vm.items.map(
-        (item, i) =>
-          new TableRow({ cantSplit: true, children: columns.map((col) => cell(col, col.value(item), { zebra: c.zebra && i % 2 === 1, detail: col.detail?.(item) })) }),
-      ),
+      ...vm.items.map((item) => {
+        if (item.kind === 'heading') {
+          const { lead, span } = headingSpan(columns, theme.table.showPosition)
+          return new TableRow({ cantSplit: true, children: [...lead.map((col) => cell(col, '', {})), cell(span[0], item.text, { span, keepNext: true })] })
+        }
+        // Stripes count the items only, so a heading does not shift them.
+        const zebra = c.zebra && item.position % 2 === 0
+        return new TableRow({ cantSplit: true, children: columns.map((col) => cell(col, col.value(item), { zebra, detail: col.detail?.(item) })) })
+      }),
     ],
   })
 

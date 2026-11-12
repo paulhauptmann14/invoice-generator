@@ -18,6 +18,8 @@ export type DraftRecipient = {
 
 export type DraftItem = {
   key: string
+  /** 'heading': a line of text between the items (e.g. "KW 41"); only `description` counts. */
+  kind: 'item' | 'heading'
   description: string
   /** '' = no quantity (a plain amount). */
   quantity: string
@@ -103,6 +105,7 @@ export type DraftAction =
   | { type: 'setSaveAsCustomer'; value: boolean }
   | { type: 'addArticle'; key: string; article: PickerArticle }
   | { type: 'addFreeItem'; key: string }
+  | { type: 'addHeading'; key: string }
   | { type: 'updateItem'; key: string; field: ItemField; value: string }
   | { type: 'setSaveAsArticle'; key: string; value: boolean }
   /** kind null removes the discount (the value is reset to ''). */
@@ -119,6 +122,7 @@ const emptyRecipient = (): DraftRecipient => ({ name: '', contactPerson: '', str
 
 const freeItem = (key: string): DraftItem => ({
   key,
+  kind: 'item',
   description: '',
   quantity: '1',
   unit: '',
@@ -178,11 +182,13 @@ export type InvoiceRecordWithItems = {
   invoice_items: {
     id: string
     position: number
+    /** 'item' or 'heading' (text only, no amounts). */
+    kind: string
     description: string
     quantity: number | null
     unit: string
-    unit_price_gross: number
-    vat_rate: number
+    unit_price_gross: number | null
+    vat_rate: number | null
     article_id: string | null
     discount_kind: string | null
     discount_value: number | null
@@ -231,22 +237,34 @@ export function draftFromInvoice(invoice: InvoiceRecordWithItems): InvoiceDraft 
     ...discountFields(invoice.discount_kind, invoice.discount_value),
     items: [...invoice.invoice_items]
       .sort((a, b) => a.position - b.position)
-      .map((i) => ({
-        key: i.id,
-        description: i.description,
-        quantity: i.quantity === null ? '' : String(i.quantity).replace('.', ','),
-        unit: i.unit,
-        unitPriceGross: formatDecimalInput(i.unit_price_gross),
-        vatRate: String(Number(i.vat_rate)),
-        articleId: i.article_id,
-        saveAsArticle: false,
-        ...discountFields(i.discount_kind, i.discount_value),
-      })),
+      .map((i) =>
+        i.kind === 'heading'
+          ? { ...freeItem(i.id), kind: 'heading' as const, description: i.description, quantity: '' }
+          : {
+              key: i.id,
+              kind: 'item' as const,
+              description: i.description,
+              quantity: i.quantity === null ? '' : String(i.quantity).replace('.', ','),
+              unit: i.unit,
+              unitPriceGross: i.unit_price_gross === null ? '' : formatDecimalInput(i.unit_price_gross),
+              vatRate: String(Number(i.vat_rate)),
+              articleId: i.article_id,
+              saveAsArticle: false,
+              ...discountFields(i.discount_kind, i.discount_value),
+            },
+      ),
   }
 }
 
+/** The starter line of a new invoice, nothing typed into it yet (a heading always counts as touched). */
 function isUntouched(item: DraftItem): boolean {
-  return item.articleId === null && item.description.trim() === '' && item.unitPriceGross.trim() === '' && item.unit.trim() === ''
+  return (
+    item.kind === 'item' &&
+    item.articleId === null &&
+    item.description.trim() === '' &&
+    item.unitPriceGross.trim() === '' &&
+    item.unit.trim() === ''
+  )
 }
 
 export function createDraftReducer(ctx: NumberContext) {
@@ -300,6 +318,7 @@ export function createDraftReducer(ctx: NumberContext) {
         const a = action.article
         const item: DraftItem = {
           key: action.key,
+          kind: 'item',
           description: a.description ? `${a.name}\n${a.description}` : a.name,
           quantity: a.withoutQuantity ? '' : '1',
           unit: a.unit,
@@ -316,6 +335,8 @@ export function createDraftReducer(ctx: NumberContext) {
       }
       case 'addFreeItem':
         return { ...state, items: [...state.items, freeItem(action.key)] }
+      case 'addHeading':
+        return { ...state, items: [...state.items, { ...freeItem(action.key), kind: 'heading', quantity: '' }] }
       case 'updateItem':
         return {
           ...state,
@@ -378,16 +399,21 @@ export function toPayload(draft: InvoiceDraft) {
     introText: draft.introText,
     closingText: draft.closingText,
     discount: draft.discountKind === null ? null : { kind: draft.discountKind, value: draft.discountValue },
-    items: draft.items.map((i) => ({
-      description: i.description,
-      quantity: i.quantity,
-      unit: i.unit,
-      unitPriceGross: i.unitPriceGross,
-      vatRate: i.vatRate,
-      articleId: i.articleId,
-      saveAsArticle: i.saveAsArticle,
-      discount: i.discountKind === null ? null : { kind: i.discountKind, value: i.discountValue },
-    })),
+    items: draft.items.map((i) =>
+      i.kind === 'heading'
+        ? { kind: 'heading' as const, description: i.description }
+        : {
+            kind: 'item' as const,
+            description: i.description,
+            quantity: i.quantity,
+            unit: i.unit,
+            unitPriceGross: i.unitPriceGross,
+            vatRate: i.vatRate,
+            articleId: i.articleId,
+            saveAsArticle: i.saveAsArticle,
+            discount: i.discountKind === null ? null : { kind: i.discountKind, value: i.discountValue },
+          },
+    ),
   }
 }
 
@@ -428,6 +454,8 @@ export function draftTotals(draft: InvoiceDraft): {
   const discountMessages = new Map<string, string>()
   let itemDiscountFailed = false
   for (const item of draft.items) {
+    // Headings carry no amounts.
+    if (item.kind === 'heading') continue
     const typed = readDiscount(item.discountKind, item.discountValue)
     // An empty quantity is a plain amount (counts as one unit); anything else must be readable.
     const quantity = item.quantity.trim() === '' ? null : parseGermanDecimal(item.quantity)

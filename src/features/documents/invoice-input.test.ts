@@ -1,5 +1,12 @@
 import { describe, expect, test } from 'vitest'
+import { type InvoiceLineInput, isItemLine } from '@/lib/domain/view-model'
 import { inputFromInvoice, inputFromPayload } from './invoice-input'
+
+/** The line as an item (fails the test for a heading). */
+function item(line: InvoiceLineInput) {
+  if (!isItemLine(line)) throw new Error('expected an item')
+  return line
+}
 
 describe('inputFromInvoice', () => {
   test('maps the stored record and sorts items', () => {
@@ -17,19 +24,19 @@ describe('inputFromInvoice', () => {
       discount_kind: null,
       discount_value: null,
       invoice_items: [
-        { id: 'b', position: 1, description: 'B', quantity: null, unit: '', unit_price_gross: 2, vat_rate: 19, article_id: null, discount_kind: null, discount_value: null },
-        { id: 'a', position: 0, description: 'A', quantity: 2, unit: 'kg', unit_price_gross: 1.5, vat_rate: 7, article_id: null, discount_kind: null, discount_value: null },
+        { id: 'b', kind: 'item', position: 1, description: 'B', quantity: null, unit: '', unit_price_gross: 2, vat_rate: 19, article_id: null, discount_kind: null, discount_value: null },
+        { id: 'a', kind: 'item', position: 0, description: 'A', quantity: 2, unit: 'kg', unit_price_gross: 1.5, vat_rate: 7, article_id: null, discount_kind: null, discount_value: null },
       ],
     })
     expect(input.recipient).toEqual({ name: 'Müller', contactPerson: 'Max', street: 'Weg 1', postalCode: '1', city: 'Ort', countryCode: 'DE', vatId: 'DE1' })
     expect(input.items.map((i) => i.description)).toEqual(['A', 'B'])
     expect(input.items[0]).toEqual({ description: 'A', quantity: 2, unit: 'kg', unitPriceGross: 1.5, vatRate: 7, discount: null })
     // A stored item without quantity stays without one.
-    expect(input.items[1].quantity).toBeNull()
+    expect(item(input.items[1]).quantity).toBeNull()
     expect(input.discount).toBeNull()
   })
   test('maps the discount columns of items and invoice', () => {
-    const row = { id: 'a', position: 0, description: 'A', quantity: 20, unit: '', unit_price_gross: 24.9, vat_rate: 7, article_id: null }
+    const row = { id: 'a', kind: 'item', position: 0, description: 'A', quantity: 20, unit: '', unit_price_gross: 24.9, vat_rate: 7, article_id: null }
     const input = inputFromInvoice({
       number: '2026-0001',
       number_range_id: null,
@@ -49,8 +56,8 @@ describe('inputFromInvoice', () => {
       ],
     })
     expect(input.discount).toEqual({ kind: 'amount', value: 30.41 })
-    expect(input.items[0].discount).toEqual({ kind: 'percent', value: 10 })
-    expect(input.items[1].discount).toBeNull()
+    expect(item(input.items[0]).discount).toEqual({ kind: 'percent', value: 10 })
+    expect(item(input.items[1]).discount).toBeNull()
   })
 })
 
@@ -97,7 +104,7 @@ describe('inputFromPayload (live preview, lenient)', () => {
       },
       '2026-10-08',
     )
-    expect(input.items.map((i) => i.discount)).toEqual([{ kind: 'percent', value: 10 }, null, null, null])
+    expect(input.items.map((i) => item(i).discount)).toEqual([{ kind: 'percent', value: 10 }, null, null, null])
     // D is negative, so the invoice discount is dropped as well
     expect(input.discount).toBeNull()
     const ok = inputFromPayload({ ...payload, discount: { kind: 'amount', value: '5,50' }, items: [payload.items[0]] }, '2026-10-08')
